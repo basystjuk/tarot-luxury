@@ -1,0 +1,178 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import AnimatedSection from "@/components/ui/AnimatedSection";
+import GoldDivider from "@/components/ui/GoldDivider";
+
+export const metadata: Metadata = {
+  title: "Про мене — Ellen Soul Таро",
+  description:
+    "Дізнайтесь більше про Олену — сертифікованого таро-консультанта та психолога відносин з 4-річним досвідом.",
+};
+
+const values = [
+  {
+    title: "Безпека та конфіденційність",
+    desc: "Все, що ви розповідаєте під час сесії, залишається між нами. Я створюю простір, де ви можете бути чесними із собою.",
+  },
+  {
+    title: "Психологічна глибина",
+    desc: "Карти — лише мова. За ними завжди стоїть реальна людська ситуація, яку я аналізую через призму сучасної психології.",
+  },
+  {
+    title: "Етика та відповідальність",
+    desc: "Я ніколи не маніпулюю страхами і не створюю залежності. Моя мета — ваша автономія та здатність самостійно приймати рішення.",
+  },
+];
+
+const stats = [
+  { value: "500+", label: "консультацій проведено" },
+  { value: "4", label: "роки практики" },
+  { value: "12", label: "країн, звідки клієнти" },
+  { value: "98%", label: "задоволені сесією" },
+];
+
+export default function AboutPage() {
+  return (
+    <>
+      {/* Hero */}
+      <section className="pt-36 pb-20 bg-[#FDFBF7] relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(196,169,122,0.12),transparent)]" />
+        <div className="relative max-w-4xl mx-auto px-6 text-center">
+          <AnimatedSection>
+            <span className="tag mb-6 inline-block">Таро-консультант · Психолог</span>
+            <h1
+              className="text-[clamp(2.8rem,6vw,5.5rem)] text-[#1C1512] mb-6 leading-[1.06]"
+              style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
+            >
+              Привіт, я <em className="gradient-text not-italic">Ellen Soul</em>
+            </h1>
+            <p className="text-xl text-[#7A6A58] max-w-2xl mx-auto leading-relaxed">
+              Допомагаю жінкам знайти ясність у стосунках, прийняти складні рішення та почути себе — через мову карт і психологію.
+            </p>
+          </AnimatedSection>
+        </div>
+      </section>
+
+      <GoldDivider />
+
+      {/* My Story */}
+      <section className="section-padding bg-[#FDFBF7]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Visual */}
+            <AnimatedSection direction="right">
+              <div className="relative flex justify-center">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-[360px] h-[360px] rounded-full border border-[rgba(196,169,122,0.15)]" />
+                </div>
+                <div className="relative w-[300px] h-[380px] rounded-[50%] bg-gradient-to-b from-[#E8DCC5] via-[#D4B88A] to-[#C4A97A] shadow-[0_20px_80px_rgba(196,169,122,0.25)]">
+                  <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-transparent to-[rgba(28,21,18,0.15)]" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span
+                      className="text-8xl text-white/50"
+                      style={{ fontFamily: "var(--font-cormorant)", fontWeight: 300 }}
+                    >
+                      О
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stats badge */}
+                <div className="absolute top-8 -left-4 card-luxury !p-5 !rounded-2xl text-center">
+                  <p
+                    className="text-3xl text-[#B8883A] mb-1"
+                    style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
+                  >
+                    500+
+                  </p>
+                  <p className="text-xs text-[#7A6A58] tracking-wide">консультацій</p>
+                </div>
+              </div>
+            </AnimatedSection>
+
+            {/* Text */}
+            <AnimatedSection direction="left" delay={0.15}>
+              <span className="tag mb-6 inline-block">Моя історія</span>
+              <h2
+                className="text-[clamp(1.8rem,3vw,2.8rem)] mb-6 text-[#1C1512]"
+                style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
+              >
+                Від запитань без відповіді — до практики, яка змінює життя
+              </h2>
+              <p className="text-[#7A6A58] leading-relaxed mb-5">
+                Мій шлях до таро почався не з містики, а з потреби розібратись у власних стосунках. У найскладніший момент свого життя я знайшла в картах те, чого не дали жодні книги — можливість побачити ситуацію без осуду та страху.
+              </p>
+              <p className="text-[#7A6A58] leading-relaxed mb-8">
+                Сьогодні я поєдную традиційну символіку таро з доказовими підходами психології: КПТ, нарративна практика, системна сімейна терапія. Це дозволяє не просто «читати карти», а справді допомагати людям розуміти себе та свої відносини глибше.
+              </p>
+              <blockquote
+                className="border-l-2 border-[#C4A97A] pl-6 text-2xl text-[#5C4530] mb-8"
+                style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic" }}
+              >
+                "Карти — це дзеркало, яке не бреше."
+              </blockquote>
+              <Link href="/contacts" className="btn-primary">
+                Записатись на сесію
+                <ArrowRight size={16} />
+              </Link>
+            </AnimatedSection>
+          </div>
+        </div>
+      </section>
+
+      <GoldDivider />
+
+      {/* Values */}
+      <section className="section-padding bg-[#F2EBD9]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+          <AnimatedSection className="text-center mb-14">
+            <span className="tag mb-4 inline-block">Моя філософія</span>
+            <h2
+              className="text-[clamp(2rem,4vw,3.5rem)] text-[#1C1512]"
+              style={{ fontFamily: "var(--font-cormorant)" }}
+            >
+              Цінності моєї практики
+            </h2>
+          </AnimatedSection>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {values.map((val, i) => (
+              <AnimatedSection key={i} delay={i * 0.12}>
+                <div className="card-luxury h-full">
+                  <div className="w-10 h-px bg-[#C4A97A] mb-6" />
+                  <h3
+                    className="text-2xl text-[#1C1512] mb-4"
+                    style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
+                  >
+                    {val.title}
+                  </h3>
+                  <p className="text-[#7A6A58] text-sm leading-relaxed">{val.desc}</p>
+                </div>
+              </AnimatedSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="section-padding bg-[#FDFBF7]">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+            {stats.map((stat, i) => (
+              <AnimatedSection key={i} delay={i * 0.1}>
+                <p
+                  className="text-5xl text-[#B8883A] mb-2"
+                  style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
+                >
+                  {stat.value}
+                </p>
+                <p className="text-sm text-[#7A6A58] tracking-wide">{stat.label}</p>
+              </AnimatedSection>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}

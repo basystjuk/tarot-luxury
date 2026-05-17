@@ -1,7 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "tarot-olena.com",
+      },
+    ],
+  },
+  // Enable strict mode for production safety
+  reactStrictMode: true,
 };
 
 export default nextConfig;
