@@ -1,8 +1,11 @@
+'use client';
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Clock, Check, ArrowRight } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
+import { useLanguage } from '@/hooks/useLanguage';
 
 export const metadata: Metadata = {
   title: "Послуги — Ellen Soul Таро",
@@ -96,6 +99,8 @@ const faqs = [
 ];
 
 export default function ServicesPage() {
+  const { t } = useLanguage();
+
   return (
     <>
       {/* Hero */}
@@ -175,7 +180,7 @@ export default function ServicesPage() {
                       <div className="h-px bg-[rgba(196,169,122,0.3)] my-6" />
                     </div>
                     <Link href="/contacts" className="btn-primary text-center">
-                      Записатись
+                      {t('services.book')}
                       <ArrowRight size={16} />
                     </Link>
                   </div>

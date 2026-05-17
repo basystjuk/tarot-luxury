@@ -7,6 +7,7 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import Testimonials from "@/components/sections/Testimonials";
 import * as Accordion from "@radix-ui/react-accordion";
+import { useLanguage } from '@/hooks/useLanguage';
 
 const services = [
   {
@@ -55,6 +56,8 @@ const faqs = [
 ];
 
 export default function HomePage() {
+  const { t } = useLanguage();
+
   return (
     <>
       {/* ── Hero ──────────────────────────────────────────────────────── */}
@@ -132,11 +135,11 @@ export default function HomePage() {
             className="flex flex-wrap gap-4 justify-center mb-16"
           >
             <Link href="/contacts" className="btn-primary">
-              Записатись на консультацію
+              {t('home.hero.cta.primary')}
               <ArrowRight size={16} />
             </Link>
             <Link href="/about" className="btn-outline">
-              Дізнатись більше
+              {t('home.hero.cta.secondary')}
             </Link>
           </motion.div>
 
@@ -245,7 +248,7 @@ export default function HomePage() {
                 Чотири роки практики, сотні консультацій і постійне навчання — я поєдную традиційну роботу з таро та сучасні психологічні підходи, щоб дати вам не лише відповідь, але й розуміння.
               </p>
               <Link href="/about" className="btn-outline">
-                Дізнатись більше про мене
+                {t('home.hero.cta.secondary')} про мене
                 <ArrowRight size={16} />
               </Link>
             </AnimatedSection>

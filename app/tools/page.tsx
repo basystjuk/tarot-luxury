@@ -1,8 +1,11 @@
+'use client';
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
+import { useLanguage } from '@/hooks/useLanguage';
 
 export const metadata: Metadata = {
   title: "Інструменти — Ellen Soul Таро",
@@ -40,7 +43,7 @@ const tools = [
   },
   {
     href: "/tools/daily-card",
-    title: "Карта дня",
+    title: "{t('tools.card_of_day.title')}",
     subtitle: "Таро",
     description:
       "Щоденна карта Старшого Аркану — ваш орієнтир та медитація на сьогодні. Оновлюється щодня.",
@@ -59,6 +62,8 @@ const tools = [
 ];
 
 export default function ToolsPage() {
+  const { t } = useLanguage();
+
   return (
     <>
       {/* Hero */}

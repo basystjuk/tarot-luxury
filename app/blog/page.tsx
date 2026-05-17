@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
+import { useLanguage } from '@/hooks/useLanguage';
 
 const posts = [
   {
@@ -29,7 +30,7 @@ const posts = [
     slug: "chy-vartyi-vin-vashykh-slez",
     title: "Як зрозуміти, чи вартий він ваших сліз",
     excerpt:
-      "Психологія та таро разом дають дуже чітку відповідь на це питання. Не те, яке ми хочемо почути — а те, яке нам потрібно.",
+      "{t('blog.categories.psychology')} та таро разом дають дуже чітку відповідь на це питання. Не те, яке ми хочемо почути — а те, яке нам потрібно.",
     category: "Відносини",
     readTime: "8 хв",
     date: "15 квітня 2025",
@@ -57,19 +58,21 @@ const posts = [
     title: "Коли відпустити: коли карти кажуть «досить»",
     excerpt:
       "Є комбінації карт, які не можна ігнорувати. Якщо вони з'являються знову і знову — це не випадковість. Це відповідь.",
-    category: "Психологія",
+    category: "{t('blog.categories.psychology')}",
     readTime: "9 хв",
     date: "10 березня 2025",
   },
 ];
 
-const categories = ["Всі", "Таро", "Відносини", "Психологія", "Астрологія"];
+const categories = ["{t('blog.categories.all')}", "Таро", "Відносини", "{t('blog.categories.psychology')}", "Астрологія"];
 
 export default function BlogPage() {
-  const [activeCategory, setActiveCategory] = useState("Всі");
+  const { t } = useLanguage();
+
+  const [activeCategory, setActiveCategory] = useState("{t('blog.categories.all')}");
 
   const filtered =
-    activeCategory === "Всі"
+    activeCategory === "{t('blog.categories.all')}"
       ? posts
       : posts.filter((p) => p.category === activeCategory);
 

@@ -5,15 +5,18 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from '@/hooks/useLanguage';
 
-const navLinks = [
-  { href: "/", label: "Головна" },
-  { href: "/about", label: "Про мене" },
-  { href: "/services", label: "Послуги" },
-  { href: "/blog", label: "Блог" },
-  { href: "/tools", label: "Інструменти" },
-  { href: "/contacts", label: "Контакти" },
-];
+const { t, language, setLanguage } = useLanguage();
+
+  const navLinks = [
+    { href: "/", label: t('nav.home') },
+    { href: "/about", label: t('nav.about') },
+    { href: "/services", label: t('nav.services') },
+    { href: "/blog", label: t('nav.blog') },
+    { href: "/tools", label: t('nav.tools') },
+    { href: "/contacts", label: t('nav.contacts') },
+  ];
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
@@ -66,7 +69,7 @@ export default function Header() {
               className="text-[10px] tracking-[0.18em] uppercase text-[#7A6A58] mt-0.5"
               style={{ fontFamily: "var(--font-jost, 'Jost')", fontWeight: 400 }}
             >
-              таро · психологія
+              {t('header.logo.subtitle')}
             </span>
           </Link>
 
@@ -89,9 +92,7 @@ export default function Header() {
             <Link
               href="/contacts"
               className="hidden sm:inline-flex btn-primary text-sm px-6 py-3"
-            >
-              Записатись
-            </Link>
+            >{t('header.cta')}</Link>
             <button
               onClick={() => setMenuOpen(true)}
               className="lg:hidden p-2 text-[#1C1512] hover:text-[#B8883A] transition-colors"
@@ -150,7 +151,34 @@ export default function Header() {
                     </Link>
                   </motion.div>
                 ))}
-              </nav>
+              
+        {/* Language Switcher */}
+        <div className="flex items-center gap-0 ml-4 text-xs tracking-widest font-light select-none">
+          <button
+            onClick={() => setLanguage('uk')}
+            className={`px-1 py-0.5 transition-colors duration-200 ${
+              language === 'uk'
+                ? 'text-[#C9A96E] font-semibold'
+                : 'text-white/50 hover:text-white/80'
+            }`}
+            aria-label="Ukrainian"
+          >
+            УКР
+          </button>
+          <span className="text-white/30">|</span>
+          <button
+            onClick={() => setLanguage('ru')}
+            className={`px-1 py-0.5 transition-colors duration-200 ${
+              language === 'ru'
+                ? 'text-[#C9A96E] font-semibold'
+                : 'text-white/50 hover:text-white/80'
+            }`}
+            aria-label="Russian"
+          >
+            РУС
+          </button>
+        </div>
+      </nav>
 
               <motion.div
                 initial={{ opacity: 0, y: 16 }}

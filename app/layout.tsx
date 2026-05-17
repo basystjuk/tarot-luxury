@@ -3,6 +3,7 @@ import { Cormorant_Garamond, Jost } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { LanguageProvider } from '@/contexts/LanguageContext';
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin", "cyrillic"],
@@ -75,7 +76,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#FDFBF7] text-[#1C1512]">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1"><LanguageProvider>{children}</LanguageProvider></main>
         <Footer />
       </body>
     </html>

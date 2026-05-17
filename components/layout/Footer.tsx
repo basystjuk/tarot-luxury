@@ -1,11 +1,14 @@
+'use client';
+
 import Link from "next/link";
+import { useLanguage } from '@/hooks/useLanguage';
 
 const pageLinks = [
-  { href: "/", label: "Головна" },
-  { href: "/about", label: "Про мене" },
-  { href: "/blog", label: "Блог" },
+  { href: "/", label: "{t('nav.home')}" },
+  { href: "/about", label: "{t('nav.about')}" },
+  { href: "/blog", label: "{t('nav.blog')}" },
   { href: "/faq", label: "Питання та відповіді" },
-  { href: "/contacts", label: "Контакти" },
+  { href: "/contacts", label: "{t('nav.contacts')}" },
 ];
 
 const serviceLinks = [
@@ -42,6 +45,8 @@ function TelegramIcon() {
 }
 
 export default function Footer() {
+  const { t } = useLanguage();
+
   return (
     <footer className="bg-[#1C1512] text-white/70">
       <div className="h-px bg-gradient-to-r from-transparent via-[#C4A97A] to-transparent" />
@@ -119,7 +124,7 @@ export default function Footer() {
               className="text-xs tracking-[0.15em] uppercase text-[#C4A97A] mb-5"
               style={{ fontFamily: "var(--font-jost, 'Jost')", fontWeight: 500 }}
             >
-              Послуги
+              {t('footer.services.title')}
             </h4>
             <ul className="space-y-3">
               {serviceLinks.map((link) => (
@@ -141,7 +146,7 @@ export default function Footer() {
               className="text-xs tracking-[0.15em] uppercase text-[#C4A97A] mb-5"
               style={{ fontFamily: "var(--font-jost, 'Jost')", fontWeight: 500 }}
             >
-              Інструменти
+              {t('nav.tools')}
             </h4>
             <ul className="space-y-3">
               {toolLinks.map((link) => (

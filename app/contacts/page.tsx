@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Send, CheckCircle } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
+import { useLanguage } from '@/hooks/useLanguage';
 
 function InstagramIcon() {
   return (
@@ -32,6 +33,8 @@ const TOPICS = [
 ];
 
 export default function ContactsPage() {
+  const { t } = useLanguage();
+
   const [form, setForm] = useState({
     name: "",
     contact: "",
@@ -102,7 +105,7 @@ export default function ContactsPage() {
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">Ваше ім'я *</label>
+                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">{t('contacts.form.name')} *</label>
                       <input
                         type="text"
                         required

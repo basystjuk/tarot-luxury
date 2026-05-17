@@ -1,8 +1,11 @@
+'use client';
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
+import { useLanguage } from '@/hooks/useLanguage';
 
 export const metadata: Metadata = {
   title: "Про мене — Ellen Soul Таро",
@@ -33,6 +36,8 @@ const stats = [
 ];
 
 export default function AboutPage() {
+  const { t } = useLanguage();
+
   return (
     <>
       {/* Hero */}
@@ -113,7 +118,7 @@ export default function AboutPage() {
                 "Карти — це дзеркало, яке не бреше."
               </blockquote>
               <Link href="/contacts" className="btn-primary">
-                Записатись на сесію
+                {t('header.cta')} на сесію
                 <ArrowRight size={16} />
               </Link>
             </AnimatedSection>
