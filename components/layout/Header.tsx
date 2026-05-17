@@ -55,7 +55,7 @@ export default function Header() {
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex flex-col leading-none group">
+          <Link href="/" className="flex flex-col items-center leading-none group">
             <span
               className="text-2xl tracking-wide text-[#1C1512] transition-colors group-hover:text-[#B8883A]"
               style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 400 }}
