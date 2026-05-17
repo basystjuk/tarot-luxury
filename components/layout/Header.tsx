@@ -97,7 +97,7 @@ export default function Header() {
                     ? 'text-[#B8883A] font-semibold'
                     : 'text-[#7A6A58] hover:text-[#1C1512]'
                 }`}
-              >УКР</button>
+              >ua</button>
               <span className="text-[#C4A97A]/50">|</span>
               <button
                 onClick={() => setLanguage('ru')}
@@ -106,7 +106,7 @@ export default function Header() {
                     ? 'text-[#B8883A] font-semibold'
                     : 'text-[#7A6A58] hover:text-[#1C1512]'
                 }`}
-              >РУС</button>
+              >ru</button>
             </div>
             <Link
               href="/contacts"

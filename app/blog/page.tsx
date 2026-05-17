@@ -7,72 +7,120 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
-const posts = [
-  {
-    slug: "znaky-karti-vidnosyny",
-    title: "Що карти кажуть про ваші стосунки: 5 знаків",
-    excerpt:
-      "Таро може розкрити те, про що партнер мовчить, а ви боїтесь запитати. Ось п'ять аркану, які точно вказують на стан ваших відносин.",
-    category: "Таро",
-    readTime: "7 хв",
-    date: "12 травня 2025",
-  },
-  {
-    slug: "taro-zakohanykh-arkan",
-    title: "Таро Закоханих — глибокий розбір аркану",
-    excerpt:
-      "VI аркан — один із найбільш неправильно розтлумачених у колоді. Це не лише про романтику. Читайте, що насправді означають Закохані.",
-    category: "Таро",
-    readTime: "10 хв",
-    date: "28 квітня 2025",
-  },
-  {
-    slug: "chy-vartyi-vin-vashykh-slez",
-    title: "Як зрозуміти, чи вартий він ваших сліз",
-    excerpt:
-      "{t('blog.categories.psychology')} та таро разом дають дуже чітку відповідь на це питання. Не те, яке ми хочемо почути — а те, яке нам потрібно.",
-    category: "Відносини",
-    readTime: "8 хв",
-    date: "15 квітня 2025",
-  },
-  {
-    slug: "misyats-emotsiyi-astrolohiya",
-    title: "Місяць і емоції: астрологічний погляд",
-    excerpt:
-      "Чому у певні дні ми плачемо без причини, а в інші — відчуваємо неймовірний підйом? Місяць відповідає за наш емоційний фон більше, ніж ми думаємо.",
-    category: "Астрологія",
-    readTime: "6 хв",
-    date: "3 квітня 2025",
-  },
-  {
-    slug: "pytannya-taro-pro-lyubov",
-    title: "7 питань до таро про любов, які реально працюють",
-    excerpt:
-      "«Чи він мене любить?» — не найкраще питання до карт. Ось сім формулювань, які дадуть вам справді корисні відповіді.",
-    category: "Таро",
-    readTime: "5 хв",
-    date: "22 березня 2025",
-  },
-  {
-    slug: "koly-vidpustyty",
-    title: "Коли відпустити: коли карти кажуть «досить»",
-    excerpt:
-      "Є комбінації карт, які не можна ігнорувати. Якщо вони з'являються знову і знову — це не випадковість. Це відповідь.",
-    category: "{t('blog.categories.psychology')}",
-    readTime: "9 хв",
-    date: "10 березня 2025",
-  },
-];
-
-const categories = ["{t('blog.categories.all')}", "Таро", "Відносини", "{t('blog.categories.psychology')}", "Астрологія"];
-
 export default function BlogPage() {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const isRu = language === 'ru';
 
-  const [activeCategory, setActiveCategory] = useState("{t('blog.categories.all')}");
+  const posts = isRu ? [
+    {
+      slug: "znaky-karti-vidnosyny",
+      title: "Что карты говорят о ваших отношениях: 5 знаков",
+      excerpt: "Таро может раскрыть то, о чём партнёр молчит, а вы боитесь спросить. Вот пять арканов, которые точно указывают на состояние ваших отношений.",
+      category: "Таро",
+      readTime: "7 мин",
+      date: "12 мая 2025",
+    },
+    {
+      slug: "taro-zakohanykh-arkan",
+      title: "Таро Влюблённых — глубокий разбор аркана",
+      excerpt: "VI аркан — один из наиболее неправильно истолкованных в колоде. Это не только о романтике. Читайте, что на самом деле означают Влюблённые.",
+      category: "Таро",
+      readTime: "10 мин",
+      date: "28 апреля 2025",
+    },
+    {
+      slug: "chy-vartyi-vin-vashykh-slez",
+      title: "Как понять, стоит ли он ваших слёз",
+      excerpt: "Психология и таро вместе дают очень чёткий ответ на этот вопрос. Не тот, который мы хотим услышать — а тот, который нам нужен.",
+      category: "Отношения",
+      readTime: "8 мин",
+      date: "15 апреля 2025",
+    },
+    {
+      slug: "misyats-emotsiyi-astrolohiya",
+      title: "Луна и эмоции: астрологический взгляд",
+      excerpt: "Почему в определённые дни мы плачем без причины, а в другие — чувствуем невероятный подъём? Луна отвечает за наш эмоциональный фон больше, чем мы думаем.",
+      category: "Астрология",
+      readTime: "6 мин",
+      date: "3 апреля 2025",
+    },
+    {
+      slug: "pytannya-taro-pro-lyubov",
+      title: "7 вопросов к таро о любви, которые реально работают",
+      excerpt: "«Он меня любит?» — не лучший вопрос картам. Вот семь формулировок, которые дадут вам по-настоящему полезные ответы.",
+      category: "Таро",
+      readTime: "5 мин",
+      date: "22 марта 2025",
+    },
+    {
+      slug: "koly-vidpustyty",
+      title: "Когда отпустить: когда карты говорят «хватит»",
+      excerpt: "Есть комбинации карт, которые нельзя игнорировать. Если они появляются снова и снова — это не случайность. Это ответ.",
+      category: "Психология",
+      readTime: "9 мин",
+      date: "10 марта 2025",
+    },
+  ] : [
+    {
+      slug: "znaky-karti-vidnosyny",
+      title: "Що карти кажуть про ваші стосунки: 5 знаків",
+      excerpt: "Таро може розкрити те, про що партнер мовчить, а ви боїтесь запитати. Ось п'ять аркану, які точно вказують на стан ваших відносин.",
+      category: "Таро",
+      readTime: "7 хв",
+      date: "12 травня 2025",
+    },
+    {
+      slug: "taro-zakohanykh-arkan",
+      title: "Таро Закоханих — глибокий розбір аркану",
+      excerpt: "VI аркан — один із найбільш неправильно розтлумачених у колоді. Це не лише про романтику. Читайте, що насправді означають Закохані.",
+      category: "Таро",
+      readTime: "10 хв",
+      date: "28 квітня 2025",
+    },
+    {
+      slug: "chy-vartyi-vin-vashykh-slez",
+      title: "Як зрозуміти, чи вартий він ваших сліз",
+      excerpt: "Психологія та таро разом дають дуже чітку відповідь на це питання. Не те, яке ми хочемо почути — а те, яке нам потрібно.",
+      category: "Відносини",
+      readTime: "8 хв",
+      date: "15 квітня 2025",
+    },
+    {
+      slug: "misyats-emotsiyi-astrolohiya",
+      title: "Місяць і емоції: астрологічний погляд",
+      excerpt: "Чому у певні дні ми плачемо без причини, а в інші — відчуваємо неймовірний підйом? Місяць відповідає за наш емоційний фон більше, ніж ми думаємо.",
+      category: "Астрологія",
+      readTime: "6 хв",
+      date: "3 квітня 2025",
+    },
+    {
+      slug: "pytannya-taro-pro-lyubov",
+      title: "7 питань до таро про любов, які реально працюють",
+      excerpt: "«Чи він мене любить?» — не найкраще питання до карт. Ось сім формулювань, які дадуть вам справді корисні відповіді.",
+      category: "Таро",
+      readTime: "5 хв",
+      date: "22 березня 2025",
+    },
+    {
+      slug: "koly-vidpustyty",
+      title: "Коли відпустити: коли карти кажуть «досить»",
+      excerpt: "Є комбінації карт, які не можна ігнорувати. Якщо вони з'являються знову і знову — це не випадковість. Це відповідь.",
+      category: "Психологія",
+      readTime: "9 хв",
+      date: "10 березня 2025",
+    },
+  ];
+
+  const ALL_LABEL = isRu ? "Все" : "Всі";
+
+  const categories = isRu
+    ? [ALL_LABEL, "Таро", "Отношения", "Психология", "Астрология"]
+    : [ALL_LABEL, "Таро", "Відносини", "Психологія", "Астрологія"];
+
+  const [activeCategory, setActiveCategory] = useState(ALL_LABEL);
 
   const filtered =
-    activeCategory === "{t('blog.categories.all')}"
+    activeCategory === ALL_LABEL
       ? posts
       : posts.filter((p) => p.category === activeCategory);
 
@@ -83,15 +131,19 @@ export default function BlogPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(196,169,122,0.1),transparent)]" />
         <div className="relative max-w-3xl mx-auto px-6 text-center">
           <AnimatedSection>
-            <span className="tag mb-6 inline-block">Блог</span>
+            <span className="tag mb-6 inline-block">
+              {isRu ? "Дневник таролога" : "Щоденник таролога"}
+            </span>
             <h1
               className="text-[clamp(2.5rem,5vw,5rem)] text-[#1C1512] mb-6 leading-[1.06]"
               style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
             >
-              Думки та розбори
+              {isRu ? "Мысли и разборы" : "Думки та розбори"}
             </h1>
             <p className="text-xl text-[#7A6A58] leading-relaxed">
-              Статті про таро, психологію стосунків та жіночу мудрість.
+              {isRu
+                ? "Статьи о таро, психологии отношений и женской мудрости."
+                : "Статті про таро, психологію стосунків та жіночу мудрість."}
             </p>
           </AnimatedSection>
         </div>
@@ -164,7 +216,7 @@ export default function BlogPage() {
                         {post.readTime}
                       </span>
                       <span className="flex items-center gap-1 text-sm text-[#B8883A] group-hover:gap-2 transition-all">
-                        Читати
+                        {isRu ? "Читать" : "Читати"}
                         <ArrowRight size={14} />
                       </span>
                     </div>
@@ -176,7 +228,7 @@ export default function BlogPage() {
 
           {filtered.length === 0 && (
             <div className="text-center py-16 text-[#7A6A58]">
-              Статей у цій категорії поки немає.
+              {isRu ? "Статей в этой категории пока нет." : "Статей у цій категорії поки немає."}
             </div>
           )}
         </div>

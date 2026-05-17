@@ -3,29 +3,6 @@
 import Link from "next/link";
 import { useLanguage } from '@/hooks/useLanguage';
 
-const pageLinks = [
-  { href: "/", label: "{t('nav.home')}" },
-  { href: "/about", label: "{t('nav.about')}" },
-  { href: "/blog", label: "{t('nav.blog')}" },
-  { href: "/faq", label: "Питання та відповіді" },
-  { href: "/contacts", label: "{t('nav.contacts')}" },
-];
-
-const serviceLinks = [
-  { href: "/services#personal", label: "Особиста консультація" },
-  { href: "/services#couple", label: "Аналіз пари" },
-  { href: "/services#month", label: "Картка місяця" },
-  { href: "/services#year", label: "Річний прогноз" },
-];
-
-const toolLinks = [
-  { href: "/tools/natal-chart", label: "Натальна карта" },
-  { href: "/tools/moon-phase", label: "Місячний гороскоп" },
-  { href: "/tools/compatibility", label: "Сумісність знаків" },
-  { href: "/tools/daily-card", label: "Карта дня" },
-  { href: "/tools/numerology", label: "Нумерологія" },
-];
-
 function InstagramIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -46,6 +23,29 @@ function TelegramIcon() {
 
 export default function Footer() {
   const { t } = useLanguage();
+
+  const pageLinks = [
+    { href: "/", label: t('nav.home') },
+    { href: "/about", label: t('nav.about') },
+    { href: "/blog", label: t('nav.blog') },
+    { href: "/faq", label: t('footer.faq') },
+    { href: "/contacts", label: t('nav.contacts') },
+  ];
+
+  const serviceLinks = [
+    { href: "/services", label: t('footer.service1') },
+    { href: "/services", label: t('footer.service2') },
+    { href: "/services", label: t('footer.service3') },
+    { href: "/services", label: t('footer.service4') },
+  ];
+
+  const toolLinks = [
+    { href: "/tools/natal-chart", label: t('footer.tool1') },
+    { href: "/tools/moon-phase", label: t('footer.tool2') },
+    { href: "/tools/compatibility", label: t('footer.tool3') },
+    { href: "/tools/daily-card", label: t('footer.tool4') },
+    { href: "/tools/numerology", label: t('footer.tool5') },
+  ];
 
   return (
     <footer className="bg-[#1C1512] text-white/70">

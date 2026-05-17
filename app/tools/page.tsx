@@ -1,64 +1,98 @@
 'use client';
 
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
-
-
-const tools = [
-  {
-    href: "/tools/natal-chart",
-    title: "Натальна карта",
-    subtitle: "Астрологічний",
-    description:
-      "Розрахуйте своє натальне небо. Позиції планет, знак Сонця, Місяця та Асцендента, будинки — все в одному місці.",
-    glyph: "☽",
-    accent: "from-[#D4A853] to-[#B8883A]",
-  },
-  {
-    href: "/tools/moon-phase",
-    title: "Місячний гороскоп",
-    subtitle: "Місячний",
-    description:
-      "Дізнайтесь поточну фазу Місяця, відсоток освітлення та дату наступного новомісяця і повного місяця.",
-    glyph: "🌙",
-    accent: "from-[#C4A97A] to-[#9A6E28]",
-  },
-  {
-    href: "/tools/compatibility",
-    title: "Сумісність знаків",
-    subtitle: "Астрологічний",
-    description:
-      "Перевірте астрологічну сумісність двох знаків Зодіаку. Сильні сторони, виклики та загальна оцінка пари.",
-    glyph: "♡",
-    accent: "from-[#E8C98A] to-[#C4A97A]",
-  },
-  {
-    href: "/tools/daily-card",
-    title: "{t('tools.card_of_day.title')}",
-    subtitle: "Таро",
-    description:
-      "Щоденна карта Старшого Аркану — ваш орієнтир та медитація на сьогодні. Оновлюється щодня.",
-    glyph: "✦",
-    accent: "from-[#B8883A] to-[#9A6E28]",
-  },
-  {
-    href: "/tools/numerology",
-    title: "Нумерологія",
-    subtitle: "Нумерологія",
-    description:
-      "Ваше число Долі та число Життєвого Шляху за ім'ям і датою народження. З детальною інтерпретацією.",
-    glyph: "∞",
-    accent: "from-[#D4A853] to-[#C4A97A]",
-  },
-];
-
 export default function ToolsPage() {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const isRu = language === 'ru';
+
+  const tools = isRu ? [
+    {
+      href: "/tools/natal-chart",
+      title: "Натальная карта",
+      subtitle: "Астрология",
+      description: "Рассчитайте своё натальное небо. Позиции планет, знак Солнца, Луны и Асцендента, дома — всё в одном месте.",
+      glyph: "☽",
+      accent: "from-[#D4A853] to-[#B8883A]",
+    },
+    {
+      href: "/tools/moon-phase",
+      title: "Лунный гороскоп",
+      subtitle: "Лунный",
+      description: "Узнайте текущую фазу Луны, процент освещения и дату следующего новолуния и полнолуния.",
+      glyph: "🌙",
+      accent: "from-[#C4A97A] to-[#9A6E28]",
+    },
+    {
+      href: "/tools/compatibility",
+      title: "Совместимость знаков",
+      subtitle: "Астрология",
+      description: "Проверьте астрологическую совместимость двух знаков Зодиака. Сильные стороны, вызовы и общая оценка пары.",
+      glyph: "♡",
+      accent: "from-[#E8C98A] to-[#C4A97A]",
+    },
+    {
+      href: "/tools/daily-card",
+      title: "Карта дня",
+      subtitle: "Таро",
+      description: "Ежедневная карта Старшего Аркана — ваш ориентир и медитация на сегодня. Обновляется каждый день.",
+      glyph: "✦",
+      accent: "from-[#B8883A] to-[#9A6E28]",
+    },
+    {
+      href: "/tools/numerology",
+      title: "Нумерология",
+      subtitle: "Нумерология",
+      description: "Ваше число Судьбы и число Жизненного Пути по имени и дате рождения. С детальной интерпретацией.",
+      glyph: "∞",
+      accent: "from-[#D4A853] to-[#C4A97A]",
+    },
+  ] : [
+    {
+      href: "/tools/natal-chart",
+      title: "Натальна карта",
+      subtitle: "Астрологічний",
+      description: "Розрахуйте своє натальне небо. Позиції планет, знак Сонця, Місяця та Асцендента, будинки — все в одному місці.",
+      glyph: "☽",
+      accent: "from-[#D4A853] to-[#B8883A]",
+    },
+    {
+      href: "/tools/moon-phase",
+      title: "Місячний гороскоп",
+      subtitle: "Місячний",
+      description: "Дізнайтесь поточну фазу Місяця, відсоток освітлення та дату наступного новомісяця і повного місяця.",
+      glyph: "🌙",
+      accent: "from-[#C4A97A] to-[#9A6E28]",
+    },
+    {
+      href: "/tools/compatibility",
+      title: "Сумісність знаків",
+      subtitle: "Астрологічний",
+      description: "Перевірте астрологічну сумісність двох знаків Зодіаку. Сильні сторони, виклики та загальна оцінка пари.",
+      glyph: "♡",
+      accent: "from-[#E8C98A] to-[#C4A97A]",
+    },
+    {
+      href: "/tools/daily-card",
+      title: "Карта дня",
+      subtitle: "Таро",
+      description: "Щоденна карта Старшого Аркану — ваш орієнтир та медитація на сьогодні. Оновлюється щодня.",
+      glyph: "✦",
+      accent: "from-[#B8883A] to-[#9A6E28]",
+    },
+    {
+      href: "/tools/numerology",
+      title: "Нумерологія",
+      subtitle: "Нумерологія",
+      description: "Ваше число Долі та число Життєвого Шляху за ім'ям і датою народження. З детальною інтерпретацією.",
+      glyph: "∞",
+      accent: "from-[#D4A853] to-[#C4A97A]",
+    },
+  ];
 
   return (
     <>
@@ -67,15 +101,19 @@ export default function ToolsPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(196,169,122,0.1),transparent)]" />
         <div className="relative max-w-3xl mx-auto px-6 text-center">
           <AnimatedSection>
-            <span className="tag mb-6 inline-block">Безкоштовно</span>
+            <span className="tag mb-6 inline-block">
+              {isRu ? "Бесплатно" : "Безкоштовно"}
+            </span>
             <h1
               className="text-[clamp(2.5rem,5vw,5rem)] text-[#1C1512] mb-6 leading-[1.06]"
               style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
             >
-              Інструменти
+              {isRu ? "Инструменты" : "Інструменти"}
             </h1>
             <p className="text-xl text-[#7A6A58] leading-relaxed">
-              Астрологія, таро та нумерологія — у вашому браузері. Безкоштовно та без реєстрації.
+              {isRu
+                ? "Астрология, таро и нумерология — в вашем браузере. Бесплатно и без регистрации."
+                : "Астрологія, таро та нумерологія — у вашому браузері. Безкоштовно та без реєстрації."}
             </p>
           </AnimatedSection>
         </div>
@@ -90,7 +128,6 @@ export default function ToolsPage() {
               <AnimatedSection key={tool.href} delay={i * 0.1}>
                 <Link href={tool.href} className="group block h-full">
                   <div className="card-luxury h-full flex flex-col">
-                    {/* Icon */}
                     <div
                       className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${tool.accent} flex items-center justify-center text-white text-3xl mb-6 transition-transform duration-300 group-hover:scale-110`}
                       style={{ fontFamily: "var(--font-cormorant)" }}
@@ -113,7 +150,7 @@ export default function ToolsPage() {
                     </p>
 
                     <div className="flex items-center gap-2 text-[#B8883A] text-sm mt-auto">
-                      Відкрити
+                      {isRu ? "Открыть" : "Відкрити"}
                       <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>

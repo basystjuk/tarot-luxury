@@ -24,16 +24,27 @@ function TelegramIcon() {
   );
 }
 
-const TOPICS = [
-  "Особиста консультація",
-  "Аналіз пари",
-  "Картка місяця",
-  "Річний прогноз",
-  "Загальне питання",
-];
-
 export default function ContactsPage() {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const isRu = language === 'ru';
+
+  const TOPICS_UK = [
+    "Особиста консультація",
+    "Аналіз пари",
+    "Картка місяця",
+    "Річний прогноз",
+    "Загальне питання",
+  ];
+
+  const TOPICS_RU = [
+    "Личная консультация",
+    "Анализ пары",
+    "Карта месяца",
+    "Годовой прогноз",
+    "Общий вопрос",
+  ];
+
+  const TOPICS = isRu ? TOPICS_RU : TOPICS_UK;
 
   const [form, setForm] = useState({
     name: "",
@@ -47,12 +58,21 @@ export default function ContactsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate form submission
     setTimeout(() => {
       setLoading(false);
       setSubmitted(true);
     }, 1200);
   };
+
+  const hours = isRu ? [
+    { day: "Понедельник–Пятница", hours: "10:00 – 20:00" },
+    { day: "Суббота", hours: "11:00 – 18:00" },
+    { day: "Воскресенье", hours: "по договорённости" },
+  ] : [
+    { day: "Понеділок–П'ятниця", hours: "10:00 – 20:00" },
+    { day: "Субота", hours: "11:00 – 18:00" },
+    { day: "Неділя", hours: "за домовленістю" },
+  ];
 
   return (
     <>
@@ -60,15 +80,19 @@ export default function ContactsPage() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(196,169,122,0.1),transparent)]" />
         <div className="relative max-w-3xl mx-auto px-6 text-center">
           <AnimatedSection>
-            <span className="tag mb-6 inline-block">Зв'язатись</span>
+            <span className="tag mb-6 inline-block">
+              {isRu ? "Связаться" : "Зв'язатись"}
+            </span>
             <h1
               className="text-[clamp(2.5rem,5vw,5rem)] text-[#1C1512] mb-6 leading-[1.06]"
               style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
             >
-              Записатись на консультацію
+              {isRu ? "Записаться на консультацию" : "Записатись на консультацію"}
             </h1>
             <p className="text-xl text-[#7A6A58] leading-relaxed">
-              Залиште заявку — і я зв'яжуся з вами протягом 24 годин.
+              {isRu
+                ? "Оставьте заявку — и я свяжусь с вами в течение 24 часов."
+                : "Залиште заявку — і я зв'яжуся з вами протягом 24 годин."}
             </p>
           </AnimatedSection>
         </div>
@@ -88,10 +112,12 @@ export default function ContactsPage() {
                     className="text-3xl text-[#1C1512] mb-4"
                     style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
                   >
-                    Дякую за заявку!
+                    {isRu ? "Спасибо за заявку!" : "Дякую за заявку!"}
                   </h2>
                   <p className="text-[#7A6A58] max-w-sm">
-                    Я отримала ваше повідомлення і зв'яжуся з вами протягом 24 годин. Якщо термінова потреба — напишіть у Telegram.
+                    {isRu
+                      ? "Я получила ваше сообщение и свяжусь с вами в течение 24 часов. Если срочно — напишите в Telegram."
+                      : "Я отримала ваше повідомлення і зв'яжуся з вами протягом 24 годин. Якщо термінова потреба — напишіть у Telegram."}
                   </p>
                 </div>
               ) : (
@@ -100,12 +126,14 @@ export default function ContactsPage() {
                     className="text-2xl text-[#1C1512] mb-8"
                     style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
                   >
-                    Форма запиту
+                    {isRu ? "Форма запроса" : "Форма запиту"}
                   </h2>
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">{t('contacts.form.name')} *</label>
+                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
+                        {isRu ? "Ваше имя" : "Ваше ім'я"} *
+                      </label>
                       <input
                         type="text"
                         required
@@ -118,12 +146,12 @@ export default function ContactsPage() {
 
                     <div>
                       <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                        Telegram або Instagram *
+                        Telegram {isRu ? "или" : "або"} Instagram *
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="@username або номер телефону"
+                        placeholder={isRu ? "@username или номер телефона" : "@username або номер телефону"}
                         value={form.contact}
                         onChange={(e) => setForm({ ...form, contact: e.target.value })}
                         className="input-luxury"
@@ -131,23 +159,29 @@ export default function ContactsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">Тема запиту</label>
+                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
+                        {isRu ? "Тема запроса" : "Тема запиту"}
+                      </label>
                       <select
                         value={form.topic}
                         onChange={(e) => setForm({ ...form, topic: e.target.value })}
                         className="input-luxury"
                       >
-                        {TOPICS.map((t) => (
-                          <option key={t} value={t}>{t}</option>
+                        {TOPICS.map((topic) => (
+                          <option key={topic} value={topic}>{topic}</option>
                         ))}
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">Повідомлення (необов'язково)</label>
+                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
+                        {isRu ? "Сообщение (необязательно)" : "Повідомлення (необов'язково)"}
+                      </label>
                       <textarea
                         rows={5}
-                        placeholder="Коротко опишіть ситуацію або питання, з яким хочете звернутись..."
+                        placeholder={isRu
+                          ? "Кратко опишите ситуацию или вопрос, с которым хотите обратиться..."
+                          : "Коротко опишіть ситуацію або питання, з яким хочете звернутись..."}
                         value={form.message}
                         onChange={(e) => setForm({ ...form, message: e.target.value })}
                         className="input-luxury resize-none"
@@ -165,18 +199,20 @@ export default function ContactsPage() {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
                           </svg>
-                          Відправляємо...
+                          {isRu ? "Отправляем..." : "Відправляємо..."}
                         </span>
                       ) : (
                         <>
                           <Send size={16} />
-                          Відправити заявку
+                          {isRu ? "Отправить заявку" : "Відправити заявку"}
                         </>
                       )}
                     </button>
 
                     <p className="text-xs text-[#7A6A58] text-center">
-                      Надсилаючи форму, ви погоджуєтесь на обробку даних для зворотного зв'язку.
+                      {isRu
+                        ? "Отправляя форму, вы соглашаетесь на обработку данных для обратной связи."
+                        : "Надсилаючи форму, ви погоджуєтесь на обробку даних для зворотного зв'язку."}
                     </p>
                   </form>
                 </div>
@@ -192,7 +228,7 @@ export default function ContactsPage() {
                     className="text-2xl text-[#1C1512] mb-5"
                     style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
                   >
-                    Швидший зв'язок
+                    {isRu ? "Быстрая связь" : "Швидший зв'язок"}
                   </h3>
                   <a
                     href="https://t.me/olena_tarot"
@@ -230,14 +266,10 @@ export default function ContactsPage() {
                     className="text-xl text-[#1C1512] mb-4"
                     style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
                   >
-                    Робочий час
+                    {isRu ? "Рабочее время" : "Робочий час"}
                   </h3>
                   <div className="space-y-3">
-                    {[
-                      { day: "Понеділок–П'ятниця", hours: "10:00 – 20:00" },
-                      { day: "Субота", hours: "11:00 – 18:00" },
-                      { day: "Неділя", hours: "за домовленістю" },
-                    ].map((item) => (
+                    {hours.map((item) => (
                       <div key={item.day} className="flex justify-between items-center py-2 border-b border-[rgba(196,169,122,0.15)]">
                         <span className="text-sm text-[#7A6A58]">{item.day}</span>
                         <span className="text-sm text-[#1C1512] font-medium">{item.hours}</span>
@@ -245,7 +277,9 @@ export default function ContactsPage() {
                     ))}
                   </div>
                   <p className="text-xs text-[#7A6A58] mt-4">
-                    Час за Київським часовим поясом (UTC+2/UTC+3)
+                    {isRu
+                      ? "Время по Киевскому часовому поясу (UTC+2/UTC+3)"
+                      : "Час за Київським часовим поясом (UTC+2/UTC+3)"}
                   </p>
                 </div>
 
@@ -255,10 +289,12 @@ export default function ContactsPage() {
                     <span className="text-2xl text-[#D4A853] mt-0.5">✦</span>
                     <div>
                       <p className="font-medium text-[#1C1512] mb-1" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.1rem" }}>
-                        Гарантія конфіденційності
+                        {isRu ? "Гарантия конфиденциальности" : "Гарантія конфіденційності"}
                       </p>
                       <p className="text-xs text-[#7A6A58] leading-relaxed">
-                        Усе, що ви розповідаєте — залишається між нами. Я не передаю дані третім особам.
+                        {isRu
+                          ? "Всё, что вы рассказываете — остаётся между нами. Я не передаю данные третьим лицам."
+                          : "Усе, що ви розповідаєте — залишається між нами. Я не передаю дані третім особам."}
                       </p>
                     </div>
                   </div>
