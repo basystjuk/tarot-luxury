@@ -7,11 +7,7 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
-export const metadata: Metadata = {
-  title: "Послуги — Ellen Soul Таро",
-  description:
-    "Таро-консультації з любові та відносин. Особиста сесія, аналіз пари, картка місяця, річний прогноз. Онлайн та особисто.",
-};
+
 
 const services = [
   {

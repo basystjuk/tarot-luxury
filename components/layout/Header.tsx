@@ -7,7 +7,8 @@ import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from '@/hooks/useLanguage';
 
-const { t, language, setLanguage } = useLanguage();
+export default function Header() {
+  const { t, language, setLanguage } = useLanguage();
 
   const navLinks = [
     { href: "/", label: t('nav.home') },
@@ -17,8 +18,6 @@ const { t, language, setLanguage } = useLanguage();
     { href: "/tools", label: t('nav.tools') },
     { href: "/contacts", label: t('nav.contacts') },
   ];
-
-export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

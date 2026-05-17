@@ -7,11 +7,7 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
-export const metadata: Metadata = {
-  title: "Інструменти — Ellen Soul Таро",
-  description:
-    "Безкоштовні астрологічні інструменти: натальна карта, місячний гороскоп, сумісність знаків, карта дня, нумерологія.",
-};
+
 
 const tools = [
   {

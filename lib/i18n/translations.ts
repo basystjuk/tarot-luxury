@@ -32,7 +32,7 @@ export const translations = {
       'Кожна консультація — це унікальний простір для вашого зростання та розуміння',
     'home.services.tarot.title': 'Таро-консультація',
     'home.services.tarot.desc':
-      'Глибинний аналіз вашої ситуації через символіку карт. Відповіді на хвилюючі питання щодо стосунків, кар'єри, особистого розвитку.',
+      'Глибинний аналіз вашої ситуації через символіку карт. Відповіді на хвилюючі питання щодо стосунків, кар\'єри, особистого розвитку.',
     'home.services.psychology.title': 'Психологічна підтримка',
     'home.services.psychology.desc':
       'Робота з внутрішніми блоками, страхами та переконаннями. Інтеграція таро з психологічними техніками для глибшого розуміння себе.',
@@ -91,7 +91,7 @@ export const translations = {
     'services.tarot.title': 'Таро-консультація',
     'services.tarot.duration': '60–90 хвилин',
     'services.tarot.desc':
-      'Глибинний розклад на актуальну ситуацію з детальним розбором кожної карти. Підходить для питань про стосунки, кар'єру, фінанси та особистий розвиток.',
+      'Глибинний розклад на актуальну ситуацію з детальним розбором кожної карти. Підходить для питань про стосунки, кар\'єру, фінанси та особистий розвиток.',
     'services.tarot.feature1': 'Аналіз поточної ситуації',
     'services.tarot.feature2': 'Можливі сценарії розвитку подій',
     'services.tarot.feature3': 'Практичні рекомендації',
@@ -150,7 +150,7 @@ export const translations = {
     'about.values.v1.title': 'Конфіденційність',
     'about.values.v1.desc': 'Все, що ви розповідаєте на сесії, залишається між нами. Завжди.',
     'about.values.v2.title': 'Чесність',
-    'about.values.v2.desc': 'Я говорю правду, навіть коли вона незручна. М'яко, але відкрито.',
+    'about.values.v2.desc': 'Я говорю правду, навіть коли вона незручна. М\'яко, але відкрито.',
     'about.values.v3.title': 'Безосудність',
     'about.values.v3.desc': 'Немає "правильних" або "неправильних" ситуацій. Є тільки ваш шлях.',
     'about.values.v4.title': 'Розвиток',
@@ -212,9 +212,9 @@ export const translations = {
 
     // ── Contacts page ────────────────────────────────────────────────────────
     'contacts.hero.section': 'КОНТАКТИ',
-    'contacts.hero.title': 'Зв'яжіться зі мною',
+    'contacts.hero.title': 'Зв\'яжіться зі мною',
     'contacts.hero.subtitle': 'Я відповідаю протягом 24 годин',
-    'contacts.form.name': 'Ваше ім'я',
+    'contacts.form.name': 'Ваше ім\'я',
     'contacts.form.email': 'Email',
     'contacts.form.message': 'Ваше повідомлення',
     'contacts.form.submit': 'Надіслати',
@@ -513,7 +513,7 @@ export const translations = {
       'Working with inner blocks, fears and beliefs. Integrating tarot with psychological techniques for deeper self-understanding.',
     'home.services.couples.title': 'Couples consultations',
     'home.services.couples.desc':
-      'Exploring relationship dynamics, improving communication and understanding each other's needs through the lens of the cards.',
+      'Exploring relationship dynamics, improving communication and understanding each other\'s needs through the lens of the cards.',
     'home.services.link': 'All services',
 
     'home.about.section': 'ABOUT ME',
@@ -653,7 +653,7 @@ export const translations = {
     'tools.hero.title': 'Free tools',
     'tools.hero.subtitle': 'Practical resources for your self-discovery and growth',
     'tools.card_of_day.title': 'Card of the day',
-    'tools.card_of_day.desc': 'Receive today's message from the cards',
+    'tools.card_of_day.desc': 'Receive today\'s message from the cards',
     'tools.card_of_day.button': 'Draw a card',
     'tools.spread.title': 'Weekly spread',
     'tools.spread.desc': 'Three cards reflecting your week',

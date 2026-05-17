@@ -7,11 +7,7 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
-export const metadata: Metadata = {
-  title: "Про мене — Ellen Soul Таро",
-  description:
-    "Дізнайтесь більше про Олену — сертифікованого таро-консультанта та психолога відносин з 4-річним досвідом.",
-};
+
 
 const values = [
   {
