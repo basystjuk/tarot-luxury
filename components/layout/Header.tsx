@@ -86,8 +86,28 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* CTA + Hamburger */}
+          {/* Language Switcher + CTA + Hamburger */}
           <div className="flex items-center gap-4">
+            {/* Language switcher — desktop */}
+            <div className="hidden lg:flex items-center gap-0 text-xs tracking-widest font-light select-none">
+              <button
+                onClick={() => setLanguage('uk')}
+                className={`px-1.5 py-0.5 transition-colors duration-200 ${
+                  language === 'uk'
+                    ? 'text-[#B8883A] font-semibold'
+                    : 'text-[#7A6A58] hover:text-[#1C1512]'
+                }`}
+              >УКР</button>
+              <span className="text-[#C4A97A]/50">|</span>
+              <button
+                onClick={() => setLanguage('ru')}
+                className={`px-1.5 py-0.5 transition-colors duration-200 ${
+                  language === 'ru'
+                    ? 'text-[#B8883A] font-semibold'
+                    : 'text-[#7A6A58] hover:text-[#1C1512]'
+                }`}
+              >РУС</button>
+            </div>
             <Link
               href="/contacts"
               className="hidden sm:inline-flex btn-primary text-sm px-6 py-3"
