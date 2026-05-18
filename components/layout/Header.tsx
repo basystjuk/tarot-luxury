@@ -17,8 +17,9 @@ export default function Header() {
     { href: `/${language}/about`, label: t('nav.about') },
     { href: `/${language}/services`, label: t('nav.services') },
     { href: `/${language}/blog`, label: t('nav.blog') },
-    { href: `/${language}/tools`, label: t('nav.tools') },
+    { href: `/${language}/studio`, label: t('nav.studio') },
     { href: `/${language}/contacts`, label: t('nav.contacts') },
+    { href: `/${language}/faq`, label: language === 'ru' ? 'Подсказка' : language === 'en' ? 'Guide' : 'Підказка' },
   ];
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);

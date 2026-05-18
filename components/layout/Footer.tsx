@@ -1,6 +1,5 @@
 'use client';
 
-import Link from "next/link";
 import { useLanguage } from '@/hooks/useLanguage';
 
 function InstagramIcon() {
@@ -15,176 +14,74 @@ function InstagramIcon() {
 
 function TelegramIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21.8 2.2L1.5 10.3c-1.3.5-1.3 1.4-.2 1.8l5.1 1.6 2 6.2c.2.7.5.9 1 .9.4 0 .6-.2 1-.5l2.4-2.4 4.9 3.6c.9.5 1.6.2 1.8-.8L22.9 3.4c.3-1.3-.5-1.8-1.1-1.2z"/>
-    </svg>
-  );
-}
-
-function TikTokIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
     </svg>
   );
 }
 
 export default function Footer() {
   const { t, language } = useLanguage();
-
-  const pageLinks = [
-    { href: `/${language}`, label: t('nav.home') },
-    { href: `/${language}/about`, label: t('nav.about') },
-    { href: `/${language}/blog`, label: t('nav.blog') },
-    { href: `/${language}/faq`, label: t('footer.faq') },
-    { href: `/${language}/contacts`, label: t('nav.contacts') },
-  ];
-
-  const serviceLinks = [
-    { href: `/${language}/services`, label: t('footer.service1') },
-    { href: `/${language}/services`, label: t('footer.service2') },
-    { href: `/${language}/services`, label: t('footer.service3') },
-    { href: `/${language}/services`, label: t('footer.service4') },
-  ];
-
-  const toolLinks = [
-    { href: `/${language}/tools/natal-chart`, label: t('footer.tool1') },
-    { href: `/${language}/tools/moon-phase`, label: t('footer.tool2') },
-    { href: `/${language}/tools/compatibility`, label: t('footer.tool3') },
-    { href: `/${language}/tools/daily-card`, label: t('footer.tool4') },
-    { href: `/${language}/tools/numerology`, label: t('footer.tool5') },
-  ];
+  const isRu = language === 'ru';
+  const isEn = language === 'en';
 
   return (
     <footer className="bg-[#1C1512] text-white/70">
       <div className="h-px bg-gradient-to-r from-transparent via-[#C4A97A] to-transparent" />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-14">
+        <div className="flex flex-col items-center text-center mb-14">
           {/* Brand */}
-          <div className="lg:col-span-1">
-            <div className="mb-4">
-              <span
-                className="text-3xl text-white tracking-wide block mb-1"
-                style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 300 }}
-              >
-                Ellen Soul
-              </span>
-              <span
-                className="text-xs tracking-[0.18em] uppercase text-[#C4A97A]"
-                style={{ fontFamily: "var(--font-jost, 'Jost')" }}
-              >
-                таро · психологія · відносини
-              </span>
-            </div>
-            <p className="text-sm leading-relaxed text-white/50 mb-8 max-w-xs">
-              {t('footer.tagline')}
-            </p>
-
-            {/* Socials */}
-            <div className="flex gap-4">
-              <a
-                href="https://instagram.com/ellen_soul_taro"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
-                aria-label="Instagram"
-              >
-                <InstagramIcon />
-              </a>
-              <a
-                href="https://t.me/ellen_soul_taro"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
-                aria-label="Telegram"
-              >
-                <TelegramIcon />
-              </a>
-              <a
-                href="https://www.tiktok.com/@ellen_soul_taro"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
-                aria-label="TikTok"
-              >
-                <TikTokIcon />
-              </a>
-            </div>
-          </div>
-
-          {/* Pages */}
-          <div>
-            <h4
-              className="text-xs tracking-[0.15em] uppercase text-[#C4A97A] mb-5"
-              style={{ fontFamily: "var(--font-jost, 'Jost')", fontWeight: 500 }}
+          <div className="mb-4">
+            <span
+              className="text-3xl text-white tracking-wide block mb-1"
+              style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 300 }}
             >
-              Сторінки
-            </h4>
-            <ul className="space-y-3">
-              {pageLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-white/50 hover:text-[#D4A853] transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Services */}
-          <div>
-            <h4
-              className="text-xs tracking-[0.15em] uppercase text-[#C4A97A] mb-5"
-              style={{ fontFamily: "var(--font-jost, 'Jost')", fontWeight: 500 }}
+              Ellen Soul
+            </span>
+            <span
+              className="text-xs tracking-[0.18em] uppercase text-[#C4A97A]"
+              style={{ fontFamily: "var(--font-jost, 'Jost')" }}
             >
-              {t('footer.services.title')}
-            </h4>
-            <ul className="space-y-3">
-              {serviceLinks.map((link, i) => (
-                <li key={i}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-white/50 hover:text-[#D4A853] transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+              таро · психологія
+            </span>
           </div>
+          <p className="text-sm leading-relaxed text-white/50 mb-8 max-w-xs">
+            {isRu
+              ? "Помогаю найти ответы через язык карт и глубинную психологию."
+              : isEn
+              ? "I help find answers through the language of cards and depth psychology."
+              : "Допомагаю знайти відповіді через мову карт і глибинну психологію."}
+          </p>
 
-          {/* Tools */}
-          <div>
-            <h4
-              className="text-xs tracking-[0.15em] uppercase text-[#C4A97A] mb-5"
-              style={{ fontFamily: "var(--font-jost, 'Jost')", fontWeight: 500 }}
+          {/* Socials */}
+          <div className="flex gap-4 justify-center">
+            <a
+              href="https://instagram.com/ellen_soul_taro"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
+              aria-label="Instagram"
             >
-              {t('nav.tools')}
-            </h4>
-            <ul className="space-y-3">
-              {toolLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-white/50 hover:text-[#D4A853] transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+              <InstagramIcon />
+            </a>
+            <a
+              href="https://t.me/ellen_soul_taro"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
+              aria-label="Telegram"
+            >
+              <TelegramIcon />
+            </a>
           </div>
         </div>
 
         <div className="h-px bg-white/8 mb-8" />
 
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-white/30">
+        <div className="flex flex-col items-center gap-3 text-xs text-white/30 text-center">
           <p>© {new Date().getFullYear()} Ellen Soul. Усі права захищено.</p>
-          <p>Made with ♥ в Україні</p>
+          <p>Made with 💙💛 Ukraine</p>
         </div>
       </div>
     </footer>

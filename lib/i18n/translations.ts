@@ -10,6 +10,7 @@ export const translations = {
     'nav.services': 'Послуги',
     'nav.blog': 'Щоденник таролога',
     'nav.tools': 'Інструменти',
+    'nav.studio': 'Soul Studio',
     'nav.contacts': 'Контакти',
 
     // ── Header ───────────────────────────────────────────────────────────────
@@ -256,6 +257,7 @@ export const translations = {
     'nav.services': 'Услуги',
     'nav.blog': 'Дневник таролога',
     'nav.tools': 'Инструменты',
+    'nav.studio': 'Soul Studio',
     'nav.contacts': 'Контакты',
 
     // ── Header ───────────────────────────────────────────────────────────────
@@ -501,6 +503,7 @@ export const translations = {
     'nav.services': 'Services',
     'nav.blog': 'Blog',
     'nav.tools': 'Tools',
+    'nav.studio': 'Soul Studio',
     'nav.contacts': 'Contacts',
 
     // ── Header ───────────────────────────────────────────────────────────────

@@ -142,29 +142,6 @@ export default function ServicesPage() {
         </div>
       </section>
 
-      <section className="section-padding bg-[#2D2218] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_70%_at_50%_50%,rgba(196,169,122,0.07),transparent)]" />
-        <div className="relative max-w-2xl mx-auto px-6 text-center">
-          <AnimatedSection>
-            <h2 className="text-[clamp(2rem,4vw,3.5rem)] text-white mb-6" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 300 }}>
-              {isRu ? 'Готовы записаться?' : isEn ? 'Ready to Book?' : 'Готова записатись?'}
-            </h2>
-            <p className="text-white/50 mb-10 max-w-md mx-auto">
-              {isRu
-                ? 'Напишите мне в Telegram — и мы подберём удобное время для вашей сессии.'
-                : isEn
-                ? 'Message me on Telegram — and we will find a convenient time for your session.'
-                : 'Напишіть мені у Telegram — і ми підберемо зручний час для вашої сесії.'}
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <a href="https://t.me/ellen_soul_taro" target="_blank" rel="noopener noreferrer" className="btn-primary">Telegram</a>
-              <Link href={`/${language}/contacts`} className="btn-outline !border-white/30 !text-white hover:!border-[#D4A853] hover:!text-[#D4A853]">
-                {isRu ? 'Форма запроса' : isEn ? 'Contact Form' : 'Форма запиту'}
-              </Link>
-            </div>
-          </AnimatedSection>
-        </div>
-      </section>
     </>
   );
 }
