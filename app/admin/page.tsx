@@ -380,7 +380,18 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       .then((r) => r.json())
       .then((d) => { if (d.url) setCurrentPhotoUrl(d.url); })
       .catch(() => {});
-  }, []);
+  }, [BLOG_KEY]);
+
+  const saveBlog = () => {
+    localStorage.setItem(BLOG_KEY, JSON.stringify({
+      title_ru: blogTitle_ru, desc_ru: blogDesc_ru,
+      title_uk: blogTitle_uk, desc_uk: blogDesc_uk,
+      btn_ru: blogBtn_ru, btn_uk: blogBtn_uk,
+      link: blogLink,
+    }));
+    setBlogSaved(true);
+    setTimeout(() => setBlogSaved(false), 2000);
+  };
 
   // Publish ALL content to Vercel Blob — called after every change
   const publishContent = async (patch: {
@@ -990,6 +1001,82 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* ── Blog Tab ── */}
+        {activeTab === "blog" && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Сторінка блогу</h2>
+              <p className="text-white/40 text-sm">Текст картки з посиланням на Telegram-канал</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* RU */}
+              <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)] space-y-4">
+                <p className="text-xs text-[#C4A97A] tracking-widest uppercase">Російська</p>
+                <div>
+                  <label className="text-xs text-white/40 block mb-1">Заголовок</label>
+                  <input className="admin-input w-full" value={blogTitle_ru} onChange={(e) => setBlogTitleRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 block mb-1">Опис</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDesc_ru} onChange={(e) => setBlogDescRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 block mb-1">Текст кнопки</label>
+                  <input className="admin-input w-full" value={blogBtn_ru} onChange={(e) => setBlogBtnRu(e.target.value)} />
+                </div>
+              </div>
+
+              {/* UK */}
+              <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)] space-y-4">
+                <p className="text-xs text-[#C4A97A] tracking-widest uppercase">Українська</p>
+                <div>
+                  <label className="text-xs text-white/40 block mb-1">Заголовок</label>
+                  <input className="admin-input w-full" value={blogTitle_uk} onChange={(e) => setBlogTitleUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 block mb-1">Опис</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDesc_uk} onChange={(e) => setBlogDescUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 block mb-1">Текст кнопки</label>
+                  <input className="admin-input w-full" value={blogBtn_uk} onChange={(e) => setBlogBtnUk(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Link */}
+            <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)]">
+              <label className="text-xs text-[#C4A97A] tracking-widest uppercase block mb-2">Посилання кнопки</label>
+              <input className="admin-input w-full" value={blogLink} onChange={(e) => setBlogLink(e.target.value)} placeholder="https://t.me/..." />
+            </div>
+
+            {/* Preview */}
+            <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)]">
+              <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-4">Прев'ю (RU)</p>
+              <div className="bg-[#FDFBF7] rounded-2xl p-8 text-center border border-[rgba(196,169,122,0.3)]">
+                <div className="text-3xl text-[#D4A853] mb-3">✦</div>
+                <p className="text-[#1C1512] text-xl mb-2" style={{ fontFamily: "Georgia, serif" }}>{blogTitle_ru}</p>
+                <p className="text-[#7A6A58] text-sm mb-5">{blogDesc_ru}</p>
+                <span className="bg-[#D4A853] text-white px-6 py-2.5 rounded-full text-sm inline-block">{blogBtn_ru}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button
+                onClick={saveBlog}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+              >
+                <Save size={14} />
+                {blogSaved ? "Збережено!" : "Зберегти в localStorage"}
+              </button>
+              <p className="text-white/30 text-xs">
+                Для публікації — надішли мені оновлений текст
+              </p>
+            </div>
           </div>
         )}
       </div>
