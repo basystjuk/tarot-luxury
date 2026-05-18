@@ -8,6 +8,15 @@ import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 import { DEFAULT_SERVICES, DEFAULT_ORG, type ServiceItem, type OrgItem } from "@/lib/data/services";
 
+// Wrap digit sequences in Jost font to match price style
+function subtitleWithJostNums(text: string) {
+  return text.split(/(\d+)/).map((part, i) =>
+    /^\d+$/.test(part)
+      ? <span key={i} style={{ fontFamily: "var(--font-jost)", fontVariantNumeric: "lining-nums", letterSpacing: "-0.02em", fontWeight: 300 }}>{part}</span>
+      : part
+  );
+}
+
 export default function ServicesPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
@@ -77,7 +86,7 @@ export default function ServicesPage() {
                             className="text-[#9A7040]"
                             style={{ fontSize: "0.72em", fontWeight: 400 }}
                           >
-                            {" "}({subtitle.charAt(0).toLowerCase() + subtitle.slice(1)})
+                            {" "}({subtitleWithJostNums(subtitle.charAt(0).toLowerCase() + subtitle.slice(1))})
                           </span>
                         )}
                       </h2>
