@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type { Testimonial } from "@/lib/data/testimonials";
+import {
+  DEFAULT_SERVICES,
+  DEFAULT_ORG,
+  SERVICES_STORAGE_KEY,
+  ORG_STORAGE_KEY,
+  type ServiceItem,
+  type OrgItem,
+} from "@/lib/data/services";
 
 const ADMIN_PASSWORD = "ellensoul2025";
 const STORAGE_KEY = "ellen_admin_testimonials";
@@ -313,7 +321,13 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "testimonials">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services">("testimonials");
+
+  // Services state
+  const [svcList, setSvcList] = useState<ServiceItem[]>(DEFAULT_SERVICES);
+  const [orgList, setOrgList] = useState<OrgItem[]>(DEFAULT_ORG);
+  const [expandedSvc, setExpandedSvc] = useState<string | null>(null);
+  const [svcCopied, setSvcCopied] = useState(false);
 
   // Photo upload state
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(DEFAULT_PHOTO);
@@ -327,15 +341,30 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try { setTestimonials(JSON.parse(saved)); } catch {}
-    }
-    // Load current photo from API (Vercel Blob or fallback)
+    if (saved) { try { setTestimonials(JSON.parse(saved)); } catch {} }
+    const savedSvc = localStorage.getItem(SERVICES_STORAGE_KEY);
+    if (savedSvc) { try { setSvcList(JSON.parse(savedSvc)); } catch {} }
+    const savedOrg = localStorage.getItem(ORG_STORAGE_KEY);
+    if (savedOrg) { try { setOrgList(JSON.parse(savedOrg)); } catch {} }
     fetch("/api/photo")
       .then((r) => r.json())
       .then((d) => { if (d.url) setCurrentPhotoUrl(d.url); })
       .catch(() => {});
   }, []);
+
+  const saveSvc = (list: ServiceItem[]) => {
+    setSvcList(list);
+    localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(list));
+  };
+  const saveOrg = (list: OrgItem[]) => {
+    setOrgList(list);
+    localStorage.setItem(ORG_STORAGE_KEY, JSON.stringify(list));
+  };
+  const copySvcJson = () => {
+    navigator.clipboard.writeText(JSON.stringify({ services: svcList, org: orgList }, null, 2));
+    setSvcCopied(true);
+    setTimeout(() => setSvcCopied(false), 2000);
+  };
 
   const handleFileSelect = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -447,7 +476,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "testimonials"] as const).map((tab) => (
+          {(["photo", "testimonials", "blog", "services"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -457,7 +486,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   : "border-transparent text-white/40 hover:text-white/70"
               }`}
             >
-              {tab === "photo" ? "📷 Фото" : "⭐ Відгуки"}
+              {tab === "photo" ? "📷 Фото" : tab === "testimonials" ? "⭐ Відгуки" : tab === "blog" ? "📝 Блог" : "🛎 Послуги"}
             </button>
           ))}
         </div>
@@ -705,6 +734,153 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Services Tab ── */}
+        {activeTab === "services" && (
+          <div className="space-y-8">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Послуги та ціни</h2>
+                <p className="text-white/40 text-sm">Керуй переліком послуг та організаційними питаннями</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={copySvcJson}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/15 text-white/60 hover:text-white transition-colors text-sm"
+                >
+                  {svcCopied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                  {svcCopied ? "Скопійовано!" : "Копіювати JSON"}
+                </button>
+                <button
+                  onClick={() => {
+                    const newSvc: ServiceItem = {
+                      id: Date.now().toString(),
+                      title_ru: "Новая услуга", subtitle_ru: "",
+                      title_uk: "Нова послуга", subtitle_uk: "",
+                      price: "$0",
+                      desc_ru: "", desc_uk: "",
+                      includes_ru: [], includes_uk: [],
+                    };
+                    const updated = [...svcList, newSvc];
+                    saveSvc(updated);
+                    setExpandedSvc(newSvc.id);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Plus size={14} /> Додати послугу
+                </button>
+              </div>
+            </div>
+
+            {/* Services list */}
+            <div className="space-y-3">
+              {svcList.map((svc, idx) => (
+                <div key={svc.id} className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] overflow-hidden">
+                  {/* Header row */}
+                  <div className="flex items-center gap-3 px-5 py-4">
+                    <GripVertical size={16} className="text-white/20 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{svc.title_ru}</p>
+                      <p className="text-white/40 text-xs">{svc.subtitle_ru} · {svc.price}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => { if (idx === 0) return; const l = [...svcList]; [l[idx-1], l[idx]] = [l[idx], l[idx-1]]; saveSvc(l); }} className="p-1.5 text-white/30 hover:text-white disabled:opacity-20" disabled={idx === 0}><ChevronUp size={14} /></button>
+                      <button onClick={() => { if (idx === svcList.length-1) return; const l = [...svcList]; [l[idx], l[idx+1]] = [l[idx+1], l[idx]]; saveSvc(l); }} className="p-1.5 text-white/30 hover:text-white disabled:opacity-20" disabled={idx === svcList.length-1}><ChevronDown size={14} /></button>
+                      <button onClick={() => setExpandedSvc(expandedSvc === svc.id ? null : svc.id)} className="px-3 py-1.5 rounded-lg text-white/40 hover:text-white border border-white/10 hover:border-white/25 transition-colors text-xs">
+                        {expandedSvc === svc.id ? "Згорнути" : "Редагувати"}
+                      </button>
+                      <button onClick={() => { if (confirm("Видалити послугу?")) saveSvc(svcList.filter(s => s.id !== svc.id)); }} className="p-1.5 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+
+                  {/* Edit form */}
+                  {expandedSvc === svc.id && (
+                    <div className="border-t border-white/10 p-5 space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Назва (RU)</label>
+                          <input className="admin-input w-full" value={svc.title_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, title_ru: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (RU)</label>
+                          <input className="admin-input w-full" value={svc.subtitle_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, subtitle_ru: e.target.value} : s))} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Назва (UK)</label>
+                          <input className="admin-input w-full" value={svc.title_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, title_uk: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (UK)</label>
+                          <input className="admin-input w-full" value={svc.subtitle_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, subtitle_uk: e.target.value} : s))} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Ціна</label>
+                        <input className="admin-input w-32" value={svc.price} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, price: e.target.value} : s))} />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
+                          <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_ru: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
+                          <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_uk: e.target.value} : s))} />
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (RU) — кожен з нового рядка</label>
+                          <textarea rows={5} className="admin-input w-full resize-none text-xs" value={svc.includes_ru.join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_ru: e.target.value.split("\n").filter(Boolean)} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (UK) — кожен з нового рядка</label>
+                          <textarea rows={5} className="admin-input w-full resize-none text-xs" value={svc.includes_uk.join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_uk: e.target.value.split("\n").filter(Boolean)} : s))} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Org questions */}
+            <div>
+              <h3 className="text-lg mb-4 text-[#C4A97A]" style={{ fontFamily: "var(--font-cormorant)" }}>Організаційні питання</h3>
+              <div className="space-y-3">
+                {orgList.map((item, idx) => (
+                  <div key={item.id} className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.15)] p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-white/40 text-xs">#{idx + 1}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => { if (idx===0) return; const l=[...orgList]; [l[idx-1],l[idx]]=[l[idx],l[idx-1]]; saveOrg(l); }} disabled={idx===0} className="p-1 text-white/30 hover:text-white disabled:opacity-20"><ChevronUp size={12}/></button>
+                        <button onClick={() => { if (idx===orgList.length-1) return; const l=[...orgList]; [l[idx],l[idx+1]]=[l[idx+1],l[idx]]; saveOrg(l); }} disabled={idx===orgList.length-1} className="p-1 text-white/30 hover:text-white disabled:opacity-20"><ChevronDown size={12}/></button>
+                        <button onClick={() => { if (confirm("Видалити?")) saveOrg(orgList.filter(o=>o.id!==item.id)); }} className="p-1 text-white/30 hover:text-red-400"><Trash2 size={12}/></button>
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_ru} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_ru: e.target.value} : o))} placeholder="RU" />
+                      <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_uk} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_uk: e.target.value} : o))} placeholder="UK" />
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => saveOrg([...orgList, { id: Date.now().toString(), text_ru: "", text_uk: "" }])}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-white/15 text-white/40 hover:text-white/70 text-sm w-full justify-center"
+                >
+                  <Plus size={14} /> Додати пункт
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-[#2A1F18] rounded-2xl p-5 border border-[rgba(196,169,122,0.1)]">
+              <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-2">Як опублікувати зміни</p>
+              <p className="text-white/50 text-sm">Натисни <strong className="text-white/70">«Копіювати JSON»</strong> → надішли розробнику → зміни з'являться для всіх</p>
+            </div>
           </div>
         )}
       </div>
