@@ -11,12 +11,12 @@ import { useLanguage } from '@/hooks/useLanguage';
 const FALLBACK_PHOTO = "/images/ellen-soul-taro-konsultant.jpg";
 
 function useProfilePhoto() {
-  const [url, setUrl] = useState(FALLBACK_PHOTO);
+  const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/photo")
       .then((r) => r.json())
-      .then((d) => { if (d.url) setUrl(d.url); })
-      .catch(() => {});
+      .then((d) => setUrl(d.url || FALLBACK_PHOTO))
+      .catch(() => setUrl(FALLBACK_PHOTO));
   }, []);
   return url;
 }
@@ -25,6 +25,7 @@ export default function AboutPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const photoUrl = useProfilePhoto();
+  const [imgVisible, setImgVisible] = useState(false);
 
   const values = isRu ? [
     {
@@ -108,14 +109,19 @@ export default function AboutPage() {
 
                 {/* Photo */}
                 <div className="relative w-[300px] h-[400px] rounded-3xl overflow-hidden shadow-[0_20px_80px_rgba(196,169,122,0.25)]">
-                  <Image
-                    src={photoUrl}
-                    alt="Ellen Soul — таро-консультант і психолог"
-                    fill
-                    className="object-cover object-top"
-                    sizes="300px"
-                    priority
-                  />
+                  {/* Skeleton while photo loads */}
+                  <div className={`absolute inset-0 bg-[#EDE5D4] transition-opacity duration-500 ${imgVisible ? 'opacity-0' : 'opacity-100'}`} />
+                  {photoUrl && (
+                    <Image
+                      src={photoUrl}
+                      alt="Ellen Soul — таро-консультант і психолог"
+                      fill
+                      className={`object-cover object-top transition-opacity duration-500 ${imgVisible ? 'opacity-100' : 'opacity-0'}`}
+                      sizes="300px"
+                      priority
+                      onLoad={() => setImgVisible(true)}
+                    />
+                  )}
                   {/* subtle overlay */}
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[rgba(28,21,18,0.12)]" />
                 </div>

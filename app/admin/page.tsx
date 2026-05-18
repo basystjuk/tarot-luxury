@@ -230,18 +230,25 @@ function PhotoCropper({
 
   const handleConfirm = () => {
     if (!imgSrc || !nat.w) return;
+    // Output at the natural resolution of the cropped area (capped at 2400px)
+    const srcW = CROP_W / scale;
+    const srcH = CROP_H / scale;
+    const maxPx = 2400;
+    const outScale = Math.min(1, maxPx / Math.max(srcW, srcH));
+    const outW = Math.round(srcW * outScale);
+    const outH = Math.round(srcH * outScale);
     const canvas = document.createElement("canvas");
-    canvas.width = CROP_W;
-    canvas.height = CROP_H;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const img = new window.Image();
     img.onload = () => {
-      ctx.drawImage(img, -offset.x / scale, -offset.y / scale, CROP_W / scale, CROP_H / scale, 0, 0, CROP_W, CROP_H);
+      ctx.drawImage(img, -offset.x / scale, -offset.y / scale, srcW, srcH, 0, 0, outW, outH);
       canvas.toBlob((blob) => {
         if (!blob) return;
         onConfirm(new File([blob], "ellen-soul-taro-konsultant.jpg", { type: "image/jpeg" }));
-      }, "image/jpeg", 0.93);
+      }, "image/jpeg", 0.95);
     };
     img.src = imgSrc;
   };
