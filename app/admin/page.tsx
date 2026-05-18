@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import type { Testimonial } from "@/lib/data/testimonials";
+import {
+  DEFAULT_SERVICES,
+  DEFAULT_ORG,
+  SERVICES_STORAGE_KEY,
+  ORG_STORAGE_KEY,
+  type ServiceItem,
+  type OrgItem,
+} from "@/lib/data/services";
 
 const ADMIN_PASSWORD = "ellensoul2025";
 const STORAGE_KEY = "ellen_admin_testimonials";
@@ -313,18 +321,29 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services">("testimonials");
+
+  // Services state
+  const [svcList, setSvcList] = useState<ServiceItem[]>(DEFAULT_SERVICES);
+  const [orgList, setOrgList] = useState<OrgItem[]>(DEFAULT_ORG);
+  const [expandedSvc, setExpandedSvc] = useState<string | null>(null);
 
   // Blog state
-  const BLOG_KEY = "ellen_admin_blog";
-  const [blogTitle_ru, setBlogTitleRu] = useState("Telegram-канал");
-  const [blogDesc_ru, setBlogDescRu] = useState("Там я регулярно публикую расклады, пишу о картах и делюсь мыслями.");
-  const [blogTitle_uk, setBlogTitleUk] = useState("Telegram-канал");
-  const [blogDesc_uk, setBlogDescUk] = useState("Там я регулярно публікую розклади, пишу про карти та ділюся думками.");
-  const [blogBtn_ru, setBlogBtnRu] = useState("Перейти в канал");
-  const [blogBtn_uk, setBlogBtnUk] = useState("Перейти в канал");
+  const [blogTitleRu, setBlogTitleRu] = useState("Telegram-канал");
+  const [blogDescRu, setBlogDescRu] = useState("Там я регулярно публикую расклады, пишу о картах и делюсь мыслями.");
+  const [blogBtnRu, setBlogBtnRu] = useState("Перейти в канал");
+  const [blogTitleUk, setBlogTitleUk] = useState("Telegram-канал");
+  const [blogDescUk, setBlogDescUk] = useState("Там я регулярно публікую розклади, пишу про карти та ділюся думками.");
+  const [blogBtnUk, setBlogBtnUk] = useState("Перейти в канал");
   const [blogLink, setBlogLink] = useState("https://t.me/ellen_soul_taro");
-  const [blogSaved, setBlogSaved] = useState(false);
+
+  // Global save indicator
+  const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Refs to always have latest values for publishContent
+  const svcRef = useRef(DEFAULT_SERVICES);
+  const orgRef = useRef(DEFAULT_ORG);
+  const testimonialsRef = useRef<Testimonial[]>([]);
+  const blogRef = useRef({ title_ru: "Telegram-канал", desc_ru: "", btn_ru: "", title_uk: "Telegram-канал", desc_uk: "", btn_uk: "", link: "" });
 
   // Photo upload state
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(DEFAULT_PHOTO);
@@ -337,40 +356,77 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try { setTestimonials(JSON.parse(saved)); } catch {}
-    }
-    // Load blog settings
-    const savedBlog = localStorage.getItem(BLOG_KEY);
-    if (savedBlog) {
-      try {
-        const b = JSON.parse(savedBlog);
-        if (b.title_ru) setBlogTitleRu(b.title_ru);
-        if (b.desc_ru) setBlogDescRu(b.desc_ru);
-        if (b.title_uk) setBlogTitleUk(b.title_uk);
-        if (b.desc_uk) setBlogDescUk(b.desc_uk);
-        if (b.btn_ru) setBlogBtnRu(b.btn_ru);
-        if (b.btn_uk) setBlogBtnUk(b.btn_uk);
-        if (b.link) setBlogLink(b.link);
-      } catch {}
-    }
-    // Load current photo from API (Vercel Blob or fallback)
+    // Load all content from Vercel Blob (single source of truth)
+    fetch("/api/content")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.services?.length) { setSvcList(d.services); svcRef.current = d.services; }
+        if (d.org?.length) { setOrgList(d.org); orgRef.current = d.org; }
+        if (d.testimonials?.length) { setTestimonials(d.testimonials); testimonialsRef.current = d.testimonials; }
+        if (d.blog) {
+          const b = d.blog;
+          if (b.title_ru) setBlogTitleRu(b.title_ru);
+          if (b.desc_ru) setBlogDescRu(b.desc_ru);
+          if (b.btn_ru) setBlogBtnRu(b.btn_ru);
+          if (b.title_uk) setBlogTitleUk(b.title_uk);
+          if (b.desc_uk) setBlogDescUk(b.desc_uk);
+          if (b.btn_uk) setBlogBtnUk(b.btn_uk);
+          if (b.link) setBlogLink(b.link);
+          blogRef.current = b;
+        }
+      })
+      .catch(() => {});
     fetch("/api/photo")
       .then((r) => r.json())
       .then((d) => { if (d.url) setCurrentPhotoUrl(d.url); })
       .catch(() => {});
-  }, [BLOG_KEY]);
+  }, []);
 
+  // Publish ALL content to Vercel Blob — called after every change
+  const publishContent = async (patch: {
+    services?: ServiceItem[];
+    org?: OrgItem[];
+    testimonials?: Testimonial[];
+    blog?: typeof blogRef.current;
+  } = {}) => {
+    if (patch.services) svcRef.current = patch.services;
+    if (patch.org) orgRef.current = patch.org;
+    if (patch.testimonials) testimonialsRef.current = patch.testimonials;
+    if (patch.blog) blogRef.current = patch.blog;
+    setSaving("saving");
+    try {
+      const res = await fetch("/api/admin/content", {
+        method: "POST",
+        headers: { "x-admin-password": ADMIN_PASSWORD, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          services: svcRef.current,
+          org: orgRef.current,
+          testimonials: testimonialsRef.current,
+          blog: blogRef.current,
+        }),
+      });
+      setSaving(res.ok ? "saved" : "error");
+    } catch {
+      setSaving("error");
+    }
+    setTimeout(() => setSaving("idle"), 2500);
+  };
+
+  const saveSvc = (list: ServiceItem[]) => {
+    setSvcList(list);
+    publishContent({ services: list });
+  };
+  const saveOrg = (list: OrgItem[]) => {
+    setOrgList(list);
+    publishContent({ org: list });
+  };
   const saveBlog = () => {
-    localStorage.setItem(BLOG_KEY, JSON.stringify({
-      title_ru: blogTitle_ru, desc_ru: blogDesc_ru,
-      title_uk: blogTitle_uk, desc_uk: blogDesc_uk,
-      btn_ru: blogBtn_ru, btn_uk: blogBtn_uk,
+    const blog = {
+      title_ru: blogTitleRu, desc_ru: blogDescRu, btn_ru: blogBtnRu,
+      title_uk: blogTitleUk, desc_uk: blogDescUk, btn_uk: blogBtnUk,
       link: blogLink,
-    }));
-    setBlogSaved(true);
-    setTimeout(() => setBlogSaved(false), 2000);
+    };
+    publishContent({ blog });
   };
 
   const handleFileSelect = useCallback((file: File) => {
@@ -435,7 +491,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const save = (list: Testimonial[]) => {
     setTestimonials(list);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    publishContent({ testimonials: list });
   };
 
   const addTestimonial = (t: Testimonial) => {
@@ -470,6 +526,20 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <span style={{ fontFamily: "var(--font-cormorant)" }} className="text-2xl text-[#C4A97A] font-light">
             Ellen Soul Admin
           </span>
+          {saving === "saving" && (
+            <span className="text-xs text-white/40 flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border border-white/20 border-t-[#D4A853] rounded-full animate-spin" />
+              Зберігається...
+            </span>
+          )}
+          {saving === "saved" && (
+            <span className="text-xs text-green-400 flex items-center gap-1.5">
+              <Check size={12} /> Збережено
+            </span>
+          )}
+          {saving === "error" && (
+            <span className="text-xs text-red-400">Помилка збереження</span>
+          )}
         </div>
         <button
           onClick={onLogout}
@@ -483,7 +553,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "testimonials", "blog"] as const).map((tab) => (
+          {(["photo", "testimonials", "blog", "services"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -493,7 +563,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   : "border-transparent text-white/40 hover:text-white/70"
               }`}
             >
-              {tab === "photo" ? "📷 Фото" : tab === "testimonials" ? "⭐ Відгуки" : "📝 Блог"}
+              {tab === "photo" ? "📷 Фото" : tab === "testimonials" ? "⭐ Відгуки" : tab === "blog" ? "📝 Блог" : "🛎 Послуги"}
             </button>
           ))}
         </div>
@@ -729,93 +799,251 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
 
-            {testimonials.length > 0 && (
-              <div className="bg-[#2A1F18] rounded-2xl p-5 border border-[rgba(196,169,122,0.1)]">
-                <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-2">
-                  Як опублікувати відгуки на сайті
-                </p>
-                <p className="text-white/50 text-sm leading-relaxed">
-                  1. Натисни <strong className="text-white/70">&ldquo;Копіювати JSON&rdquo;</strong> вгорі<br />
-                  2. Надішли мені (розробнику) скопійований текст<br />
-                  3. Я оновлю код — відгуки з'являться для всіх відвідувачів
-                </p>
-              </div>
-            )}
           </div>
         )}
 
         {/* ── Blog Tab ── */}
         {activeTab === "blog" && (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div>
-              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Сторінка блогу</h2>
-              <p className="text-white/40 text-sm">Текст картки з посиланням на Telegram-канал</p>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Блог — Telegram-блок</h2>
+              <p className="text-white/40 text-sm">Текст картки на сторінці «Блог» (посилання на Telegram-канал)</p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* RU */}
-              <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)] space-y-4">
-                <p className="text-xs text-[#C4A97A] tracking-widest uppercase">Російська</p>
+            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-6 space-y-5">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-white/40 block mb-1">Заголовок</label>
-                  <input className="admin-input w-full" value={blogTitle_ru} onChange={(e) => setBlogTitleRu(e.target.value)} />
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (RU)</label>
+                  <input className="admin-input w-full" value={blogTitleRu} onChange={e => setBlogTitleRu(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 block mb-1">Опис</label>
-                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDesc_ru} onChange={(e) => setBlogDescRu(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 block mb-1">Текст кнопки</label>
-                  <input className="admin-input w-full" value={blogBtn_ru} onChange={(e) => setBlogBtnRu(e.target.value)} />
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (UK)</label>
+                  <input className="admin-input w-full" value={blogTitleUk} onChange={e => setBlogTitleUk(e.target.value)} />
                 </div>
               </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescRu} onChange={e => setBlogDescRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescUk} onChange={e => setBlogDescUk(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (RU)</label>
+                  <input className="admin-input w-full" value={blogBtnRu} onChange={e => setBlogBtnRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (UK)</label>
+                  <input className="admin-input w-full" value={blogBtnUk} onChange={e => setBlogBtnUk(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Посилання</label>
+                <input className="admin-input w-full" value={blogLink} onChange={e => setBlogLink(e.target.value)} placeholder="https://t.me/..." />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={saveBlog}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> Зберегти
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-              {/* UK */}
-              <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)] space-y-4">
-                <p className="text-xs text-[#C4A97A] tracking-widest uppercase">Українська</p>
-                <div>
-                  <label className="text-xs text-white/40 block mb-1">Заголовок</label>
-                  <input className="admin-input w-full" value={blogTitle_uk} onChange={(e) => setBlogTitleUk(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 block mb-1">Опис</label>
-                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDesc_uk} onChange={(e) => setBlogDescUk(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-white/40 block mb-1">Текст кнопки</label>
-                  <input className="admin-input w-full" value={blogBtn_uk} onChange={(e) => setBlogBtnUk(e.target.value)} />
-                </div>
+        {/* ── Services Tab ── */}
+        {activeTab === "services" && (
+          <div className="space-y-8">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Послуги та ціни</h2>
+                <p className="text-white/40 text-sm">Керуй переліком послуг та організаційними питаннями</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const newSvc: ServiceItem = {
+                      id: Date.now().toString(),
+                      title_ru: "Новая услуга", subtitle_ru: "",
+                      title_uk: "Нова послуга", subtitle_uk: "",
+                      price: "$0",
+                      desc_ru: "", desc_uk: "",
+                      includes_ru: [], includes_uk: [],
+                    };
+                    const updated = [...svcList, newSvc];
+                    saveSvc(updated);
+                    setExpandedSvc(newSvc.id);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Plus size={14} /> Додати послугу
+                </button>
               </div>
             </div>
 
-            {/* Link */}
-            <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)]">
-              <label className="text-xs text-[#C4A97A] tracking-widest uppercase block mb-2">Посилання кнопки</label>
-              <input className="admin-input w-full" value={blogLink} onChange={(e) => setBlogLink(e.target.value)} placeholder="https://t.me/..." />
+            {/* Services list */}
+            <div className="space-y-3">
+              {svcList.map((svc, idx) => (
+                <div key={svc.id} className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] overflow-hidden">
+                  {/* Header row */}
+                  <div className="flex items-center gap-3 px-5 py-4">
+                    <GripVertical size={16} className="text-white/20 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{svc.title_ru}</p>
+                      <p className="text-white/40 text-xs">{svc.subtitle_ru} · {svc.price}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => { if (idx === 0) return; const l = [...svcList]; [l[idx-1], l[idx]] = [l[idx], l[idx-1]]; saveSvc(l); }} className="p-1.5 text-white/30 hover:text-white disabled:opacity-20" disabled={idx === 0}><ChevronUp size={14} /></button>
+                      <button onClick={() => { if (idx === svcList.length-1) return; const l = [...svcList]; [l[idx], l[idx+1]] = [l[idx+1], l[idx]]; saveSvc(l); }} className="p-1.5 text-white/30 hover:text-white disabled:opacity-20" disabled={idx === svcList.length-1}><ChevronDown size={14} /></button>
+                      <button onClick={() => setExpandedSvc(expandedSvc === svc.id ? null : svc.id)} className="px-3 py-1.5 rounded-lg text-white/40 hover:text-white border border-white/10 hover:border-white/25 transition-colors text-xs">
+                        {expandedSvc === svc.id ? "Згорнути" : "Редагувати"}
+                      </button>
+                      <button onClick={() => { if (confirm("Видалити послугу?")) saveSvc(svcList.filter(s => s.id !== svc.id)); }} className="p-1.5 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+
+                  {/* Edit form */}
+                  {expandedSvc === svc.id && (
+                    <div className="border-t border-white/10 p-5 space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Назва (RU)</label>
+                          <input className="admin-input w-full" value={svc.title_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, title_ru: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (RU)</label>
+                          <input className="admin-input w-full" value={svc.subtitle_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, subtitle_ru: e.target.value} : s))} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Назва (UK)</label>
+                          <input className="admin-input w-full" value={svc.title_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, title_uk: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (UK)</label>
+                          <input className="admin-input w-full" value={svc.subtitle_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, subtitle_uk: e.target.value} : s))} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Ціна</label>
+                        <input className="admin-input w-32" value={svc.price} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, price: e.target.value} : s))} />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
+                          <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_ru: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
+                          <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_uk: e.target.value} : s))} />
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (RU) — кожен з нового рядка</label>
+                          <textarea rows={5} className="admin-input w-full resize-none text-xs" value={svc.includes_ru.join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_ru: e.target.value.split("\n").filter(Boolean)} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (UK) — кожен з нового рядка</label>
+                          <textarea rows={5} className="admin-input w-full resize-none text-xs" value={svc.includes_uk.join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_uk: e.target.value.split("\n").filter(Boolean)} : s))} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {/* Preview */}
-            <div className="bg-[#2A1F18] rounded-2xl p-6 border border-[rgba(196,169,122,0.2)]">
-              <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-4">Прев'ю (RU)</p>
-              <div className="bg-[#FDFBF7] rounded-2xl p-8 text-center border border-[rgba(196,169,122,0.3)]">
-                <div className="text-3xl text-[#D4A853] mb-3">✦</div>
-                <p className="text-[#1C1512] text-xl mb-2" style={{ fontFamily: "Georgia, serif" }}>{blogTitle_ru}</p>
-                <p className="text-[#7A6A58] text-sm mb-5">{blogDesc_ru}</p>
-                <span className="bg-[#D4A853] text-white px-6 py-2.5 rounded-full text-sm inline-block">{blogBtn_ru}</span>
+            {/* Org questions */}
+            <div>
+              <h3 className="text-lg mb-4 text-[#C4A97A]" style={{ fontFamily: "var(--font-cormorant)" }}>Організаційні питання</h3>
+              <div className="space-y-3">
+                {orgList.map((item, idx) => (
+                  <div key={item.id} className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.15)] p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-white/40 text-xs">#{idx + 1}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => { if (idx===0) return; const l=[...orgList]; [l[idx-1],l[idx]]=[l[idx],l[idx-1]]; saveOrg(l); }} disabled={idx===0} className="p-1 text-white/30 hover:text-white disabled:opacity-20"><ChevronUp size={12}/></button>
+                        <button onClick={() => { if (idx===orgList.length-1) return; const l=[...orgList]; [l[idx],l[idx+1]]=[l[idx+1],l[idx]]; saveOrg(l); }} disabled={idx===orgList.length-1} className="p-1 text-white/30 hover:text-white disabled:opacity-20"><ChevronDown size={12}/></button>
+                        <button onClick={() => { if (confirm("Видалити?")) saveOrg(orgList.filter(o=>o.id!==item.id)); }} className="p-1 text-white/30 hover:text-red-400"><Trash2 size={12}/></button>
+                      </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_ru} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_ru: e.target.value} : o))} placeholder="RU" />
+                      <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_uk} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_uk: e.target.value} : o))} placeholder="UK" />
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => saveOrg([...orgList, { id: Date.now().toString(), text_ru: "", text_uk: "" }])}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-white/15 text-white/40 hover:text-white/70 text-sm w-full justify-center"
+                >
+                  <Plus size={14} /> Додати пункт
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <button
-                onClick={saveBlog}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
-              >
-                <Save size={14} />
-                {blogSaved ? "Збережено!" : "Зберегти в localStorage"}
-              </button>
-              <p className="text-white/30 text-xs">
-                Для публікації — надішли мені оновлений текст
-              </p>
+          </div>
+        )}
+
+        {/* ── Blog Tab ── */}
+        {activeTab === "blog" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Блог — Telegram-блок</h2>
+              <p className="text-white/40 text-sm">Текст картки на сторінці «Блог» (посилання на Telegram-канал)</p>
+            </div>
+
+            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-6 space-y-5">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (RU)</label>
+                  <input className="admin-input w-full" value={blogTitleRu} onChange={e => setBlogTitleRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (UK)</label>
+                  <input className="admin-input w-full" value={blogTitleUk} onChange={e => setBlogTitleUk(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescRu} onChange={e => setBlogDescRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescUk} onChange={e => setBlogDescUk(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (RU)</label>
+                  <input className="admin-input w-full" value={blogBtnRu} onChange={e => setBlogBtnRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (UK)</label>
+                  <input className="admin-input w-full" value={blogBtnUk} onChange={e => setBlogBtnUk(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Посилання</label>
+                <input className="admin-input w-full" value={blogLink} onChange={e => setBlogLink(e.target.value)} placeholder="https://t.me/..." />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={saveBlog}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> Зберегти
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -1,13 +1,36 @@
 "use client";
 
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
+const DEFAULT_BLOG = {
+  title_ru: "Telegram-канал",
+  desc_ru: "Там я регулярно публикую расклады, пишу о картах и делюсь мыслями.",
+  btn_ru: "Перейти в канал",
+  title_uk: "Telegram-канал",
+  desc_uk: "Там я регулярно публікую розклади, пишу про карти та ділюся думками.",
+  btn_uk: "Перейти в канал",
+  link: "https://t.me/ellen_soul_taro",
+};
+
 export default function BlogPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
+
+  const [blog, setBlog] = useState(DEFAULT_BLOG);
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then((r) => r.json())
+      .then((d) => { if (d.blog) setBlog(d.blog); })
+      .catch(() => {});
+  }, []);
+
+  const title = isRu ? blog.title_ru : blog.title_uk;
+  const desc = isRu ? blog.desc_ru : blog.desc_uk;
+  const btn = isRu ? blog.btn_ru : blog.btn_uk;
 
   return (
     <>
@@ -47,20 +70,18 @@ export default function BlogPage() {
                 className="text-3xl text-[#1C1512] mb-4"
                 style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
               >
-                {isRu ? "Telegram-канал" : "Telegram-канал"}
+                {title}
               </h2>
               <p className="text-[#7A6A58] mb-8 leading-relaxed">
-                {isRu
-                  ? "Там я регулярно публикую расклады, пишу о картах и делюсь мыслями."
-                  : "Там я регулярно публікую розклади, пишу про карти та ділюся думками."}
+                {desc}
               </p>
               <a
-                href="https://t.me/ellen_soul_taro"
+                href={blog.link}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary inline-flex"
               >
-                {isRu ? "Перейти в канал" : "Перейти в канал"}
+                {btn}
               </a>
             </div>
           </AnimatedSection>

@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import AnimatedSection from "@/components/ui/AnimatedSection";
-import { testimonials } from "@/lib/data/testimonials";
+import { testimonials as DEFAULT_TESTIMONIALS, type Testimonial } from "@/lib/data/testimonials";
 import { useLanguage } from "@/hooks/useLanguage";
 
 function StarRating({ count }: { count: number }) {
@@ -21,6 +22,15 @@ function StarRating({ count }: { count: number }) {
 export default function Testimonials() {
   const { language } = useLanguage();
   const isRu = language === "ru";
+
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(DEFAULT_TESTIMONIALS);
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then((r) => r.json())
+      .then((d) => { if (d.testimonials?.length) setTestimonials(d.testimonials); })
+      .catch(() => {});
+  }, []);
 
   const visible = testimonials.filter((t) => t.visible);
 
