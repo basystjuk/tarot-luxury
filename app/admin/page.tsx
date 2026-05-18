@@ -321,7 +321,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services" | "faq" | "contacts">("testimonials");
 
   // Services state
   const [svcList, setSvcList] = useState<ServiceItem[]>(DEFAULT_SERVICES);
@@ -337,6 +337,27 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [blogBtnUk, setBlogBtnUk] = useState("Перейти в канал");
   const [blogLink, setBlogLink] = useState("https://t.me/ellen_soul_taro");
 
+  // Contacts state
+  const [contactsTg, setContactsTg] = useState("@ellen_soul_taro");
+  const [contactsTgUrl, setContactsTgUrl] = useState("https://t.me/ellen_soul_taro");
+  const [contactsWa, setContactsWa] = useState("https://wa.me/380000000000");
+  const [contactsIg, setContactsIg] = useState("@ellen_soul_taro");
+  const [contactsIgUrl, setContactsIgUrl] = useState("https://instagram.com/ellen_soul_taro");
+  const [contactsSaved, setContactsSaved] = useState(false);
+
+  // FAQ state
+  type FaqItem = { id: string; category: string; q: string; a: string };
+  const [faqLang, setFaqLang] = useState<"uk" | "ru" | "en">("uk");
+  const [faqUk, setFaqUk] = useState<FaqItem[]>([]);
+  const [faqRu, setFaqRu] = useState<FaqItem[]>([]);
+  const [faqEn, setFaqEn] = useState<FaqItem[]>([]);
+  const [faqSaved, setFaqSaved] = useState(false);
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
+  const [newFaqCategory, setNewFaqCategory] = useState("");
+  const [newFaqQ, setNewFaqQ] = useState("");
+  const [newFaqA, setNewFaqA] = useState("");
+  const [addingFaq, setAddingFaq] = useState(false);
+
   // Global save indicator
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // Refs to always have latest values for publishContent
@@ -344,6 +365,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const orgRef = useRef(DEFAULT_ORG);
   const testimonialsRef = useRef<Testimonial[]>([]);
   const blogRef = useRef({ title_ru: "Telegram-канал", desc_ru: "", btn_ru: "", title_uk: "Telegram-канал", desc_uk: "", btn_uk: "", link: "" });
+  const contactsRef = useRef({ telegram_handle: "@ellen_soul_taro", telegram_url: "https://t.me/ellen_soul_taro", whatsapp_url: "https://wa.me/380000000000", instagram_handle: "@ellen_soul_taro", instagram_url: "https://instagram.com/ellen_soul_taro" });
+  const faqUkRef = useRef<FaqItem[]>([]);
+  const faqRuRef = useRef<FaqItem[]>([]);
+  const faqEnRef = useRef<FaqItem[]>([]);
 
   // Photo upload state
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(DEFAULT_PHOTO);
@@ -374,6 +399,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           if (b.link) setBlogLink(b.link);
           blogRef.current = b;
         }
+        if (d.contacts) {
+          setContactsTg(d.contacts.telegram_handle ?? "@ellen_soul_taro");
+          setContactsTgUrl(d.contacts.telegram_url ?? "https://t.me/ellen_soul_taro");
+          setContactsWa(d.contacts.whatsapp_url ?? "https://wa.me/380000000000");
+          setContactsIg(d.contacts.instagram_handle ?? "@ellen_soul_taro");
+          setContactsIgUrl(d.contacts.instagram_url ?? "https://instagram.com/ellen_soul_taro");
+          contactsRef.current = d.contacts;
+        }
+        if (d.faq_uk) { setFaqUk(d.faq_uk); faqUkRef.current = d.faq_uk; }
+        if (d.faq_ru) { setFaqRu(d.faq_ru); faqRuRef.current = d.faq_ru; }
+        if (d.faq_en) { setFaqEn(d.faq_en); faqEnRef.current = d.faq_en; }
       })
       .catch(() => {});
     fetch("/api/photo")
@@ -403,6 +439,45 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           org: orgRef.current,
           testimonials: testimonialsRef.current,
           blog: blogRef.current,
+          contacts: contactsRef.current,
+          faq_uk: faqUkRef.current,
+          faq_ru: faqRuRef.current,
+          faq_en: faqEnRef.current,
+        }),
+      });
+      setSaving(res.ok ? "saved" : "error");
+    } catch {
+      setSaving("error");
+    }
+    setTimeout(() => setSaving("idle"), 2500);
+  };
+
+  // Save all content including contacts and FAQ
+  const saveAllContent = async () => {
+    contactsRef.current = {
+      telegram_handle: contactsTg,
+      telegram_url: contactsTgUrl,
+      whatsapp_url: contactsWa,
+      instagram_handle: contactsIg,
+      instagram_url: contactsIgUrl,
+    };
+    faqUkRef.current = faqUk;
+    faqRuRef.current = faqRu;
+    faqEnRef.current = faqEn;
+    setSaving("saving");
+    try {
+      const res = await fetch("/api/admin/content", {
+        method: "POST",
+        headers: { "x-admin-password": ADMIN_PASSWORD, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          services: svcRef.current,
+          org: orgRef.current,
+          testimonials: testimonialsRef.current,
+          blog: blogRef.current,
+          contacts: contactsRef.current,
+          faq_uk: faqUkRef.current,
+          faq_ru: faqRuRef.current,
+          faq_en: faqEnRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -553,7 +628,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "testimonials", "blog", "services"] as const).map((tab) => (
+          {(["photo", "testimonials", "blog", "services", "faq", "contacts"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -563,7 +638,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   : "border-transparent text-white/40 hover:text-white/70"
               }`}
             >
-              {tab === "photo" ? "📷 Фото" : tab === "testimonials" ? "⭐ Відгуки" : tab === "blog" ? "📝 Блог" : "🛎 Послуги"}
+              {tab === "photo" ? "📷 Фото" : tab === "testimonials" ? "⭐ Відгуки" : tab === "blog" ? "📝 Блог" : tab === "services" ? "🛎 Послуги" : tab === "faq" ? "❓ FAQ" : "📞 Контакти"}
             </button>
           ))}
         </div>
@@ -993,60 +1068,131 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {/* ── Blog Tab ── */}
-        {activeTab === "blog" && (
+        {/* ── Contacts Tab ── */}
+        {activeTab === "contacts" && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Блог — Telegram-блок</h2>
-              <p className="text-white/40 text-sm">Текст картки на сторінці «Блог» (посилання на Telegram-канал)</p>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Контакти для зв&apos;язку</h2>
+              <p className="text-white/40 text-sm">Посилання у блоці «Швидкий зв&apos;язок» на сторінці Контакти</p>
             </div>
-
-            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-6 space-y-5">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (RU)</label>
-                  <input className="admin-input w-full" value={blogTitleRu} onChange={e => setBlogTitleRu(e.target.value)} />
+            <div className="grid gap-4">
+              {([
+                { label: "Telegram handle", val: contactsTg, set: setContactsTg, placeholder: "@ellen_soul_taro" },
+                { label: "Telegram URL", val: contactsTgUrl, set: setContactsTgUrl, placeholder: "https://t.me/..." },
+                { label: "WhatsApp URL", val: contactsWa, set: setContactsWa, placeholder: "https://wa.me/380..." },
+                { label: "Instagram handle", val: contactsIg, set: setContactsIg, placeholder: "@ellen_soul_taro" },
+                { label: "Instagram URL", val: contactsIgUrl, set: setContactsIgUrl, placeholder: "https://instagram.com/..." },
+              ] as { label: string; val: string; set: (v: string) => void; placeholder: string }[]).map(({ label, val, set, placeholder }) => (
+                <div key={label}>
+                  <label className="block text-xs text-white/50 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={val}
+                    onChange={e => set(e.target.value)}
+                    placeholder={placeholder}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#D4A853]"
+                  />
                 </div>
-                <div>
-                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (UK)</label>
-                  <input className="admin-input w-full" value={blogTitleUk} onChange={e => setBlogTitleUk(e.target.value)} />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
-                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescRu} onChange={e => setBlogDescRu(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
-                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescUk} onChange={e => setBlogDescUk(e.target.value)} />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (RU)</label>
-                  <input className="admin-input w-full" value={blogBtnRu} onChange={e => setBlogBtnRu(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (UK)</label>
-                  <input className="admin-input w-full" value={blogBtnUk} onChange={e => setBlogBtnUk(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Посилання</label>
-                <input className="admin-input w-full" value={blogLink} onChange={e => setBlogLink(e.target.value)} placeholder="https://t.me/..." />
-              </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={saveBlog}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
-                >
-                  <Save size={14} /> Зберегти
-                </button>
-              </div>
+              ))}
             </div>
+            <button
+              onClick={async () => { await saveAllContent(); setContactsSaved(true); setTimeout(() => setContactsSaved(false), 2000); }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+            >
+              {contactsSaved ? "✓ Збережено" : "Зберегти контакти"}
+            </button>
           </div>
         )}
+
+        {/* ── FAQ Tab ── */}
+        {activeTab === "faq" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>FAQ — Твоя підказка</h2>
+                <p className="text-white/40 text-sm">Редагування питань і відповідей</p>
+              </div>
+              <div className="flex gap-2">
+                {(["uk", "ru", "en"] as const).map(l => (
+                  <button key={l} onClick={() => setFaqLang(l)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${faqLang === l ? "bg-[#D4A853] text-white" : "bg-white/10 text-white/60 hover:bg-white/20"}`}>
+                    {l === "uk" ? "УКР" : l === "ru" ? "РУС" : "ENG"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Item list */}
+            {(() => {
+              const items = faqLang === "uk" ? faqUk : faqLang === "ru" ? faqRu : faqEn;
+              const setItems = faqLang === "uk" ? setFaqUk : faqLang === "ru" ? setFaqRu : setFaqEn;
+              return (
+                <div className="space-y-3">
+                  {items.map((item, idx) => (
+                    <div key={item.id} className="bg-white/5 rounded-xl border border-white/10 p-4">
+                      {editingFaqId === item.id ? (
+                        <div className="space-y-3">
+                          <input value={item.category} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, category: e.target.value } : it))}
+                            placeholder="Категорія" className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm" />
+                          <input value={item.q} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, q: e.target.value } : it))}
+                            placeholder="Питання" className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm" />
+                          <textarea rows={3} value={item.a} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, a: e.target.value } : it))}
+                            placeholder="Відповідь" className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm resize-none" />
+                          <button onClick={() => setEditingFaqId(null)} className="text-[#D4A853] text-sm">✓ Готово</button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <span className="text-xs text-[#C4A97A] uppercase tracking-wider">{item.category}</span>
+                            <p className="text-white/80 text-sm mt-1">{item.q}</p>
+                            <p className="text-white/40 text-xs mt-1 line-clamp-2">{item.a}</p>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button onClick={() => setEditingFaqId(item.id)} className="text-white/40 hover:text-white text-xs px-2 py-1 rounded border border-white/20">✏️</button>
+                            <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-400/60 hover:text-red-400 text-xs px-2 py-1 rounded border border-red-400/20">✕</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Add new */}
+            {addingFaq ? (
+              <div className="bg-white/5 rounded-xl border border-[#D4A853]/30 p-4 space-y-3">
+                <p className="text-white/60 text-sm">Нове питання ({faqLang.toUpperCase()})</p>
+                <input value={newFaqCategory} onChange={e => setNewFaqCategory(e.target.value)} placeholder="Категорія"
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm" />
+                <input value={newFaqQ} onChange={e => setNewFaqQ(e.target.value)} placeholder="Питання"
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm" />
+                <textarea rows={3} value={newFaqA} onChange={e => setNewFaqA(e.target.value)} placeholder="Відповідь"
+                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm resize-none" />
+                <div className="flex gap-3">
+                  <button onClick={() => {
+                    if (!newFaqQ.trim()) return;
+                    const newItem: FaqItem = { id: Date.now().toString(), category: newFaqCategory, q: newFaqQ, a: newFaqA };
+                    const setItems = faqLang === "uk" ? setFaqUk : faqLang === "ru" ? setFaqRu : setFaqEn;
+                    setItems(prev => [...prev, newItem]);
+                    setNewFaqCategory(""); setNewFaqQ(""); setNewFaqA(""); setAddingFaq(false);
+                  }} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium">+ Додати</button>
+                  <button onClick={() => setAddingFaq(false)} className="text-white/40 text-sm">Скасувати</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setAddingFaq(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-white/15 text-white/40 hover:text-white/70 text-sm w-full justify-center">
+                + Додати питання
+              </button>
+            )}
+
+            <button onClick={async () => { await saveAllContent(); setFaqSaved(true); setTimeout(() => setFaqSaved(false), 2000); }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium">
+              {faqSaved ? "✓ Збережено" : "Зберегти FAQ"}
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );
