@@ -1,10 +1,13 @@
 'use client';
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
+
+const PHOTO_PATH = "/images/ellen-soul-taro-konsultant.jpg";
 
 export default function AboutPage() {
   const { language } = useLanguage();
@@ -85,23 +88,27 @@ export default function AboutPage() {
             {/* Visual */}
             <AnimatedSection direction="right">
               <div className="relative flex justify-center">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-[360px] h-[360px] rounded-full border border-[rgba(196,169,122,0.15)]" />
+                {/* Decorative ring */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-[380px] h-[380px] rounded-full border border-[rgba(196,169,122,0.15)]" />
                 </div>
-                <div className="relative w-[300px] h-[380px] rounded-[50%] bg-gradient-to-b from-[#E8DCC5] via-[#D4B88A] to-[#C4A97A] shadow-[0_20px_80px_rgba(196,169,122,0.25)]">
-                  <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-transparent to-[rgba(28,21,18,0.15)]" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span
-                      className="text-8xl text-white/50"
-                      style={{ fontFamily: "var(--font-cormorant)", fontWeight: 300 }}
-                    >
-                      О
-                    </span>
-                  </div>
+
+                {/* Photo */}
+                <div className="relative w-[300px] h-[400px] rounded-3xl overflow-hidden shadow-[0_20px_80px_rgba(196,169,122,0.25)]">
+                  <Image
+                    src={PHOTO_PATH}
+                    alt="Ellen Soul — таро-консультант і психолог"
+                    fill
+                    className="object-cover object-top"
+                    sizes="300px"
+                    priority
+                  />
+                  {/* subtle overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[rgba(28,21,18,0.12)]" />
                 </div>
 
                 {/* Stats badge */}
-                <div className="absolute top-8 -left-4 card-luxury !p-5 !rounded-2xl text-center">
+                <div className="absolute top-8 -left-4 card-luxury !p-5 !rounded-2xl text-center shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
                   <p
                     className="text-3xl text-[#B8883A] mb-1"
                     style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}

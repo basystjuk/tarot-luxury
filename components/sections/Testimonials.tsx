@@ -1,40 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import AnimatedSection from "@/components/ui/AnimatedSection";
-
-const reviews = [
-  {
-    text: "Ellen Soul — це не просто таро. Це глибокий аналіз ситуації, тактовні запитання та дивовижно точні відповіді. Після нашої сесії я нарешті зрозуміла, чому так довго трималась за стосунки, які мене руйнували.",
-    name: "Марія К.",
-    city: "Київ",
-    rating: 5,
-  },
-  {
-    text: "Дуже рекомендую! Запис проходить швидко, консультація онлайн — зручно та комфортно. Карти допомогли побачити картину відносин ніби збоку. Ellen Soul пояснює м'яко, без осуду.",
-    name: "Вікторія Л.",
-    city: "Харків",
-    rating: 5,
-  },
-  {
-    text: "Я скептично ставилась до таро, але подруга переконала спробувати. Тепер я сама рекомендую Олену всім своїм знайомим. Неймовірно точно і при цьому дуже психологічно обґрунтовано.",
-    name: "Олеся Т.",
-    city: "Львів",
-    rating: 5,
-  },
-  {
-    text: "Картка місяця — мій маленький ритуал тепер. Кожен місяць Ellen Soul дає такий чіткий орієнтир на наступні тижні, що я вже планую своє життя разом із її консультаціями.",
-    name: "Даша М.",
-    city: "Одеса",
-    rating: 5,
-  },
-  {
-    text: "Прийшла на аналіз пари з дуже болісним питанням. Ellen Soul не просто розклала карти — вона допомогла мені самій дійти до відповіді. Я вийшла із сесії легкою і з ясним розумінням, що робити.",
-    name: "Ірина С.",
-    city: "Дніпро",
-    rating: 5,
-  },
-];
+import { testimonials } from "@/lib/data/testimonials";
+import { useLanguage } from "@/hooks/useLanguage";
 
 function StarRating({ count }: { count: number }) {
   return (
@@ -49,36 +19,59 @@ function StarRating({ count }: { count: number }) {
 }
 
 export default function Testimonials() {
+  const { language } = useLanguage();
+  const isRu = language === "ru";
+
+  const visible = testimonials.filter((t) => t.visible);
+
+  // If no testimonials yet — render nothing
+  if (visible.length === 0) return null;
+
+  const stats = isRu
+    ? [
+        { value: "500+", label: "консультаций" },
+        { value: "5+", label: "лет практики" },
+        { value: "98%", label: "довольных клиенток" },
+        { value: "12", label: "стран" },
+      ]
+    : [
+        { value: "500+", label: "консультацій" },
+        { value: "5+", label: "років практики" },
+        { value: "98%", label: "задоволених клієнток" },
+        { value: "12", label: "країн" },
+      ];
+
   return (
     <section className="section-padding bg-[#F2EBD9]">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <AnimatedSection className="text-center mb-16">
-          <span className="tag mb-4 inline-block">Відгуки</span>
+          <span className="tag mb-4 inline-block">
+            {isRu ? "Отзывы" : "Відгуки"}
+          </span>
           <h2 className="text-4xl lg:text-5xl" style={{ fontFamily: "var(--font-cormorant)" }}>
-            Що кажуть клієнтки
+            {isRu ? "Что говорят клиентки" : "Що кажуть клієнтки"}
           </h2>
         </AnimatedSection>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {reviews.slice(0, 3).map((review, i) => (
-            <AnimatedSection key={i} delay={i * 0.1}>
+          {visible.slice(0, 3).map((review, i) => (
+            <AnimatedSection key={review.id} delay={i * 0.1}>
               <motion.div
                 whileHover={{ y: -4 }}
                 className="card-luxury relative h-full flex flex-col"
               >
-                {/* Gold quote mark */}
                 <span
                   className="text-6xl text-[#D4A853] leading-none mb-2 select-none"
                   style={{ fontFamily: "var(--font-cormorant)", lineHeight: 1 }}
                   aria-hidden="true"
                 >
-                  "
+                  &ldquo;
                 </span>
 
                 <StarRating count={review.rating} />
 
                 <p className="text-[#5C4530] leading-relaxed flex-1 mb-6 text-base">
-                  {review.text}
+                  {isRu ? review.text_ru : review.text_uk}
                 </p>
 
                 <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[rgba(196,169,122,0.2)]">
@@ -98,12 +91,7 @@ export default function Testimonials() {
         {/* Trust stats */}
         <AnimatedSection delay={0.3} className="mt-16">
           <div className="flex flex-wrap justify-center gap-x-12 gap-y-6 text-center">
-            {[
-              { value: "500+", label: "консультацій" },
-              { value: "4 роки", label: "практики" },
-              { value: "98%", label: "задоволених клієнток" },
-              { value: "12", label: "країн присутності" },
-            ].map((stat) => (
+            {stats.map((stat) => (
               <div key={stat.label}>
                 <p
                   className="text-3xl text-[#B8883A] mb-1"
@@ -116,6 +104,14 @@ export default function Testimonials() {
             ))}
           </div>
         </AnimatedSection>
+
+        {visible.length > 3 && (
+          <AnimatedSection delay={0.4} className="text-center mt-10">
+            <Link href="/reviews" className="btn-outline">
+              {isRu ? "Все отзывы" : "Всі відгуки"}
+            </Link>
+          </AnimatedSection>
+        )}
       </div>
     </section>
   );
