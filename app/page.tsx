@@ -100,8 +100,8 @@ export default function HomePage() {
   ];
 
   const trustItems = isRu
-    ? ["500+ консультаций", "4 года практики", "98% довольных"]
-    : ["500+ консультацій", "4 роки практики", "98% задоволених"];
+    ? ["500+ консультаций", "5+ лет практики", "98% довольных"]
+    : ["500+ консультацій", "5+ років практики", "98% задоволених"];
 
   return (
     <>
@@ -171,8 +171,8 @@ export default function HomePage() {
             className="text-lg text-[#7A6A58] max-w-xl mx-auto mb-10 leading-relaxed"
           >
             {isRu
-              ? "Ellen Soul — сертифицированный таро-консультант и психолог с 4-летним опытом работы с темами любви, самопознания и женских отношений."
-              : "Ellen Soul — сертифікований таро-консультант і психолог з 4-річним досвідом роботи з темами кохання, самопізнання та жіночих стосунків."}
+              ? "Эмпат. Пять лет практикую Таро. Для меня Таро — это не «волшебная пилюля», а разговор с вами и вашей ситуацией. Главное направление — любовь и отношения."
+              : "Емпат. П'ять років практикую Таро. Для мене Таро — це не «чарівна таблетка», а розмова з вами і вашою ситуацією. Головний напрямок — любов і відносини."}
           </motion.p>
 
           <motion.div
@@ -330,7 +330,7 @@ export default function HomePage() {
                     className="text-2xl text-[#B8883A]"
                     style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
                   >
-                    {isRu ? "4 года" : "4 роки"}
+                    {isRu ? "5+ лет" : "5+ років"}
                   </p>
                 </motion.div>
               </div>
@@ -465,7 +465,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
               <a
-                href="https://t.me/olena_tarot"
+                href="https://t.me/ellen_soul_taro"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary"
@@ -473,12 +473,12 @@ export default function HomePage() {
                 Telegram
               </a>
               <a
-                href="https://instagram.com/olena_tarot"
+                href="https://www.tiktok.com/@ellen_soul_taro"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-outline !border-white/30 !text-white hover:!border-[#D4A853] hover:!text-[#D4A853]"
               >
-                Instagram
+                TikTok
               </a>
             </div>
           </AnimatedSection>

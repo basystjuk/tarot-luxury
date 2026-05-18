@@ -21,6 +21,14 @@ function TelegramIcon() {
   );
 }
 
+function TikTokIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/>
+    </svg>
+  );
+}
+
 export default function Footer() {
   const { t } = useLanguage();
 
@@ -70,13 +78,13 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-sm leading-relaxed text-white/50 mb-8 max-w-xs">
-              Допомагаю жінкам знайти відповіді серця через мову карт і глибинну психологію.
+              {t('footer.tagline')}
             </p>
 
             {/* Socials */}
             <div className="flex gap-4">
               <a
-                href="https://instagram.com"
+                href="https://instagram.com/ellen_soul_taro"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
@@ -85,13 +93,22 @@ export default function Footer() {
                 <InstagramIcon />
               </a>
               <a
-                href="https://t.me"
+                href="https://t.me/ellen_soul_taro"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
                 aria-label="Telegram"
               >
                 <TelegramIcon />
+              </a>
+              <a
+                href="https://www.tiktok.com/@ellen_soul_taro"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
+                aria-label="TikTok"
+              >
+                <TikTokIcon />
               </a>
             </div>
           </div>

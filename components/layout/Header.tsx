@@ -210,7 +210,7 @@ export default function Header() {
                   onClick={() => setMenuOpen(false)}
                   className="btn-primary w-full text-center"
                 >
-                  Записатись на консультацію
+                  {language === 'ru' ? 'Записаться на консультацию' : 'Записатись на консультацію'}
                 </Link>
               </motion.div>
             </div>

@@ -230,7 +230,7 @@ export const translations = {
     'contacts.working_hours.value': 'Пн–Пт: 10:00–20:00',
 
     // ── Footer ───────────────────────────────────────────────────────────────
-    'footer.tagline': 'Таро · Психологія · Відносини',
+    'footer.tagline': 'Допомагаю знайти відповіді серця через мову карт і глибинну психологію.',
     'footer.nav.title': 'Навігація',
     'footer.faq': 'Питання та відповіді',
     'footer.services.title': 'Послуги',
@@ -476,7 +476,7 @@ export const translations = {
     'contacts.working_hours.value': 'Пн–Пт: 10:00–20:00',
 
     // ── Footer ───────────────────────────────────────────────────────────────
-    'footer.tagline': 'Таро · Психология · Отношения',
+    'footer.tagline': 'Помогаю найти ответы сердца через язык карт и глубинную психологию.',
     'footer.nav.title': 'Навигация',
     'footer.faq': 'Вопросы и ответы',
     'footer.services.title': 'Услуги',

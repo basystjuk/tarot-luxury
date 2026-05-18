@@ -231,7 +231,7 @@ export default function ContactsPage() {
                     {isRu ? "Быстрая связь" : "Швидший зв'язок"}
                   </h3>
                   <a
-                    href="https://t.me/olena_tarot"
+                    href="https://t.me/ellen_soul_taro"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 rounded-xl border border-[rgba(196,169,122,0.3)] hover:border-[#D4A853] transition-all duration-300 hover:shadow-[0_4px_20px_rgba(212,168,83,0.12)] mb-3 group"
@@ -241,11 +241,11 @@ export default function ContactsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-[#1C1512] text-sm">Telegram</p>
-                      <p className="text-xs text-[#7A6A58]">@olena_tarot</p>
+                      <p className="text-xs text-[#7A6A58]">@ellen_soul_taro</p>
                     </div>
                   </a>
                   <a
-                    href="https://instagram.com/olena_tarot"
+                    href="https://instagram.com/ellen_soul_taro"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-4 p-4 rounded-xl border border-[rgba(196,169,122,0.3)] hover:border-[#D4A853] transition-all duration-300 hover:shadow-[0_4px_20px_rgba(212,168,83,0.12)] group"
@@ -255,7 +255,7 @@ export default function ContactsPage() {
                     </div>
                     <div>
                       <p className="font-medium text-[#1C1512] text-sm">Instagram</p>
-                      <p className="text-xs text-[#7A6A58]">@olena_tarot</p>
+                      <p className="text-xs text-[#7A6A58]">@ellen_soul_taro</p>
                     </div>
                   </a>
                 </div>
