@@ -79,7 +79,7 @@ export default function LangLayout({
   children,
 }: {
   children: ReactNode;
-  params: { lang: string };
+  params: Promise<{ lang: string }>;
 }) {
   return <>{children}</>;
 }
