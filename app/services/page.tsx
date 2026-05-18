@@ -6,14 +6,7 @@ import { Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
-import {
-  DEFAULT_SERVICES,
-  DEFAULT_ORG,
-  SERVICES_STORAGE_KEY,
-  ORG_STORAGE_KEY,
-  type ServiceItem,
-  type OrgItem,
-} from "@/lib/data/services";
+import { DEFAULT_SERVICES, DEFAULT_ORG, type ServiceItem, type OrgItem } from "@/lib/data/services";
 
 export default function ServicesPage() {
   const { language } = useLanguage();
@@ -22,14 +15,14 @@ export default function ServicesPage() {
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [orgItems, setOrgItems] = useState<OrgItem[]>(DEFAULT_ORG);
 
-  // Load admin overrides from localStorage if available
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(SERVICES_STORAGE_KEY);
-      if (s) setServices(JSON.parse(s));
-      const o = localStorage.getItem(ORG_STORAGE_KEY);
-      if (o) setOrgItems(JSON.parse(o));
-    } catch {}
+    fetch("/api/content")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.services?.length) setServices(d.services);
+        if (d.org?.length) setOrgItems(d.org);
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -80,7 +73,12 @@ export default function ServicesPage() {
                       >
                         {title}
                         {subtitle && (
-                          <span className="text-[#B8883A]"> ({subtitle})</span>
+                          <span
+                            className="text-[#9A7040]"
+                            style={{ fontSize: "0.65em", fontWeight: 400 }}
+                          >
+                            {" "}({subtitle.charAt(0).toLowerCase() + subtitle.slice(1)})
+                          </span>
                         )}
                       </h2>
                       <p className="text-[#7A6A58] leading-relaxed mb-6">{desc}</p>
@@ -97,12 +95,17 @@ export default function ServicesPage() {
                     {/* Price & CTA — centered */}
                     <div className="flex flex-col items-center justify-center gap-6 text-center">
                       <div>
-                        <p className="text-xs text-[#7A6A58] tracking-widest uppercase mb-2">
+                        <p className="text-xs text-[#7A6A58] tracking-widest uppercase mb-3">
                           {isRu ? 'Стоимость' : 'Вартість'}
                         </p>
                         <p
-                          className="text-5xl text-[#B8883A]"
-                          style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
+                          className="text-[3.5rem] leading-none text-[#B8883A]"
+                          style={{
+                            fontFamily: "var(--font-jost)",
+                            fontWeight: 300,
+                            fontVariantNumeric: "lining-nums",
+                            letterSpacing: "-0.02em",
+                          }}
                         >
                           {svc.price}
                         </p>

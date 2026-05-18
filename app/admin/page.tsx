@@ -329,6 +329,23 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [expandedSvc, setExpandedSvc] = useState<string | null>(null);
   const [svcCopied, setSvcCopied] = useState(false);
 
+  // Blog state
+  const [blogTitleRu, setBlogTitleRu] = useState("Telegram-канал");
+  const [blogDescRu, setBlogDescRu] = useState("Там я регулярно публикую расклады, пишу о картах и делюсь мыслями.");
+  const [blogBtnRu, setBlogBtnRu] = useState("Перейти в канал");
+  const [blogTitleUk, setBlogTitleUk] = useState("Telegram-канал");
+  const [blogDescUk, setBlogDescUk] = useState("Там я регулярно публікую розклади, пишу про карти та ділюся думками.");
+  const [blogBtnUk, setBlogBtnUk] = useState("Перейти в канал");
+  const [blogLink, setBlogLink] = useState("https://t.me/ellen_soul_taro");
+
+  // Global save indicator
+  const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Refs to always have latest values for publishContent
+  const svcRef = useRef(DEFAULT_SERVICES);
+  const orgRef = useRef(DEFAULT_ORG);
+  const testimonialsRef = useRef<Testimonial[]>([]);
+  const blogRef = useRef({ title_ru: "Telegram-канал", desc_ru: "", btn_ru: "", title_uk: "Telegram-канал", desc_uk: "", btn_uk: "", link: "" });
+
   // Photo upload state
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(DEFAULT_PHOTO);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -340,30 +357,84 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) { try { setTestimonials(JSON.parse(saved)); } catch {} }
-    const savedSvc = localStorage.getItem(SERVICES_STORAGE_KEY);
-    if (savedSvc) { try { setSvcList(JSON.parse(savedSvc)); } catch {} }
-    const savedOrg = localStorage.getItem(ORG_STORAGE_KEY);
-    if (savedOrg) { try { setOrgList(JSON.parse(savedOrg)); } catch {} }
+    // Load all content from Vercel Blob (single source of truth)
+    fetch("/api/content")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.services?.length) { setSvcList(d.services); svcRef.current = d.services; }
+        if (d.org?.length) { setOrgList(d.org); orgRef.current = d.org; }
+        if (d.testimonials?.length) { setTestimonials(d.testimonials); testimonialsRef.current = d.testimonials; }
+        if (d.blog) {
+          const b = d.blog;
+          if (b.title_ru) setBlogTitleRu(b.title_ru);
+          if (b.desc_ru) setBlogDescRu(b.desc_ru);
+          if (b.btn_ru) setBlogBtnRu(b.btn_ru);
+          if (b.title_uk) setBlogTitleUk(b.title_uk);
+          if (b.desc_uk) setBlogDescUk(b.desc_uk);
+          if (b.btn_uk) setBlogBtnUk(b.btn_uk);
+          if (b.link) setBlogLink(b.link);
+          blogRef.current = b;
+        }
+      })
+      .catch(() => {});
     fetch("/api/photo")
       .then((r) => r.json())
       .then((d) => { if (d.url) setCurrentPhotoUrl(d.url); })
       .catch(() => {});
   }, []);
 
+  // Publish ALL content to Vercel Blob — called after every change
+  const publishContent = async (patch: {
+    services?: ServiceItem[];
+    org?: OrgItem[];
+    testimonials?: Testimonial[];
+    blog?: typeof blogRef.current;
+  } = {}) => {
+    if (patch.services) svcRef.current = patch.services;
+    if (patch.org) orgRef.current = patch.org;
+    if (patch.testimonials) testimonialsRef.current = patch.testimonials;
+    if (patch.blog) blogRef.current = patch.blog;
+    setSaving("saving");
+    try {
+      const res = await fetch("/api/admin/content", {
+        method: "POST",
+        headers: { "x-admin-password": ADMIN_PASSWORD, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          services: svcRef.current,
+          org: orgRef.current,
+          testimonials: testimonialsRef.current,
+          blog: blogRef.current,
+        }),
+      });
+      setSaving(res.ok ? "saved" : "error");
+    } catch {
+      setSaving("error");
+    }
+    setTimeout(() => setSaving("idle"), 2500);
+  };
+
   const saveSvc = (list: ServiceItem[]) => {
     setSvcList(list);
-    localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(list));
+    publishContent({ services: list });
   };
   const saveOrg = (list: OrgItem[]) => {
     setOrgList(list);
-    localStorage.setItem(ORG_STORAGE_KEY, JSON.stringify(list));
+    publishContent({ org: list });
   };
+  // keep copySvcJson for manual backup only
   const copySvcJson = () => {
     navigator.clipboard.writeText(JSON.stringify({ services: svcList, org: orgList }, null, 2));
     setSvcCopied(true);
     setTimeout(() => setSvcCopied(false), 2000);
+  };
+
+  const saveBlog = () => {
+    const blog = {
+      title_ru: blogTitleRu, desc_ru: blogDescRu, btn_ru: blogBtnRu,
+      title_uk: blogTitleUk, desc_uk: blogDescUk, btn_uk: blogBtnUk,
+      link: blogLink,
+    };
+    publishContent({ blog });
   };
 
   const handleFileSelect = useCallback((file: File) => {
@@ -428,7 +499,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const save = (list: Testimonial[]) => {
     setTestimonials(list);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    publishContent({ testimonials: list });
   };
 
   const addTestimonial = (t: Testimonial) => {
@@ -463,6 +534,20 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           <span style={{ fontFamily: "var(--font-cormorant)" }} className="text-2xl text-[#C4A97A] font-light">
             Ellen Soul Admin
           </span>
+          {saving === "saving" && (
+            <span className="text-xs text-white/40 flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 border border-white/20 border-t-[#D4A853] rounded-full animate-spin" />
+              Зберігається...
+            </span>
+          )}
+          {saving === "saved" && (
+            <span className="text-xs text-green-400 flex items-center gap-1.5">
+              <Check size={12} /> Збережено
+            </span>
+          )}
+          {saving === "error" && (
+            <span className="text-xs text-red-400">Помилка збереження</span>
+          )}
         </div>
         <button
           onClick={onLogout}
@@ -722,18 +807,61 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
 
-            {testimonials.length > 0 && (
-              <div className="bg-[#2A1F18] rounded-2xl p-5 border border-[rgba(196,169,122,0.1)]">
-                <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-2">
-                  Як опублікувати відгуки на сайті
-                </p>
-                <p className="text-white/50 text-sm leading-relaxed">
-                  1. Натисни <strong className="text-white/70">&ldquo;Копіювати JSON&rdquo;</strong> вгорі<br />
-                  2. Надішли мені (розробнику) скопійований текст<br />
-                  3. Я оновлю код — відгуки з'являться для всіх відвідувачів
-                </p>
+          </div>
+        )}
+
+        {/* ── Blog Tab ── */}
+        {activeTab === "blog" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Блог — Telegram-блок</h2>
+              <p className="text-white/40 text-sm">Текст картки на сторінці «Блог» (посилання на Telegram-канал)</p>
+            </div>
+
+            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-6 space-y-5">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (RU)</label>
+                  <input className="admin-input w-full" value={blogTitleRu} onChange={e => setBlogTitleRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (UK)</label>
+                  <input className="admin-input w-full" value={blogTitleUk} onChange={e => setBlogTitleUk(e.target.value)} />
+                </div>
               </div>
-            )}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescRu} onChange={e => setBlogDescRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={blogDescUk} onChange={e => setBlogDescUk(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (RU)</label>
+                  <input className="admin-input w-full" value={blogBtnRu} onChange={e => setBlogBtnRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст кнопки (UK)</label>
+                  <input className="admin-input w-full" value={blogBtnUk} onChange={e => setBlogBtnUk(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Посилання</label>
+                <input className="admin-input w-full" value={blogLink} onChange={e => setBlogLink(e.target.value)} placeholder="https://t.me/..." />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={saveBlog}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> Зберегти
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -877,10 +1005,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
 
-            <div className="bg-[#2A1F18] rounded-2xl p-5 border border-[rgba(196,169,122,0.1)]">
-              <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-2">Як опублікувати зміни</p>
-              <p className="text-white/50 text-sm">Натисни <strong className="text-white/70">«Копіювати JSON»</strong> → надішли розробнику → зміни з'являться для всіх</p>
-            </div>
           </div>
         )}
       </div>
