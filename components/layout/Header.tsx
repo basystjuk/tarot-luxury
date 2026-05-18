@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,14 +10,15 @@ import { useLanguage } from '@/hooks/useLanguage';
 
 export default function Header() {
   const { t, language, setLanguage } = useLanguage();
+  const pathname = usePathname();
 
   const navLinks = [
-    { href: "/", label: t('nav.home') },
-    { href: "/about", label: t('nav.about') },
-    { href: "/services", label: t('nav.services') },
-    { href: "/blog", label: t('nav.blog') },
-    { href: "/tools", label: t('nav.tools') },
-    { href: "/contacts", label: t('nav.contacts') },
+    { href: `/${language}`, label: t('nav.home') },
+    { href: `/${language}/about`, label: t('nav.about') },
+    { href: `/${language}/services`, label: t('nav.services') },
+    { href: `/${language}/blog`, label: t('nav.blog') },
+    { href: `/${language}/tools`, label: t('nav.tools') },
+    { href: `/${language}/contacts`, label: t('nav.contacts') },
   ];
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -57,7 +59,7 @@ export default function Header() {
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex flex-col items-center leading-none group">
+          <Link href={`/${language}`} className="flex flex-col items-center leading-none group">
             <span
               className="text-2xl tracking-wide text-[#1C1512] transition-colors group-hover:text-[#B8883A]"
               style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 400 }}
@@ -90,26 +92,22 @@ export default function Header() {
           <div className="flex items-center gap-4">
             {/* Language switcher — desktop */}
             <div className="hidden lg:flex items-center gap-0 text-xs tracking-widest font-light select-none">
-              <button
-                onClick={() => setLanguage('uk')}
-                className={`px-1.5 py-0.5 transition-colors duration-200 ${
-                  language === 'uk'
-                    ? 'text-[#B8883A] font-semibold'
-                    : 'text-[#7A6A58] hover:text-[#1C1512]'
-                }`}
-              >ua</button>
-              <span className="text-[#C4A97A]/50">|</span>
-              <button
-                onClick={() => setLanguage('ru')}
-                className={`px-1.5 py-0.5 transition-colors duration-200 ${
-                  language === 'ru'
-                    ? 'text-[#B8883A] font-semibold'
-                    : 'text-[#7A6A58] hover:text-[#1C1512]'
-                }`}
-              >ru</button>
+              {(['uk', 'ru', 'en'] as const).map((lang, i, arr) => (
+                <React.Fragment key={lang}>
+                  <button
+                    onClick={() => setLanguage(lang)}
+                    className={`px-1.5 py-0.5 transition-colors duration-200 ${
+                      language === lang ? 'text-[#B8883A] font-semibold' : 'text-[#7A6A58] hover:text-[#1C1512]'
+                    }`}
+                  >
+                    {lang === 'uk' ? 'ua' : lang}
+                  </button>
+                  {i < arr.length - 1 && <span className="text-[#C4A97A]/50">|</span>}
+                </React.Fragment>
+              ))}
             </div>
             <Link
-              href="/contacts"
+              href={`/${language}/contacts`}
               className="hidden sm:inline-flex btn-primary text-sm px-6 py-3"
             >{t('header.cta')}</Link>
             <button
@@ -170,34 +168,24 @@ export default function Header() {
                     </Link>
                   </motion.div>
                 ))}
-              
-        {/* Language Switcher */}
-        <div className="flex items-center gap-0 ml-4 text-xs tracking-widest font-light select-none">
-          <button
-            onClick={() => setLanguage('uk')}
-            className={`px-1 py-0.5 transition-colors duration-200 ${
-              language === 'uk'
-                ? 'text-[#C9A96E] font-semibold'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-            aria-label="Ukrainian"
-          >
-            УКР
-          </button>
-          <span className="text-white/30">|</span>
-          <button
-            onClick={() => setLanguage('ru')}
-            className={`px-1 py-0.5 transition-colors duration-200 ${
-              language === 'ru'
-                ? 'text-[#C9A96E] font-semibold'
-                : 'text-white/50 hover:text-white/80'
-            }`}
-            aria-label="Russian"
-          >
-            РУС
-          </button>
-        </div>
-      </nav>
+
+                {/* Language Switcher */}
+                <div className="flex items-center gap-0 ml-4 text-xs tracking-widest font-light select-none">
+                  {(['uk', 'ru', 'en'] as const).map((lang, i, arr) => (
+                    <React.Fragment key={lang}>
+                      <button
+                        onClick={() => { setLanguage(lang); setMenuOpen(false); }}
+                        className={`px-1 py-0.5 transition-colors duration-200 ${
+                          language === lang ? 'text-[#C9A96E] font-semibold' : 'text-white/50 hover:text-white/80'
+                        }`}
+                      >
+                        {lang === 'uk' ? 'УКР' : lang === 'ru' ? 'РУС' : 'ENG'}
+                      </button>
+                      {i < arr.length - 1 && <span className="text-white/30">|</span>}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </nav>
 
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
@@ -206,11 +194,11 @@ export default function Header() {
                 className="pt-8"
               >
                 <Link
-                  href="/contacts"
+                  href={`/${language}/contacts`}
                   onClick={() => setMenuOpen(false)}
                   className="btn-primary w-full text-center"
                 >
-                  {language === 'ru' ? 'Записаться на консультацию' : 'Записатись на консультацію'}
+                  {language === 'ru' ? 'Записаться на консультацию' : language === 'en' ? 'Book a consultation' : 'Записатись на консультацію'}
                 </Link>
               </motion.div>
             </div>

@@ -1,16 +1,8 @@
 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from 'react';
+import React, { createContext, useContext, useCallback, type ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { type Language, getTranslation } from '@/lib/i18n/translations';
-
-const STORAGE_KEY = 'ellensoul-lang';
 
 interface LanguageContextValue {
   language: Language;
@@ -20,44 +12,39 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-function detectBrowserLanguage(): Language {
-  if (typeof navigator === 'undefined') return 'ru';
-  const lang = navigator.language?.toLowerCase() ?? '';
-  if (lang.startsWith('uk')) return 'uk';
-  if (lang.startsWith('ru')) return 'ru';
-  return 'ru'; // default fallback
+const LOCALES: Language[] = ['uk', 'ru', 'en'];
+
+function getLangFromPath(pathname: string): Language {
+  const seg = pathname.split('/')[1] as Language;
+  return LOCALES.includes(seg) ? seg : 'uk';
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('ru');
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // Read from localStorage first, otherwise detect from browser
-    const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-    if (stored && ['uk', 'ru', 'en'].includes(stored)) {
-      setLanguageState(stored);
-    } else {
-      setLanguageState(detectBrowserLanguage());
-    }
-    setMounted(true);
-  }, []);
+  const pathname = usePathname();
+  const router = useRouter();
+  const language = getLangFromPath(pathname);
 
   const setLanguage = useCallback((lang: Language) => {
-    setLanguageState(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
-  }, []);
+    // Replace current lang segment in path
+    const segments = pathname.split('/');
+    if (LOCALES.includes(segments[1] as Language)) {
+      segments[1] = lang;
+    } else {
+      segments.splice(1, 0, lang);
+    }
+    const newPath = segments.join('/') || '/';
+    // Set cookie so middleware remembers preference
+    document.cookie = `NEXT_LOCALE=${lang};path=/;max-age=${60*60*24*365}`;
+    router.push(newPath);
+  }, [pathname, router]);
 
   const t = useCallback(
     (key: string): string => getTranslation(language, key),
     [language]
   );
 
-  // During SSR / before mount, render with default language to avoid mismatch
-  const value: LanguageContextValue = { language, setLanguage, t };
-
   return (
-    <LanguageContext.Provider value={value}>
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -65,8 +52,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
 export function useLanguageContext(): LanguageContextValue {
   const ctx = useContext(LanguageContext);
-  if (!ctx) {
-    throw new Error('useLanguageContext must be used inside <LanguageProvider>');
-  }
+  if (!ctx) throw new Error('useLanguageContext must be used inside <LanguageProvider>');
   return ctx;
 }

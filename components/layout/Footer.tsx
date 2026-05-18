@@ -30,29 +30,29 @@ function TikTokIcon() {
 }
 
 export default function Footer() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const pageLinks = [
-    { href: "/", label: t('nav.home') },
-    { href: "/about", label: t('nav.about') },
-    { href: "/blog", label: t('nav.blog') },
-    { href: "/faq", label: t('footer.faq') },
-    { href: "/contacts", label: t('nav.contacts') },
+    { href: `/${language}`, label: t('nav.home') },
+    { href: `/${language}/about`, label: t('nav.about') },
+    { href: `/${language}/blog`, label: t('nav.blog') },
+    { href: `/${language}/faq`, label: t('footer.faq') },
+    { href: `/${language}/contacts`, label: t('nav.contacts') },
   ];
 
   const serviceLinks = [
-    { href: "/services", label: t('footer.service1') },
-    { href: "/services", label: t('footer.service2') },
-    { href: "/services", label: t('footer.service3') },
-    { href: "/services", label: t('footer.service4') },
+    { href: `/${language}/services`, label: t('footer.service1') },
+    { href: `/${language}/services`, label: t('footer.service2') },
+    { href: `/${language}/services`, label: t('footer.service3') },
+    { href: `/${language}/services`, label: t('footer.service4') },
   ];
 
   const toolLinks = [
-    { href: "/tools/natal-chart", label: t('footer.tool1') },
-    { href: "/tools/moon-phase", label: t('footer.tool2') },
-    { href: "/tools/compatibility", label: t('footer.tool3') },
-    { href: "/tools/daily-card", label: t('footer.tool4') },
-    { href: "/tools/numerology", label: t('footer.tool5') },
+    { href: `/${language}/tools/natal-chart`, label: t('footer.tool1') },
+    { href: `/${language}/tools/moon-phase`, label: t('footer.tool2') },
+    { href: `/${language}/tools/compatibility`, label: t('footer.tool3') },
+    { href: `/${language}/tools/daily-card`, label: t('footer.tool4') },
+    { href: `/${language}/tools/numerology`, label: t('footer.tool5') },
   ];
 
   return (
@@ -144,8 +144,8 @@ export default function Footer() {
               {t('footer.services.title')}
             </h4>
             <ul className="space-y-3">
-              {serviceLinks.map((link) => (
-                <li key={link.href}>
+              {serviceLinks.map((link, i) => (
+                <li key={i}>
                   <Link
                     href={link.href}
                     className="text-sm text-white/50 hover:text-[#D4A853] transition-colors"
