@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
@@ -48,14 +47,12 @@ export default function BlogPage() {
                 className="text-3xl text-[#1C1512] mb-4"
                 style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
               >
-                {isRu
-                  ? "Пока читайте мой Telegram-канал"
-                  : "Поки читайте мій Telegram-канал"}
+                {isRu ? "Telegram-канал" : "Telegram-канал"}
               </h2>
               <p className="text-[#7A6A58] mb-8 leading-relaxed">
                 {isRu
-                  ? "Там я регулярно пишу о картах, отношениях, и делюсь мыслями после консультаций."
-                  : "Там я регулярно пишу про карти, відносини та ділюся думками після консультацій."}
+                  ? "Там я регулярно публикую расклады, пишу о картах и делюсь мыслями."
+                  : "Там я регулярно публікую розклади, пишу про карти та ділюся думками."}
               </p>
               <a
                 href="https://t.me/ellen_soul_taro"
@@ -63,8 +60,7 @@ export default function BlogPage() {
                 rel="noopener noreferrer"
                 className="btn-primary inline-flex"
               >
-                {isRu ? "Перейти в Telegram" : "Перейти в Telegram"}
-                <ArrowRight size={16} />
+                {isRu ? "Перейти в канал" : "Перейти в канал"}
               </a>
             </div>
           </AnimatedSection>
