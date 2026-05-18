@@ -3,15 +3,28 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 
-const PHOTO_PATH = "/images/ellen-soul-taro-konsultant.jpg";
+const FALLBACK_PHOTO = "/images/ellen-soul-taro-konsultant.jpg";
+
+function useProfilePhoto() {
+  const [url, setUrl] = useState(FALLBACK_PHOTO);
+  useEffect(() => {
+    fetch("/api/photo")
+      .then((r) => r.json())
+      .then((d) => { if (d.url) setUrl(d.url); })
+      .catch(() => {});
+  }, []);
+  return url;
+}
 
 export default function AboutPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
+  const photoUrl = useProfilePhoto();
 
   const values = isRu ? [
     {
@@ -96,7 +109,7 @@ export default function AboutPage() {
                 {/* Photo */}
                 <div className="relative w-[300px] h-[400px] rounded-3xl overflow-hidden shadow-[0_20px_80px_rgba(196,169,122,0.25)]">
                   <Image
-                    src={PHOTO_PATH}
+                    src={photoUrl}
                     alt="Ellen Soul — таро-консультант і психолог"
                     fill
                     className="object-cover object-top"
