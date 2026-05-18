@@ -10,7 +10,11 @@ export async function GET() {
 
   try {
     const { blobs } = await list({ prefix: "ellen-soul-taro-konsultant" });
-    const url = blobs[0]?.url ?? FALLBACK;
+    // Sort by uploadedAt descending → always get the newest
+    const sorted = blobs.sort((a, b) =>
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
+    const url = sorted[0]?.url ?? FALLBACK;
     return NextResponse.json({ url }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ url: FALLBACK });

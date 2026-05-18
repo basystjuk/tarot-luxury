@@ -1,8 +1,8 @@
-import { put } from "@vercel/blob";
+import { put, list, del } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
-const PHOTO_FILENAME = "ellen-soul-taro-konsultant.jpg";
+const PHOTO_PREFIX = "ellen-soul-taro-konsultant";
 
 export async function POST(req: NextRequest) {
   // Auth check
@@ -34,11 +34,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
   }
 
-  const blob = await put(PHOTO_FILENAME, file, {
+  // Upload with unique suffix → new URL every time (avoids CDN cache issues)
+  const blob = await put(`${PHOTO_PREFIX}.jpg`, file, {
     access: "public",
-    addRandomSuffix: false, // always overwrite same filename → same URL
-    contentType: file.type,
+    addRandomSuffix: true,
+    contentType: "image/jpeg",
   });
+
+  // Delete all previous versions (keep only the new one)
+  try {
+    const { blobs } = await list({ prefix: PHOTO_PREFIX });
+    const old = blobs.filter((b) => b.url !== blob.url);
+    if (old.length > 0) {
+      await del(old.map((b) => b.url));
+    }
+  } catch {
+    // non-critical — old blobs will just sit there
+  }
 
   return NextResponse.json({ url: blob.url });
 }
