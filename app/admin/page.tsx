@@ -327,7 +327,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [svcList, setSvcList] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [orgList, setOrgList] = useState<OrgItem[]>(DEFAULT_ORG);
   const [expandedSvc, setExpandedSvc] = useState<string | null>(null);
-  const [svcCopied, setSvcCopied] = useState(false);
 
   // Blog state
   const [blogTitleRu, setBlogTitleRu] = useState("Telegram-канал");
@@ -421,13 +420,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setOrgList(list);
     publishContent({ org: list });
   };
-  // keep copySvcJson for manual backup only
-  const copySvcJson = () => {
-    navigator.clipboard.writeText(JSON.stringify({ services: svcList, org: orgList }, null, 2));
-    setSvcCopied(true);
-    setTimeout(() => setSvcCopied(false), 2000);
-  };
-
   const saveBlog = () => {
     const blog = {
       title_ru: blogTitleRu, desc_ru: blogDescRu, btn_ru: blogBtnRu,
@@ -874,13 +866,6 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <p className="text-white/40 text-sm">Керуй переліком послуг та організаційними питаннями</p>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={copySvcJson}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/15 text-white/60 hover:text-white transition-colors text-sm"
-                >
-                  {svcCopied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                  {svcCopied ? "Скопійовано!" : "Копіювати JSON"}
-                </button>
                 <button
                   onClick={() => {
                     const newSvc: ServiceItem = {

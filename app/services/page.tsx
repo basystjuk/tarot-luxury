@@ -75,7 +75,7 @@ export default function ServicesPage() {
                         {subtitle && (
                           <span
                             className="text-[#9A7040]"
-                            style={{ fontSize: "0.65em", fontWeight: 400 }}
+                            style={{ fontSize: "0.72em", fontWeight: 400 }}
                           >
                             {" "}({subtitle.charAt(0).toLowerCase() + subtitle.slice(1)})
                           </span>
@@ -99,7 +99,7 @@ export default function ServicesPage() {
                           {isRu ? 'Стоимость' : 'Вартість'}
                         </p>
                         <p
-                          className="text-[3.5rem] leading-none text-[#B8883A]"
+                          className="text-[2.75rem] leading-none text-[#B8883A]"
                           style={{
                             fontFamily: "var(--font-jost)",
                             fontWeight: 300,
