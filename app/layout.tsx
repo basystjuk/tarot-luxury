@@ -4,6 +4,9 @@ import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { ModalProvider } from '@/contexts/ModalContext';
+import BookingModal from '@/components/ui/BookingModal';
+import QuickContactModal from '@/components/ui/QuickContactModal';
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin", "cyrillic"],
@@ -81,9 +84,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#FDFBF7] text-[#1C1512]">
         <LanguageProvider>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          <ModalProvider>
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <BookingModal />
+            <QuickContactModal />
+          </ModalProvider>
         </LanguageProvider>
       </body>
     </html>
