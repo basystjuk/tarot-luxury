@@ -76,10 +76,20 @@ export default function ContactsPage() {
     }
   }, [dynamicTopics, form.topic]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSubmitted(true); }, 1200);
+    try {
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, language }),
+      });
+    } catch {
+      // still show success to user
+    }
+    setLoading(false);
+    setSubmitted(true);
   };
 
   const hours = isRu
