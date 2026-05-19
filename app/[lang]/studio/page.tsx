@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
@@ -10,6 +11,16 @@ export default function StudioPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+
+  type ApiTool = { id: string; title_uk: string; title_ru: string; title_en: string; desc_uk: string; desc_ru: string; desc_en: string };
+  const [apiTools, setApiTools] = useState<ApiTool[] | null>(null);
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => { if (d.studio_tools?.length) setApiTools(d.studio_tools); })
+      .catch(() => {});
+  }, []);
 
   const tools = isRu ? [
     { href: `/${language}/studio/moon-phase`, title: "Лунный гороскоп", subtitle: "Лунный", description: "Узнайте текущую фазу Луны, процент освещения и дату следующего новолуния и полнолуния.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
@@ -56,7 +67,11 @@ export default function StudioPage() {
       <section className="section-padding bg-[#FDFBF7]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-7">
-            {tools.map((tool, i) => (
+            {tools.map((tool, i) => {
+              const apiTool = apiTools?.find(t => t.id === tool.href.split('/').pop());
+              const title = apiTool ? (isRu ? apiTool.title_ru : isEn ? apiTool.title_en : apiTool.title_uk) : tool.title;
+              const description = apiTool ? (isRu ? apiTool.desc_ru : isEn ? apiTool.desc_en : apiTool.desc_uk) : tool.description;
+              return (
               <AnimatedSection key={tool.href} delay={i * 0.1}>
                 <Link href={tool.href} className="group block h-full">
                   <div className="card-luxury h-full flex flex-col">
@@ -64,8 +79,8 @@ export default function StudioPage() {
                       {tool.glyph}
                     </div>
                     <span className="text-xs text-[#C4A97A] tracking-[0.12em] uppercase mb-2" style={{ fontFamily: "var(--font-jost)" }}>{tool.subtitle}</span>
-                    <h2 className="text-2xl text-[#1C1512] mb-3 group-hover:text-[#B8883A] transition-colors" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{tool.title}</h2>
-                    <p className="text-[#7A6A58] text-sm leading-relaxed flex-1 mb-6">{tool.description}</p>
+                    <h2 className="text-2xl text-[#1C1512] mb-3 group-hover:text-[#B8883A] transition-colors" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{title}</h2>
+                    <p className="text-[#7A6A58] text-sm leading-relaxed flex-1 mb-6">{description}</p>
                     <div className="flex items-center gap-2 text-[#B8883A] text-sm mt-auto">
                       {isRu ? "Открыть" : isEn ? "Open" : "Відкрити"}
                       <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
@@ -73,7 +88,8 @@ export default function StudioPage() {
                   </div>
                 </Link>
               </AnimatedSection>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

@@ -44,22 +44,37 @@ export default function ContactsPage() {
     instagram_url: "https://instagram.com/ellen_soul_taro",
   });
 
-  useEffect(() => {
-    fetch("/api/content")
-      .then(r => r.json())
-      .then(data => { if (data.contacts) setContacts(data.contacts); })
-      .catch(() => {});
-  }, []);
-
-  const TOPICS = isRu
+  const TOPICS_FALLBACK = isRu
     ? ["Один вопрос", "Расклад Амур", "Онлайн таро сессия", "Личный запрос"]
     : isEn
     ? ["One Question", "Amour Spread", "Online Tarot Session", "Personal Request"]
     : ["Одне питання", "Розклад Амур", "Онлайн таро сесія", "Особистий запит"];
 
-  const [form, setForm] = useState({ name: "", contact: "", topic: TOPICS[0], message: "" });
+  const [dynamicTopics, setDynamicTopics] = useState<string[]>([]);
+  const [form, setForm] = useState({ name: "", contact: "", topic: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(data => {
+        if (data.contacts) setContacts(data.contacts);
+        if (data.services?.length) {
+          const titles = data.services.map((s: { title_ru: string; title_uk: string; title_en?: string }) =>
+            isRu ? s.title_ru : isEn ? s.title_en ?? s.title_uk : s.title_uk
+          );
+          setDynamicTopics([...titles, isRu ? "Личный запрос" : isEn ? "Personal Request" : "Особистий запит"]);
+        }
+      })
+      .catch(() => {});
+  }, [isRu, isEn]);
+
+  useEffect(() => {
+    if (dynamicTopics.length && !form.topic) {
+      setForm(f => ({ ...f, topic: dynamicTopics[0] }));
+    }
+  }, [dynamicTopics, form.topic]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,10 +83,19 @@ export default function ContactsPage() {
   };
 
   const hours = isRu
-    ? [{ day: "Понедельник–Суббота", hours: "10:00 – 20:00" }]
+    ? [
+        { day: "Понедельник–Суббота", hours: "10:00 – 20:00" },
+        { day: "Воскресенье", hours: "По договорённости" },
+      ]
     : isEn
-    ? [{ day: "Monday–Saturday", hours: "10:00 – 20:00" }]
-    : [{ day: "Понеділок–Субота", hours: "10:00 – 20:00" }];
+    ? [
+        { day: "Monday–Saturday", hours: "10:00 – 20:00" },
+        { day: "Sunday", hours: "By arrangement" },
+      ]
+    : [
+        { day: "Понеділок–Субота", hours: "10:00 – 20:00" },
+        { day: "Неділя", hours: "За домовленістю" },
+      ];
 
   return (
     <>
@@ -135,7 +159,7 @@ export default function ContactsPage() {
                         {isRu ? "Тема запроса" : isEn ? "Topic" : "Тема запиту"}
                       </label>
                       <select value={form.topic} required onChange={e => setForm({ ...form, topic: e.target.value })} className="input-luxury">
-                        {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
+                        {(dynamicTopics.length ? dynamicTopics : TOPICS_FALLBACK).map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
@@ -180,7 +204,7 @@ export default function ContactsPage() {
                 </div>
 
                 <div className="card-luxury">
-                  <h3 className="text-xl text-[#1C1512] mb-4" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                  <h3 className="text-xl text-[#1C1512] mb-4 text-center" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
                     {isRu ? "Рабочее время" : isEn ? "Working Hours" : "Робочий час"}
                   </h3>
                   <div className="space-y-3">
@@ -200,7 +224,7 @@ export default function ContactsPage() {
 
                 <div className="card-luxury bg-[rgba(196,169,122,0.05)]">
                   <div className="text-center">
-                    <p className="font-medium text-[#1C1512] mb-2 text-center" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.2rem" }}>
+                    <p className="font-medium text-[#1C1512] mb-2 text-center" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.5rem", fontWeight: 600 }}>
                       {isRu ? "Гарантия конфиденциальности" : isEn ? "Confidentiality Guarantee" : "Гарантія конфіденційності"}
                     </p>
                     <p className="text-base text-[#7A6A58] leading-relaxed text-center">
