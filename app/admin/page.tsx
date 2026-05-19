@@ -321,7 +321,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services" | "faq" | "contacts">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio">("testimonials");
 
   // Services state
   const [svcList, setSvcList] = useState<ServiceItem[]>(DEFAULT_SERVICES);
@@ -358,6 +358,45 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [newFaqA, setNewFaqA] = useState("");
   const [addingFaq, setAddingFaq] = useState(false);
 
+  // Home state
+  const [homeHeroTagUk, setHomeHeroTagUk] = useState("Таро провідник");
+  const [homeHeroTagRu, setHomeHeroTagRu] = useState("Таро проводник");
+  const [homeHeroTagEn, setHomeHeroTagEn] = useState("Tarot Guide");
+  const [homeHeroTitleUk, setHomeHeroTitleUk] = useState("Коли слова не допомагають — карти розкажуть правду");
+  const [homeHeroTitleRu, setHomeHeroTitleRu] = useState("Когда слова не помогают — карты расскажут правду");
+  const [homeHeroTitleEn, setHomeHeroTitleEn] = useState("When words fail — the cards will tell the truth");
+  const [homeHeroSubUk, setHomeHeroSubUk] = useState("Емпат, відчуваю людей та їхні запити...");
+  const [homeHeroSubRu, setHomeHeroSubRu] = useState("Эмпат, чувствую людей и их запросы...");
+  const [homeHeroSubEn, setHomeHeroSubEn] = useState("Empath — I sense people and their requests...");
+  const [homeSaved, setHomeSaved] = useState(false);
+
+  // About state
+  const [aboutStoryTitleUk, setAboutStoryTitleUk] = useState("Від запитань без відповіді — до практики, яка змінює життя");
+  const [aboutStoryTitleRu, setAboutStoryTitleRu] = useState("От вопросов без ответа — к практике, которая меняет жизни");
+  const [aboutStoryTitleEn, setAboutStoryTitleEn] = useState("From unanswered questions — to a practice that changes lives");
+  const [aboutStoryTextUk, setAboutStoryTextUk] = useState("Практикую Таро більше 5 років...");
+  const [aboutStoryTextRu, setAboutStoryTextRu] = useState("Практикую Таро больше 5 лет...");
+  const [aboutStoryTextEn, setAboutStoryTextEn] = useState("I have been practising Tarot for over 5 years...");
+  const [aboutQuoteUk, setAboutQuoteUk] = useState("Таро розклади з душею.");
+  const [aboutQuoteRu, setAboutQuoteRu] = useState("Таро расклады с душой.");
+  const [aboutQuoteEn, setAboutQuoteEn] = useState("Tarot readings with soul.");
+  const [aboutSaved, setAboutSaved] = useState(false);
+
+  // Studio state
+  type StudioTool = {
+    id: string;
+    title_uk: string; title_ru: string; title_en: string;
+    desc_uk: string; desc_ru: string; desc_en: string;
+  };
+  const DEFAULT_STUDIO_TOOLS: StudioTool[] = [
+    { id: "moon-phase", title_uk: "Місячний гороскоп", title_ru: "Лунный гороскоп", title_en: "Moon Horoscope", desc_uk: "Дізнайтесь поточну фазу Місяця...", desc_ru: "Узнайте текущую фазу Луны...", desc_en: "Find the current Moon phase..." },
+    { id: "compatibility", title_uk: "Сумісність знаків", title_ru: "Совместимость знаков", title_en: "Sign Compatibility", desc_uk: "Перевірте астрологічну сумісність...", desc_ru: "Проверьте астрологическую совместимость...", desc_en: "Check the astrological compatibility..." },
+    { id: "daily-card", title_uk: "Карта дня", title_ru: "Карта дня", title_en: "Card of the Day", desc_uk: "Щоденна карта Старшого Аркану...", desc_ru: "Ежедневная карта Старшего Аркана...", desc_en: "Daily Major Arcana card..." },
+    { id: "numerology", title_uk: "Нумерологія", title_ru: "Нумерология", title_en: "Numerology", desc_uk: "Ваше число Долі...", desc_ru: "Ваше число Судьбы...", desc_en: "Your Destiny number..." },
+  ];
+  const [studioTools, setStudioTools] = useState<StudioTool[]>(DEFAULT_STUDIO_TOOLS);
+  const studioRef = useRef<StudioTool[]>(DEFAULT_STUDIO_TOOLS);
+
   // Global save indicator
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // Refs to always have latest values for publishContent
@@ -369,6 +408,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const faqUkRef = useRef<FaqItem[]>([]);
   const faqRuRef = useRef<FaqItem[]>([]);
   const faqEnRef = useRef<FaqItem[]>([]);
+  const homeRef = useRef({ hero_tag_uk: "Таро провідник", hero_tag_ru: "Таро проводник", hero_tag_en: "Tarot Guide", hero_title_uk: "", hero_title_ru: "", hero_title_en: "", hero_sub_uk: "", hero_sub_ru: "", hero_sub_en: "" });
+  const aboutRef = useRef({ story_title_uk: "", story_title_ru: "", story_title_en: "", story_text_uk: "", story_text_ru: "", story_text_en: "", quote_uk: "", quote_ru: "", quote_en: "" });
 
   // Photo upload state
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(DEFAULT_PHOTO);
@@ -410,6 +451,33 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         if (d.faq_uk) { setFaqUk(d.faq_uk); faqUkRef.current = d.faq_uk; }
         if (d.faq_ru) { setFaqRu(d.faq_ru); faqRuRef.current = d.faq_ru; }
         if (d.faq_en) { setFaqEn(d.faq_en); faqEnRef.current = d.faq_en; }
+        if (d.home) {
+          const h = d.home;
+          if (h.hero_tag_uk) setHomeHeroTagUk(h.hero_tag_uk);
+          if (h.hero_tag_ru) setHomeHeroTagRu(h.hero_tag_ru);
+          if (h.hero_tag_en) setHomeHeroTagEn(h.hero_tag_en);
+          if (h.hero_title_uk) setHomeHeroTitleUk(h.hero_title_uk);
+          if (h.hero_title_ru) setHomeHeroTitleRu(h.hero_title_ru);
+          if (h.hero_title_en) setHomeHeroTitleEn(h.hero_title_en);
+          if (h.hero_sub_uk) setHomeHeroSubUk(h.hero_sub_uk);
+          if (h.hero_sub_ru) setHomeHeroSubRu(h.hero_sub_ru);
+          if (h.hero_sub_en) setHomeHeroSubEn(h.hero_sub_en);
+          homeRef.current = h;
+        }
+        if (d.about) {
+          const a = d.about;
+          if (a.story_title_uk) setAboutStoryTitleUk(a.story_title_uk);
+          if (a.story_title_ru) setAboutStoryTitleRu(a.story_title_ru);
+          if (a.story_title_en) setAboutStoryTitleEn(a.story_title_en);
+          if (a.story_text_uk) setAboutStoryTextUk(a.story_text_uk);
+          if (a.story_text_ru) setAboutStoryTextRu(a.story_text_ru);
+          if (a.story_text_en) setAboutStoryTextEn(a.story_text_en);
+          if (a.quote_uk) setAboutQuoteUk(a.quote_uk);
+          if (a.quote_ru) setAboutQuoteRu(a.quote_ru);
+          if (a.quote_en) setAboutQuoteEn(a.quote_en);
+          aboutRef.current = a;
+        }
+        if (d.studio_tools?.length) { setStudioTools(d.studio_tools); studioRef.current = d.studio_tools; }
       })
       .catch(() => {});
     fetch("/api/photo")
@@ -424,11 +492,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     org?: OrgItem[];
     testimonials?: Testimonial[];
     blog?: typeof blogRef.current;
+    home?: typeof homeRef.current;
+    about?: typeof aboutRef.current;
+    studio_tools?: StudioTool[];
   } = {}) => {
     if (patch.services) svcRef.current = patch.services;
     if (patch.org) orgRef.current = patch.org;
     if (patch.testimonials) testimonialsRef.current = patch.testimonials;
     if (patch.blog) blogRef.current = patch.blog;
+    if (patch.home) homeRef.current = patch.home;
+    if (patch.about) aboutRef.current = patch.about;
+    if (patch.studio_tools) studioRef.current = patch.studio_tools;
     setSaving("saving");
     try {
       const res = await fetch("/api/admin/content", {
@@ -443,6 +517,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           faq_uk: faqUkRef.current,
           faq_ru: faqRuRef.current,
           faq_en: faqEnRef.current,
+          home: homeRef.current,
+          about: aboutRef.current,
+          studio_tools: studioRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -464,6 +541,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     faqUkRef.current = faqUk;
     faqRuRef.current = faqRu;
     faqEnRef.current = faqEn;
+    homeRef.current = {
+      hero_tag_uk: homeHeroTagUk, hero_tag_ru: homeHeroTagRu, hero_tag_en: homeHeroTagEn,
+      hero_title_uk: homeHeroTitleUk, hero_title_ru: homeHeroTitleRu, hero_title_en: homeHeroTitleEn,
+      hero_sub_uk: homeHeroSubUk, hero_sub_ru: homeHeroSubRu, hero_sub_en: homeHeroSubEn,
+    };
+    aboutRef.current = {
+      story_title_uk: aboutStoryTitleUk, story_title_ru: aboutStoryTitleRu, story_title_en: aboutStoryTitleEn,
+      story_text_uk: aboutStoryTextUk, story_text_ru: aboutStoryTextRu, story_text_en: aboutStoryTextEn,
+      quote_uk: aboutQuoteUk, quote_ru: aboutQuoteRu, quote_en: aboutQuoteEn,
+    };
+    studioRef.current = studioTools;
     setSaving("saving");
     try {
       const res = await fetch("/api/admin/content", {
@@ -478,6 +566,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           faq_uk: faqUkRef.current,
           faq_ru: faqRuRef.current,
           faq_en: faqEnRef.current,
+          home: homeRef.current,
+          about: aboutRef.current,
+          studio_tools: studioRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -628,7 +719,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "testimonials", "blog", "services", "faq", "contacts"] as const).map((tab) => (
+          {(["photo", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -638,7 +729,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   : "border-transparent text-white/40 hover:text-white/70"
               }`}
             >
-              {tab === "photo" ? "📷 Фото" : tab === "testimonials" ? "⭐ Відгуки" : tab === "blog" ? "📝 Блог" : tab === "services" ? "🛎 Послуги" : tab === "faq" ? "❓ FAQ" : "📞 Контакти"}
+              {tab === "photo" ? "📷 Фото"
+                : tab === "testimonials" ? "⭐ Відгуки"
+                : tab === "blog" ? "📝 Блог"
+                : tab === "services" ? "🛎 Послуги"
+                : tab === "faq" ? "❓ FAQ"
+                : tab === "contacts" ? "📞 Контакти"
+                : tab === "home" ? "🏠 Головна"
+                : tab === "about" ? "👤 Про мене"
+                : "🔮 Студія"}
             </button>
           ))}
         </div>
@@ -1189,6 +1288,191 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <button onClick={async () => { await saveAllContent(); setFaqSaved(true); setTimeout(() => setFaqSaved(false), 2000); }}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium">
               {faqSaved ? "✓ Збережено" : "Зберегти FAQ"}
+            </button>
+          </div>
+        )}
+
+        {/* ── Home Tab ── */}
+        {activeTab === "home" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Головна сторінка — Hero</h2>
+              <p className="text-white/40 text-sm">Тег, заголовок та підзаголовок секції Hero</p>
+            </div>
+            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-6 space-y-5">
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Тег (UK)</label>
+                  <input className="admin-input w-full" value={homeHeroTagUk} onChange={e => setHomeHeroTagUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Тег (RU)</label>
+                  <input className="admin-input w-full" value={homeHeroTagRu} onChange={e => setHomeHeroTagRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Тег (EN)</label>
+                  <input className="admin-input w-full" value={homeHeroTagEn} onChange={e => setHomeHeroTagEn(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (UK)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={homeHeroTitleUk} onChange={e => setHomeHeroTitleUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (RU)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={homeHeroTitleRu} onChange={e => setHomeHeroTitleRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (EN)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={homeHeroTitleEn} onChange={e => setHomeHeroTitleEn(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (UK)</label>
+                  <textarea rows={4} className="admin-input w-full resize-none" value={homeHeroSubUk} onChange={e => setHomeHeroSubUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (RU)</label>
+                  <textarea rows={4} className="admin-input w-full resize-none" value={homeHeroSubRu} onChange={e => setHomeHeroSubRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (EN)</label>
+                  <textarea rows={4} className="admin-input w-full resize-none" value={homeHeroSubEn} onChange={e => setHomeHeroSubEn(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    homeRef.current = { hero_tag_uk: homeHeroTagUk, hero_tag_ru: homeHeroTagRu, hero_tag_en: homeHeroTagEn, hero_title_uk: homeHeroTitleUk, hero_title_ru: homeHeroTitleRu, hero_title_en: homeHeroTitleEn, hero_sub_uk: homeHeroSubUk, hero_sub_ru: homeHeroSubRu, hero_sub_en: homeHeroSubEn };
+                    await saveAllContent();
+                    setHomeSaved(true);
+                    setTimeout(() => setHomeSaved(false), 2000);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> {homeSaved ? "✓ Збережено" : "Зберегти"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── About Tab ── */}
+        {activeTab === "about" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Про мене — Моя Історія</h2>
+              <p className="text-white/40 text-sm">Заголовок, текст та цитата розділу «Моя Історія»</p>
+            </div>
+            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-6 space-y-5">
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (UK)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={aboutStoryTitleUk} onChange={e => setAboutStoryTitleUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (RU)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={aboutStoryTitleRu} onChange={e => setAboutStoryTitleRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Заголовок (EN)</label>
+                  <textarea rows={3} className="admin-input w-full resize-none" value={aboutStoryTitleEn} onChange={e => setAboutStoryTitleEn(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст (UK)</label>
+                  <textarea rows={6} className="admin-input w-full resize-none" value={aboutStoryTextUk} onChange={e => setAboutStoryTextUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст (RU)</label>
+                  <textarea rows={6} className="admin-input w-full resize-none" value={aboutStoryTextRu} onChange={e => setAboutStoryTextRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Текст (EN)</label>
+                  <textarea rows={6} className="admin-input w-full resize-none" value={aboutStoryTextEn} onChange={e => setAboutStoryTextEn(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Цитата (UK)</label>
+                  <input className="admin-input w-full" value={aboutQuoteUk} onChange={e => setAboutQuoteUk(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Цитата (RU)</label>
+                  <input className="admin-input w-full" value={aboutQuoteRu} onChange={e => setAboutQuoteRu(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Цитата (EN)</label>
+                  <input className="admin-input w-full" value={aboutQuoteEn} onChange={e => setAboutQuoteEn(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    aboutRef.current = { story_title_uk: aboutStoryTitleUk, story_title_ru: aboutStoryTitleRu, story_title_en: aboutStoryTitleEn, story_text_uk: aboutStoryTextUk, story_text_ru: aboutStoryTextRu, story_text_en: aboutStoryTextEn, quote_uk: aboutQuoteUk, quote_ru: aboutQuoteRu, quote_en: aboutQuoteEn };
+                    await saveAllContent();
+                    setAboutSaved(true);
+                    setTimeout(() => setAboutSaved(false), 2000);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> {aboutSaved ? "✓ Збережено" : "Зберегти"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Studio Tab ── */}
+        {activeTab === "studio" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Soul Studio — Інструменти</h2>
+              <p className="text-white/40 text-sm">Назви та описи 4 інструментів Студії</p>
+            </div>
+            <div className="space-y-4">
+              {studioTools.map((tool) => (
+                <div key={tool.id} className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-5 space-y-4">
+                  <p className="text-[#C4A97A] text-xs uppercase tracking-widest">{tool.id}</p>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-white/50 block mb-1">Назва (UK)</label>
+                      <input className="admin-input w-full" value={tool.title_uk} onChange={e => setStudioTools(prev => prev.map(t => t.id === tool.id ? { ...t, title_uk: e.target.value } : t))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 block mb-1">Назва (RU)</label>
+                      <input className="admin-input w-full" value={tool.title_ru} onChange={e => setStudioTools(prev => prev.map(t => t.id === tool.id ? { ...t, title_ru: e.target.value } : t))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 block mb-1">Назва (EN)</label>
+                      <input className="admin-input w-full" value={tool.title_en} onChange={e => setStudioTools(prev => prev.map(t => t.id === tool.id ? { ...t, title_en: e.target.value } : t))} />
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-white/50 block mb-1">Опис (UK)</label>
+                      <textarea rows={3} className="admin-input w-full resize-none" value={tool.desc_uk} onChange={e => setStudioTools(prev => prev.map(t => t.id === tool.id ? { ...t, desc_uk: e.target.value } : t))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 block mb-1">Опис (RU)</label>
+                      <textarea rows={3} className="admin-input w-full resize-none" value={tool.desc_ru} onChange={e => setStudioTools(prev => prev.map(t => t.id === tool.id ? { ...t, desc_ru: e.target.value } : t))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-white/50 block mb-1">Опис (EN)</label>
+                      <textarea rows={3} className="admin-input w-full resize-none" value={tool.desc_en} onChange={e => setStudioTools(prev => prev.map(t => t.id === tool.id ? { ...t, desc_en: e.target.value } : t))} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={async () => { studioRef.current = studioTools; await saveAllContent(); }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+            >
+              <Save size={14} /> Зберегти всі зміни
             </button>
           </div>
         )}

@@ -57,7 +57,7 @@ export default function FAQPage() {
               {isRu ? "Вопросы и ответы" : isEn ? "Questions & Answers" : "Питання та відповіді"}
             </span>
             <h1 className="text-[clamp(2.5rem,5vw,5rem)] text-[#1C1512] mb-6 leading-[1.06]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}>
-              {isRu ? "Твоя подсказка" : isEn ? "Your Guide" : "Твоя підказка"}
+              {isRu ? "Твои подсказки" : isEn ? "Your Tips & Answers" : "Твої підказки"}
             </h1>
             <p className="text-xl text-[#7A6A58] leading-relaxed">
               {isRu ? "Ответы на самые частые вопросы." : isEn ? "Answers to the most common questions." : "Відповіді на найпоширеніші запитання."}

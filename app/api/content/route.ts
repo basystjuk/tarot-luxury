@@ -65,5 +65,31 @@ function defaults() {
       { id: "3", category: "Payment & Organisation", q: "How does payment work?", a: "Payment is made before the session begins. I accept card, PayPal or Binance Pay." },
       { id: "4", category: "Confidentiality", q: "Will our session be recorded?", a: "I record sessions only with your consent. Confidentiality is the foundation of my practice." },
     ],
+    home: {
+      hero_tag_uk: "Таро провідник", hero_tag_ru: "Таро проводник", hero_tag_en: "Tarot Guide",
+      hero_title_uk: "Коли слова не допомагають — карти розкажуть правду",
+      hero_title_ru: "Когда слова не помогают — карты расскажут правду",
+      hero_title_en: "When words fail — the cards will tell the truth",
+      hero_sub_uk: "Емпат, відчуваю людей та їхні запити. Для мене Таро — це не «чарівна таблетка», а розмова з вами і вашою ситуацією. Головний напрямок роботи — любов і стосунки.",
+      hero_sub_ru: "Эмпат, чувствую людей и их запросы. Для меня Таро — это не «волшебная пилюля», а разговор с вами и вашей ситуацией. Главное направление работы — любовь и отношения.",
+      hero_sub_en: "Empath — I sense people and their requests. For me, Tarot is not a magic pill, it's a conversation with you and your situation. My main focus is love and relationships.",
+    },
+    about: {
+      story_title_uk: "Від запитань без відповіді — до практики, яка змінює життя",
+      story_title_ru: "От вопросов без ответа — к практике, которая меняет жизни",
+      story_title_en: "From unanswered questions — to a practice that changes lives",
+      story_text_uk: "Практикую Таро більше 5 років. Для мене Таро — це не «чарівна таблетка», а розмова. З вами, з вашою ситуацією, з тим, що ви в глибині вже знаєте — просто поки не дозволили собі почути. Головний напрям — любов і стосунки, але працюю з будь-яким запитом: вибір шляху, фінанси, робота, сім'я, внутрішній стан.",
+      story_text_ru: "Практикую Таро больше 5 лет. Для меня Таро — это не «волшебная пилюля», а разговор. С вами, с вашей ситуацией, с тем, что вы в глубине уже знаете — просто пока не разрешили себе услышать. Главное направление — любовь и отношения, но работаю с любым запросом: выбор пути, финансы, работа, семья, внутреннее состояние.",
+      story_text_en: "I have been practising Tarot for over 5 years. For me, Tarot is not a magic pill — it is a conversation. With you, with your situation, with what you already know deep down — you just haven't allowed yourself to hear it yet. My main focus is love and relationships, but I work with any request: life choices, finances, work, family, inner state.",
+      quote_uk: "Таро розклади з душею.",
+      quote_ru: "Таро расклады с душой.",
+      quote_en: "Tarot readings with soul.",
+    },
+    studio_tools: [
+      { id: "moon-phase", title_uk: "Місячний гороскоп", title_ru: "Лунный гороскоп", title_en: "Moon Horoscope", desc_uk: "Дізнайтесь поточну фазу Місяця, відсоток освітлення та дату наступного новомісяця і повного місяця.", desc_ru: "Узнайте текущую фазу Луны, процент освещения и дату следующего новолуния и полнолуния.", desc_en: "Find the current Moon phase, illumination percentage and dates of the next new moon and full moon." },
+      { id: "compatibility", title_uk: "Сумісність знаків", title_ru: "Совместимость знаков", title_en: "Sign Compatibility", desc_uk: "Перевірте астрологічну сумісність двох знаків Зодіаку. Сильні сторони, виклики та загальна оцінка пари.", desc_ru: "Проверьте астрологическую совместимость двух знаков Зодиака. Сильные стороны, вызовы и общая оценка пары.", desc_en: "Check the astrological compatibility of two Zodiac signs. Strengths, challenges and overall couple rating." },
+      { id: "daily-card", title_uk: "Карта дня", title_ru: "Карта дня", title_en: "Card of the Day", desc_uk: "Щоденна карта Старшого Аркану — ваш орієнтир та медитація на сьогодні. Оновлюється щодня.", desc_ru: "Ежедневная карта Старшего Аркана — ваш ориентир и медитация на сегодня. Обновляется каждый день.", desc_en: "Daily Major Arcana card — your guide and meditation for today. Updated every day." },
+      { id: "numerology", title_uk: "Нумерологія", title_ru: "Нумерология", title_en: "Numerology", desc_uk: "Ваше число Долі та число Життєвого Шляху за ім'ям і датою народження. З детальною інтерпретацією.", desc_ru: "Ваше число Судьбы и число Жизненного Пути по имени и дате рождения. С детальной интерпретацией.", desc_en: "Your Destiny number and Life Path number by name and date of birth. With a detailed interpretation." },
+    ],
   };
 }

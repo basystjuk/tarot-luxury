@@ -27,6 +27,24 @@ export default function AboutPage() {
   const photoUrl = useProfilePhoto();
   const [imgVisible, setImgVisible] = useState(false);
 
+  const [apiStoryTitle, setApiStoryTitle] = useState<string | null>(null);
+  const [apiStoryText, setApiStoryText] = useState<string | null>(null);
+  const [apiQuote, setApiQuote] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => {
+        if (d.about) {
+          const a = d.about;
+          setApiStoryTitle(isRu ? a.story_title_ru : isEn ? a.story_title_en : a.story_title_uk);
+          setApiStoryText(isRu ? a.story_text_ru : isEn ? a.story_text_en : a.story_text_uk);
+          setApiQuote(isRu ? a.quote_ru : isEn ? a.quote_en : a.quote_uk);
+        }
+      })
+      .catch(() => {});
+  }, [isRu, isEn]);
+
   const values = isRu ? [
     {
       title: "Безопасность и конфиденциальность",
@@ -134,39 +152,43 @@ export default function AboutPage() {
 
             {/* Text */}
             <AnimatedSection direction="left" delay={0.15}>
-              <span className="tag mb-6 inline-block">
+              <span className="tag mb-6 block text-center">
                 {isRu ? "Моя история" : isEn ? "My story" : "Моя історія"}
               </span>
               <h2
                 className="text-[clamp(1.8rem,3vw,2.8rem)] mb-6 text-[#1C1512] text-center"
                 style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
               >
-                {isRu
+                {apiStoryTitle ?? (isRu
                   ? "От вопросов без ответа — к практике, которая меняет жизни"
                   : isEn
                   ? "From unanswered questions — to a practice that changes lives"
-                  : "Від запитань без відповіді — до практики, яка змінює життя"}
+                  : "Від запитань без відповіді — до практики, яка змінює життя")}
               </h2>
               <p className="text-[#7A6A58] leading-relaxed mb-8">
-                {isRu
+                {apiStoryText ?? (isRu
                   ? "Практикую Таро больше 5 лет. Для меня Таро — это не «волшебная пилюля», а разговор. С вами, с вашей ситуацией, с тем, что вы в глубине уже знаете — просто пока не разрешили себе услышать. Главное направление — любовь и отношения, но работаю с любым запросом: выбор пути, финансы, работа, семья, внутреннее состояние."
                   : isEn
                   ? "I have been practising Tarot for over 5 years. For me, Tarot is not a magic pill — it is a conversation. With you, with your situation, with what you already know deep down — you just haven't allowed yourself to hear it yet. My main focus is love and relationships, but I work with any request: life choices, finances, work, family, inner state."
-                  : "Практикую Таро більше 5 років. Для мене Таро — це не «чарівна таблетка», а розмова. З вами, з вашою ситуацією, з тим, що ви в глибині вже знаєте — просто поки не дозволили собі почути. Головний напрям — любов і стосунки, але працюю з будь-яким запитом: вибір шляху, фінанси, робота, сім'я, внутрішній стан."}
+                  : "Практикую Таро більше 5 років. Для мене Таро — це не «чарівна таблетка», а розмова. З вами, з вашою ситуацією, з тим, що ви в глибині вже знаєте — просто поки не дозволили собі почути. Головний напрям — любов і стосунки, але працюю з будь-яким запитом: вибір шляху, фінанси, робота, сім'я, внутрішній стан.")}
               </p>
               <blockquote
                 className="border-l-2 border-[#C4A97A] pl-6 text-2xl text-[#5C4530] mb-8"
                 style={{ fontFamily: "var(--font-cormorant)", fontStyle: "italic" }}
               >
-                {isRu
+                {apiQuote
+                  ? `"${apiQuote}"`
+                  : isRu
                   ? '"Таро расклады с душой."'
                   : isEn
                   ? '"Tarot readings with soul."'
                   : '"Таро розклади з душею."'}
               </blockquote>
-              <Link href={`/${language}/contacts`} className="btn-primary">
-                {isRu ? "Записаться на сессию" : isEn ? "Book a session" : "Записатись на сесію"}
-              </Link>
+              <div className="text-center">
+                <Link href={`/${language}/contacts`} className="btn-primary">
+                  {isRu ? "Записаться на сессию" : isEn ? "Book a session" : "Записатись на сесію"}
+                </Link>
+              </div>
             </AnimatedSection>
           </div>
         </div>

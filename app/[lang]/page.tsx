@@ -1,6 +1,8 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
@@ -9,10 +11,42 @@ import Testimonials from "@/components/sections/Testimonials";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useLanguage } from '@/hooks/useLanguage';
 
+const FALLBACK_PHOTO = "/images/ellen-soul-taro-konsultant.jpg";
+function useProfilePhoto() {
+  const [url, setUrl] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    fetch("/api/photo")
+      .then((r) => r.json())
+      .then((d) => setUrl(d.url || FALLBACK_PHOTO))
+      .catch(() => setUrl(FALLBACK_PHOTO));
+  }, []);
+  return url;
+}
+
 export default function HomePage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+  const photoUrl = useProfilePhoto();
+  const [imgVisible, setImgVisible] = React.useState(false);
+
+  const [heroTag, setHeroTag] = React.useState<string | null>(null);
+  const [heroTitle, setHeroTitle] = React.useState<string | null>(null);
+  const [heroSub, setHeroSub] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/content")
+      .then(r => r.json())
+      .then(d => {
+        if (d.home) {
+          const h = d.home;
+          setHeroTag(isRu ? h.hero_tag_ru : isEn ? h.hero_tag_en : h.hero_tag_uk);
+          setHeroTitle(isRu ? h.hero_title_ru : isEn ? h.hero_title_en : h.hero_title_uk);
+          setHeroSub(isRu ? h.hero_sub_ru : isEn ? h.hero_sub_en : h.hero_sub_uk);
+        }
+      })
+      .catch(() => {});
+  }, [isRu, isEn]);
 
   const services = isRu ? [
     {
@@ -172,7 +206,7 @@ export default function HomePage() {
             transition={{ duration: 0.7, ease: [0.19, 1, 0.22, 1] }}
           >
             <span className="tag mb-8 inline-block">
-              {isRu ? "Таро проводник" : isEn ? "Tarot Guide" : "Таро провідник"}
+              {heroTag ?? (isRu ? "Таро проводник" : isEn ? "Tarot Guide" : "Таро провідник")}
             </span>
           </motion.div>
 
@@ -198,11 +232,11 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.2, ease: [0.19, 1, 0.22, 1] }}
             className="text-lg text-[#7A6A58] max-w-xl mx-auto mb-10 leading-relaxed"
           >
-            {isRu
+            {heroSub ?? (isRu
               ? "Эмпат, чувствую людей и их запросы. Для меня Таро — это не «волшебная пилюля», а разговор с вами и вашей ситуацией. Главное направление работы — любовь и отношения."
               : isEn
               ? "Empath — I sense people and their requests. For me, Tarot is not a magic pill, it's a conversation with you and your situation. My main focus is love and relationships."
-              : "Емпат, відчуваю людей та їхні запити. Для мене Таро — це не «чарівна таблетка», а розмова з вами і вашою ситуацією. Головний напрямок роботи — любов і стосунки."}
+              : "Емпат, відчуваю людей та їхні запити. Для мене Таро — це не «чарівна таблетка», а розмова з вами і вашою ситуацією. Головний напрямок роботи — любов і стосунки.")}
           </motion.p>
 
           <motion.div
@@ -285,7 +319,6 @@ export default function HomePage() {
           <AnimatedSection delay={0.35} className="text-center mt-10">
             <Link href={`/${language}/services`} className="btn-outline">
               {isRu ? "Все услуги и цены" : isEn ? "All services & prices" : "Всі послуги та ціни"}
-              <ArrowRight size={16} />
             </Link>
           </AnimatedSection>
         </div>
@@ -298,7 +331,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <AnimatedSection direction="right">
-              <span className="tag mb-6 inline-block">{isRu ? "Обо мне" : isEn ? "About me" : "Про мене"}</span>
+              <span className="tag mb-6 block text-center">{isRu ? "Обо мне" : isEn ? "About me" : "Про мене"}</span>
               <h2
                 className="text-[clamp(2rem,4vw,3.5rem)] mb-6 text-[#1C1512] leading-[1.1]"
                 style={{ fontFamily: "var(--font-cormorant)" }}
@@ -326,26 +359,31 @@ export default function HomePage() {
                   ? "Hundreds of consultations and continuous learning — I combine traditional tarot work with modern psychological approaches to give you not just an answer, but understanding."
                   : "Сотні консультацій практики та постійне навчання — я поєдную традиційну роботу з таро та сучасні психологічні підходи, щоб дати вам не лише відповідь, але й розуміння."}
               </p>
-              <Link href={`/${language}/about`} className="btn-outline">
-                {isRu ? "Подробнее обо мне" : isEn ? "More about me" : "Дізнатись більше про мене"}
-              </Link>
+              <div className="text-center">
+                <Link href={`/${language}/about`} className="btn-outline">
+                  {isRu ? "Подробнее обо мне" : isEn ? "More about me" : "Дізнатись більше про мене"}
+                </Link>
+              </div>
             </AnimatedSection>
 
             <AnimatedSection direction="left" delay={0.1}>
               <div className="relative flex justify-center">
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-[340px] h-[340px] rounded-full border border-[rgba(196,169,122,0.2)]" />
                 </div>
-                <div className="relative w-[280px] h-[360px] rounded-[50%] bg-gradient-to-b from-[#E8DCC5] via-[#D4B88A] to-[#C4A97A] shadow-[0_20px_80px_rgba(196,169,122,0.3)]">
-                  <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-transparent via-transparent to-[rgba(28,21,18,0.15)]" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span
-                      className="text-7xl text-white/60"
-                      style={{ fontFamily: "var(--font-cormorant)", fontWeight: 300 }}
-                    >
-                      О
-                    </span>
-                  </div>
+                <div className="relative w-[280px] h-[360px] rounded-3xl overflow-hidden shadow-[0_20px_80px_rgba(196,169,122,0.25)]">
+                  <div className={`absolute inset-0 bg-[#EDE5D4] transition-opacity duration-500 ${imgVisible ? 'opacity-0' : 'opacity-100'}`} />
+                  {photoUrl && (
+                    <Image
+                      src={photoUrl}
+                      alt="Ellen Soul — таролог"
+                      fill
+                      className={`object-cover object-top transition-opacity duration-500 ${imgVisible ? 'opacity-100' : 'opacity-0'}`}
+                      sizes="280px"
+                      onLoad={() => setImgVisible(true)}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[rgba(28,21,18,0.12)]" />
                 </div>
               </div>
             </AnimatedSection>
@@ -402,7 +440,6 @@ export default function HomePage() {
           <AnimatedSection delay={0.2} className="text-center mt-10">
             <Link href={`/${language}/faq`} className="btn-outline">
               {isRu ? "Все вопросы" : isEn ? "All questions" : "Всі питання"}
-              <ArrowRight size={16} />
             </Link>
           </AnimatedSection>
         </div>

@@ -19,23 +19,19 @@ export default function Header() {
     { href: `/${language}/blog`, label: t('nav.blog') },
     { href: `/${language}/studio`, label: t('nav.studio') },
     { href: `/${language}/contacts`, label: t('nav.contacts') },
-    { href: `/${language}/faq`, label: language === 'ru' ? 'Подсказка' : language === 'en' ? 'Guide' : 'Підказка' },
+    { href: `/${language}/faq`, label: language === 'ru' ? 'Подсказки' : language === 'en' ? 'Tips' : 'Підказки' },
   ];
   const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [lastY, setLastY] = useState(0);
 
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 40);
-      setHidden(y > lastY && y > 120);
-      setLastY(y);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [lastY]);
+  }, []);
 
   useEffect(() => {
     if (menuOpen) {
@@ -49,7 +45,7 @@ export default function Header() {
   return (
     <>
       <motion.header
-        animate={{ y: hidden && !menuOpen ? -100 : 0 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }}
         className={cn(
           "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
