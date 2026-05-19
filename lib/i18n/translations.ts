@@ -248,6 +248,20 @@ export const translations = {
     'footer.copyright': '© 2026 Ellen Soul. Всі права захищені.',
     'footer.privacy': 'Політика конфіденційності',
 
+    // ── SEO Meta ────────────────────────────────────────────────────────────
+    'meta.about.title': 'Про мене — Ellen Soul, таролог-емпат',
+    'meta.about.desc': 'Дізнайтесь більше про Ellen Soul — таролога з 5+ роками практики, 500+ консультаціями. Онлайн сесії таро на відносини, любов, вибір шляху.',
+    'meta.services.title': 'Послуги та ціни — Розклади таро онлайн',
+    'meta.services.desc': 'Розклади таро від $20: одне питання, Амур на стосунки, повноцінна онлайн-сесія. Детальний опис та ціни.',
+    'meta.blog.title': 'Щоденник таролога — Статті про таро і психологію',
+    'meta.blog.desc': 'Авторські статті Ellen Soul про таро, психологію, стосунки та самопізнання. Читайте та розвивайтесь.',
+    'meta.contacts.title': 'Контакти — Записатись на консультацію таро',
+    'meta.contacts.desc': 'Зв\'яжіться з Ellen Soul для запису на онлайн-консультацію таро. Telegram, Instagram та email.',
+    'meta.faq.title': 'Питання та відповіді — Таро онлайн',
+    'meta.faq.desc': 'Відповіді на часті запитання про онлайн-консультації таро з Ellen Soul: як проходить, що підготувати, скільки коштує.',
+    'meta.studio.title': 'Soul Studio — Безкоштовні таро-інструменти онлайн',
+    'meta.studio.desc': 'Безкоштовні інструменти: карта дня, нумерологія, натальна карта, сумісність знаків, місячна фаза. Відкрийте Soul Studio.',
+
   },
 
   ru: {
@@ -494,6 +508,20 @@ export const translations = {
     'footer.social.title': 'Социальные сети',
     'footer.copyright': '© 2026 Ellen Soul. Все права защищены.',
     'footer.privacy': 'Политика конфиденциальности',
+
+    // ── SEO Meta ────────────────────────────────────────────────────────────
+    'meta.about.title': 'Обо мне — Ellen Soul, таролог-эмпат',
+    'meta.about.desc': 'Узнайте больше об Ellen Soul — тарологе с 5+ годами практики и 500+ консультациями. Онлайн сессии таро на отношения, любовь, выбор пути.',
+    'meta.services.title': 'Услуги и цены — Расклады таро онлайн',
+    'meta.services.desc': 'Расклады таро от $20: один вопрос, Амур на отношения, полноценная онлайн-сессия. Подробное описание и цены.',
+    'meta.blog.title': 'Дневник таролога — Статьи о таро и психологии',
+    'meta.blog.desc': 'Авторские статьи Ellen Soul о таро, психологии, отношениях и самопознании. Читайте и развивайтесь.',
+    'meta.contacts.title': 'Контакты — Записаться на консультацию таро',
+    'meta.contacts.desc': 'Свяжитесь с Ellen Soul для записи на онлайн-консультацию таро. Telegram, Instagram и email.',
+    'meta.faq.title': 'Вопросы и ответы — Таро онлайн',
+    'meta.faq.desc': 'Ответы на частые вопросы об онлайн-консультациях таро с Ellen Soul: как проходит, что подготовить, сколько стоит.',
+    'meta.studio.title': 'Soul Studio — Бесплатные таро-инструменты онлайн',
+    'meta.studio.desc': 'Бесплатные инструменты: карта дня, нумерология, натальная карта, совместимость знаков, лунная фаза. Откройте Soul Studio.',
   },
 
   en: {
@@ -709,8 +737,22 @@ export const translations = {
     'footer.services.psychology': 'Psychology',
     'footer.services.couples': 'For couples',
     'footer.social.title': 'Social media',
-    'footer.copyright': '© 2025 Ellen Soul. All rights reserved.',
+    'footer.copyright': '© 2026 Ellen Soul. All rights reserved.',
     'footer.privacy': 'Privacy policy',
+
+    // ── SEO Meta ────────────────────────────────────────────────────────────
+    'meta.about.title': 'About Me — Ellen Soul, Empath Tarot Reader',
+    'meta.about.desc': 'Learn more about Ellen Soul — a tarot reader with 5+ years of practice and 500+ consultations. Online tarot sessions for relationships, love, and life choices.',
+    'meta.services.title': 'Services & Prices — Online Tarot Readings',
+    'meta.services.desc': 'Tarot readings from $20: one question, Amour relationship spread, full online session. Detailed descriptions and prices.',
+    'meta.blog.title': 'Tarot Diary — Articles on Tarot & Psychology',
+    'meta.blog.desc': 'Original articles by Ellen Soul on tarot, psychology, relationships, and self-discovery. Read and grow.',
+    'meta.contacts.title': 'Contact — Book a Tarot Consultation',
+    'meta.contacts.desc': 'Reach Ellen Soul to book an online tarot consultation. Available via Telegram, Instagram, and email.',
+    'meta.faq.title': 'FAQ — Online Tarot Readings',
+    'meta.faq.desc': 'Answers to common questions about online tarot consultations with Ellen Soul: how it works, what to prepare, and pricing.',
+    'meta.studio.title': 'Soul Studio — Free Online Tarot Tools',
+    'meta.studio.desc': 'Free tools: daily card, numerology, natal chart, sign compatibility, moon phase. Open Soul Studio.',
   },
 } as const;
 
