@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DEFAULT_SERVICES } from "@/lib/data/services";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, contact, topic, message, language } = await req.json();
+    const { name, contactType, contact, topic, message, currency } =
+      await req.json();
 
     if (!name?.trim() || !contact?.trim()) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -16,19 +18,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const flag = language === "ru" ? "🇷🇺" : language === "en" ? "🇬🇧" : "🇺🇦";
-    const text = [
-      `📩 *Новий запит з сайту*`,
+    // ── Resolve topic → Russian title + price ──────────────────────────────
+    const matched = DEFAULT_SERVICES.find(
+      s =>
+        s.title_ru === topic ||
+        s.title_uk === topic ||
+        s.title_en === topic
+    );
+    const topicLine = matched
+      ? `${matched.title_ru} ${matched.price}`
+      : topic || "Личный запрос";
+
+    // ── Contact line ───────────────────────────────────────────────────────
+    const methodLabel =
+      contactType === "whatsapp"
+        ? "WhatsApp"
+        : contactType === "instagram"
+        ? "Instagram"
+        : "Telegram";
+    const contactLine = `${methodLabel} ${contact}`;
+
+    // ── Currency line ──────────────────────────────────────────────────────
+    const currencyLine = currency?.trim() ? `💰 ${currency.trim()}` : null;
+
+    // ── Assemble message ───────────────────────────────────────────────────
+    const parts: (string | null)[] = [
+      `📋 *${escMd(topicLine)}*`,
       ``,
-      `👤 *Ім'я:* ${escape(name)}`,
-      `📬 *Контакт:* ${escape(contact)}`,
-      `📋 *Тема:* ${escape(topic || "—")}`,
-      message?.trim() ? `💬 *Повідомлення:* ${escape(message)}` : null,
-      ``,
-      `${flag} Мова: ${language ?? "uk"}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+      `Name: ${escMd(name.trim())}`,
+      escMd(contactLine),
+      currencyLine ? escMd(currencyLine) : null,
+      message?.trim() ? `\n${escMd(message.trim())}` : null,
+    ];
+
+    const text = parts.filter(p => p !== null).join("\n");
 
     const res = await fetch(
       `https://api.telegram.org/bot${token}/sendMessage`,
@@ -56,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function escape(text: string): string {
-  // Escape Markdown special chars
+/** Escape Markdown special chars for Telegram MarkdownV1 */
+function escMd(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
