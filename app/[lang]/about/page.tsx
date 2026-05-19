@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
+import { useModal } from '@/contexts/ModalContext';
 
 const FALLBACK_PHOTO = "/images/ellen-soul-taro-konsultant.jpg";
 
@@ -24,6 +25,7 @@ export default function AboutPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+  const { openBooking } = useModal();
   const photoUrl = useProfilePhoto();
   const [imgVisible, setImgVisible] = useState(false);
 
@@ -185,9 +187,9 @@ export default function AboutPage() {
                   : '"Таро розклади з душею."'}
               </blockquote>
               <div className="text-center">
-                <Link href={`/${language}/contacts`} className="btn-primary">
+                <button onClick={() => openBooking()} className="btn-primary">
                   {isRu ? "Записаться на сессию" : isEn ? "Book a session" : "Записатись на сесію"}
-                </Link>
+                </button>
               </div>
             </AnimatedSection>
           </div>

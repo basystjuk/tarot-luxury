@@ -6,11 +6,13 @@ import { ChevronDown } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
+import { useModal } from '@/contexts/ModalContext';
 
 export default function FAQPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+  const { openQuickContact } = useModal();
 
   type FaqItem = { id: string; category: string; q: string; a: string };
 
@@ -113,9 +115,9 @@ export default function FAQPage() {
                   : isEn ? "Write to me directly — I will answer any question."
                   : "Напишіть мені напряму — я відповім на будь-яке питання."}
               </p>
-              <Link href={`/${language}/contacts`} className="btn-primary">
+              <button onClick={openQuickContact} className="btn-primary">
                 {isRu ? "Написать мне" : isEn ? "Write to Me" : "Написати мені"}
-              </Link>
+              </button>
             </div>
           </AnimatedSection>
         </div>

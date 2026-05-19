@@ -7,9 +7,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from '@/hooks/useLanguage';
+import { useModal } from '@/contexts/ModalContext';
 
 export default function Header() {
   const { t, language, setLanguage } = useLanguage();
+  const { openBooking } = useModal();
   const pathname = usePathname();
 
   const navLinks = [
@@ -103,10 +105,10 @@ export default function Header() {
                 </React.Fragment>
               ))}
             </div>
-            <Link
-              href={`/${language}/contacts`}
+            <button
+              onClick={() => openBooking()}
               className="hidden sm:inline-flex btn-primary text-sm px-6 py-3"
-            >{t('header.cta')}</Link>
+            >{t('header.cta')}</button>
             <button
               onClick={() => setMenuOpen(true)}
               className="lg:hidden p-2 text-[#1C1512] hover:text-[#B8883A] transition-colors"
@@ -190,13 +192,12 @@ export default function Header() {
                 transition={{ delay: 0.45 }}
                 className="pt-8"
               >
-                <Link
-                  href={`/${language}/contacts`}
-                  onClick={() => setMenuOpen(false)}
+                <button
+                  onClick={() => { openBooking(); setMenuOpen(false); }}
                   className="btn-primary w-full text-center"
                 >
                   {language === 'ru' ? 'Записаться на консультацию' : language === 'en' ? 'Book a consultation' : 'Записатись на консультацію'}
-                </Link>
+                </button>
               </motion.div>
             </div>
           </motion.div>

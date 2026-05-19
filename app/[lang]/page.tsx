@@ -10,6 +10,7 @@ import GoldDivider from "@/components/ui/GoldDivider";
 import Testimonials from "@/components/sections/Testimonials";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useLanguage } from '@/hooks/useLanguage';
+import { useModal } from '@/contexts/ModalContext';
 
 const FALLBACK_PHOTO = "/images/ellen-soul-taro-konsultant.jpg";
 function useProfilePhoto() {
@@ -27,6 +28,7 @@ export default function HomePage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+  const { openBooking } = useModal();
   const photoUrl = useProfilePhoto();
   const [imgVisible, setImgVisible] = React.useState(false);
 
@@ -245,9 +247,9 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.3, ease: [0.19, 1, 0.22, 1] }}
             className="flex flex-wrap gap-4 justify-center mb-16 mx-auto"
           >
-            <Link href={`/${language}/contacts`} className="btn-primary">
+            <button onClick={() => openBooking()} className="btn-primary">
               {isRu ? "Записаться на консультацию" : isEn ? "Book a consultation" : "Записатись на консультацію"}
-            </Link>
+            </button>
           </motion.div>
 
           <motion.div

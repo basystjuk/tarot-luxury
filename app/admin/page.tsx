@@ -1046,9 +1046,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       id: Date.now().toString(),
                       title_ru: "Новая услуга", subtitle_ru: "",
                       title_uk: "Нова послуга", subtitle_uk: "",
+                      title_en: "New Service", subtitle_en: "",
                       price: "$0",
-                      desc_ru: "", desc_uk: "",
-                      includes_ru: [], includes_uk: [],
+                      desc_ru: "", desc_uk: "", desc_en: "",
+                      includes_ru: [], includes_uk: [], includes_en: [],
                     };
                     const updated = [...svcList, newSvc];
                     saveSvc(updated);
@@ -1105,11 +1106,21 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                           <input className="admin-input w-full" value={svc.subtitle_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, subtitle_uk: e.target.value} : s))} />
                         </div>
                       </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Назва (EN)</label>
+                          <input className="admin-input w-full" value={svc.title_en ?? ''} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, title_en: e.target.value} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Підзаголовок (EN)</label>
+                          <input className="admin-input w-full" value={svc.subtitle_en ?? ''} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, subtitle_en: e.target.value} : s))} />
+                        </div>
+                      </div>
                       <div>
                         <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Ціна</label>
                         <input className="admin-input w-32" value={svc.price} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, price: e.target.value} : s))} />
                       </div>
-                      <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid md:grid-cols-3 gap-4">
                         <div>
                           <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (RU)</label>
                           <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_ru} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_ru: e.target.value} : s))} />
@@ -1118,8 +1129,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                           <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (UK)</label>
                           <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_uk} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_uk: e.target.value} : s))} />
                         </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Опис (EN)</label>
+                          <textarea rows={2} className="admin-input w-full resize-none" value={svc.desc_en ?? ''} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, desc_en: e.target.value} : s))} />
+                        </div>
                       </div>
-                      <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid md:grid-cols-3 gap-4">
                         <div>
                           <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (RU) — кожен з нового рядка</label>
                           <textarea rows={5} className="admin-input w-full resize-none text-xs" value={svc.includes_ru.join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_ru: e.target.value.split("\n").filter(Boolean)} : s))} />
@@ -1127,6 +1142,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         <div>
                           <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (UK) — кожен з нового рядка</label>
                           <textarea rows={5} className="admin-input w-full resize-none text-xs" value={svc.includes_uk.join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_uk: e.target.value.split("\n").filter(Boolean)} : s))} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-[#C4A97A] uppercase tracking-widest block mb-1">Пункти (EN) — кожен з нового рядка</label>
+                          <textarea rows={5} className="admin-input w-full resize-none text-xs" value={(svc.includes_en ?? []).join("\n")} onChange={e => saveSvc(svcList.map(s => s.id === svc.id ? {...s, includes_en: e.target.value.split("\n").filter(Boolean)} : s))} />
                         </div>
                       </div>
                     </div>
@@ -1149,14 +1168,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         <button onClick={() => { if (confirm("Видалити?")) saveOrg(orgList.filter(o=>o.id!==item.id)); }} className="p-1 text-white/30 hover:text-red-400"><Trash2 size={12}/></button>
                       </div>
                     </div>
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <div className="grid md:grid-cols-3 gap-3">
                       <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_ru} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_ru: e.target.value} : o))} placeholder="RU" />
                       <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_uk} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_uk: e.target.value} : o))} placeholder="UK" />
+                      <textarea rows={3} className="admin-input w-full resize-none text-xs" value={item.text_en ?? ''} onChange={e => saveOrg(orgList.map(o => o.id===item.id ? {...o, text_en: e.target.value} : o))} placeholder="EN" />
                     </div>
                   </div>
                 ))}
                 <button
-                  onClick={() => saveOrg([...orgList, { id: Date.now().toString(), text_ru: "", text_uk: "" }])}
+                  onClick={() => saveOrg([...orgList, { id: Date.now().toString(), text_ru: "", text_uk: "", text_en: "" }])}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-white/15 text-white/40 hover:text-white/70 text-sm w-full justify-center"
                 >
                   <Plus size={14} /> Додати пункт

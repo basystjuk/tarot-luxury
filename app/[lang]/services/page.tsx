@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
+import { useModal } from '@/contexts/ModalContext';
 import { DEFAULT_SERVICES, DEFAULT_ORG, type ServiceItem, type OrgItem } from "@/lib/data/services";
 
 function subtitleWithJostNums(text: string) {
@@ -20,6 +20,7 @@ export default function ServicesPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+  const { openBooking } = useModal();
 
   const [services, setServices] = useState<ServiceItem[]>(DEFAULT_SERVICES);
   const [orgItems, setOrgItems] = useState<OrgItem[]>(DEFAULT_ORG);
@@ -65,10 +66,10 @@ export default function ServicesPage() {
       <section className="section-padding bg-[#FDFBF7]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 space-y-8">
           {services.map((svc, i) => {
-            const title = isRu ? svc.title_ru : svc.title_uk;
-            const subtitle = isRu ? svc.subtitle_ru : svc.subtitle_uk;
-            const desc = isRu ? svc.desc_ru : svc.desc_uk;
-            const includes = isRu ? svc.includes_ru : svc.includes_uk;
+            const title = isRu ? svc.title_ru : isEn ? (svc.title_en || svc.title_uk) : svc.title_uk;
+            const subtitle = isRu ? svc.subtitle_ru : isEn ? (svc.subtitle_en || svc.subtitle_uk) : svc.subtitle_uk;
+            const desc = isRu ? svc.desc_ru : isEn ? (svc.desc_en || svc.desc_uk) : svc.desc_uk;
+            const includes = isRu ? svc.includes_ru : isEn ? (svc.includes_en || svc.includes_uk) : svc.includes_uk;
 
             return (
               <AnimatedSection key={svc.id} delay={i * 0.06}>
@@ -107,9 +108,12 @@ export default function ServicesPage() {
                         </p>
                       </div>
                       <div className="h-px w-full bg-[rgba(196,169,122,0.3)]" />
-                      <Link href={`/${language}/contacts`} className="btn-primary w-full text-center justify-center">
+                      <button
+                        onClick={() => openBooking(title)}
+                        className="btn-primary w-full text-center justify-center"
+                      >
                         {isRu ? 'Записаться' : isEn ? 'Book Now' : 'Записатись'}
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -133,7 +137,7 @@ export default function ServicesPage() {
               <AnimatedSection key={item.id} delay={i * 0.1}>
                 <div className="card-luxury">
                   <p className="text-[#5C4530] leading-relaxed text-sm">
-                    {isRu ? item.text_ru : item.text_uk}
+                    {isRu ? item.text_ru : isEn ? (item.text_en || item.text_uk) : item.text_uk}
                   </p>
                 </div>
               </AnimatedSection>
