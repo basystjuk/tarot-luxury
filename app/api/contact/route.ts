@@ -10,20 +10,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token  = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
     if (!token || !chatId) {
-      // Silently succeed if not configured (dev/preview)
       return NextResponse.json({ ok: true });
     }
 
-    // ── Resolve topic → Russian title + price ──────────────────────────────
+    // ── Topic → Russian title + price ─────────────────────────────────────
     const matched = DEFAULT_SERVICES.find(
-      s =>
-        s.title_ru === topic ||
-        s.title_uk === topic ||
-        s.title_en === topic
+      s => s.title_ru === topic || s.title_uk === topic || s.title_en === topic
     );
     const topicLine = matched
       ? `${matched.title_ru} ${matched.price}`
@@ -31,44 +27,38 @@ export async function POST(req: NextRequest) {
 
     // ── Contact line ───────────────────────────────────────────────────────
     const methodLabel =
-      contactType === "whatsapp"
-        ? "WhatsApp"
-        : contactType === "instagram"
-        ? "Instagram"
-        : "Telegram";
-    const contactLine = `${methodLabel} ${contact}`;
-
-    // ── Currency line ──────────────────────────────────────────────────────
-    const currencyLine = currency?.trim() ? `💰 ${currency.trim()}` : null;
+      contactType === "whatsapp"  ? "WhatsApp"  :
+      contactType === "instagram" ? "Instagram" : "Telegram";
 
     // ── Assemble message ───────────────────────────────────────────────────
-    const parts: (string | null)[] = [
-      `📋 *${escMd(topicLine)}*`,
+    const parts: string[] = [
+      `❤️ *${esc(topicLine)}*`,
       ``,
-      `Name: ${escMd(name.trim())}`,
-      escMd(contactLine),
-      currencyLine ? escMd(currencyLine) : null,
-      message?.trim() ? `\n${escMd(message.trim())}` : null,
+      `👤 Name: ${esc(name.trim())}`,
+      `📲 ${methodLabel} ${esc(contact.trim())}`,
     ];
 
-    const text = parts.filter(p => p !== null).join("\n");
+    if (currency?.trim()) {
+      parts.push(`💲 ${esc(currency.trim())}`);
+    }
+
+    if (message?.trim()) {
+      parts.push(``, `📜 ${esc(message.trim())}`);
+    }
+
+    const text = parts.join("\n");
 
     const res = await fetch(
       `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: "Markdown",
-        }),
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
       }
     );
 
     if (!res.ok) {
-      const err = await res.text();
-      console.error("Telegram error:", err);
+      console.error("Telegram error:", await res.text());
       return NextResponse.json({ error: "Telegram error" }, { status: 500 });
     }
 
@@ -79,7 +69,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** Escape Markdown special chars for Telegram MarkdownV1 */
-function escMd(text: string): string {
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
+/**
+ * Escape only Telegram MarkdownV1 special chars: _ * ` [
+ * Do NOT escape +, -, ., etc. — they are plain text in MarkdownV1.
+ */
+function esc(text: string): string {
+  return text.replace(/[_*`[]/g, "\\$&");
 }

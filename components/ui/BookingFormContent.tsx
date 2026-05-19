@@ -7,9 +7,7 @@ import { useLanguage } from '@/hooks/useLanguage';
 type ContactMethod = 'telegram' | 'whatsapp' | 'instagram';
 
 interface Props {
-  /** Pre-fill the topic dropdown (e.g. from services page) */
   defaultTopic?: string;
-  /** Called after successful submission */
   onSuccess?: () => void;
 }
 
@@ -39,10 +37,44 @@ function InstagramIcon() {
   );
 }
 
-/**
- * Shared booking form.
- * Used in: BookingModal, contacts page.
- */
+// ─── Input helpers ────────────────────────────────────────────────────────────
+
+/** Keep @ prefix; allow only latin letters, digits, dots, underscores, hyphens */
+function handleUsernameChange(raw: string, setter: (v: string) => void) {
+  const body = raw.startsWith('@') ? raw.slice(1) : raw;
+  const clean = body.replace(/[^a-zA-Z0-9._\-]/g, '');
+  setter('@' + clean);
+}
+
+/** Keep + prefix; allow only digits */
+function handlePhoneChange(raw: string, setter: (v: string) => void) {
+  const body = raw.startsWith('+') ? raw.slice(1) : raw;
+  const digits = body.replace(/\D/g, '');
+  setter('+' + digits);
+}
+
+/** Validate phone digits count (E.164: 7–15 digits) */
+function phoneError(phone: string, isRu: boolean, isEn: boolean): string | null {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 7)
+    return isRu
+      ? 'Введите минимум 7 цифр номера'
+      : isEn
+      ? 'Enter at least 7 digits'
+      : 'Введіть мінімум 7 цифр номера';
+  if (digits.length > 15)
+    return isRu
+      ? 'Номер слишком длинный (максимум 15 цифр)'
+      : isEn
+      ? 'Phone number too long (max 15 digits)'
+      : 'Номер занадто довгий (максимум 15 цифр)';
+  return null;
+}
+
+const isEmpty = (v: string) => v.length <= 1; // just @ or +
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
   const { language } = useLanguage();
   const isRu = language === 'ru';
@@ -76,25 +108,19 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
 
   const topics = dynamicTopics.length ? dynamicTopics : TOPICS_FALLBACK;
 
-  const [form, setForm] = useState({
-    name: '',
-    topic: defaultTopic ?? '',
-    message: '',
-    currency: '',
-  });
+  const [form, setForm] = useState({ name: '', topic: defaultTopic ?? '', message: '', currency: '' });
 
-  // Contact method state
+  // Contact fields – prefixes are always present
   const [contactMethod, setContactMethod] = useState<ContactMethod>('telegram');
-  const [telegramUsername, setTelegramUsername] = useState('');
-  const [telegramPhone, setTelegramPhone] = useState('');
-  const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [instagramHandle, setInstagramHandle] = useState('');
+  const [tgUsername, setTgUsername] = useState('@');
+  const [tgPhone, setTgPhone]       = useState('+');
+  const [waPhone, setWaPhone]       = useState('+');
+  const [igHandle, setIgHandle]     = useState('@');
 
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]     = useState(false);
   const [contactError, setContactError] = useState('');
 
-  // Sync topic when topics list loads or defaultTopic changes
   useEffect(() => {
     if (defaultTopic) {
       setForm(f => ({ ...f, topic: defaultTopic }));
@@ -104,18 +130,15 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultTopic, topics]);
 
-  /** Validate phone: must contain at least 7 digits */
-  function isValidPhone(phone: string) {
-    return (phone.replace(/\D/g, '').length >= 7);
-  }
-
-  /** Build the contact string and validate; returns null if invalid */
+  // ── Build & validate contact ──────────────────────────────────────────────
   function buildContact(): string | null {
     setContactError('');
+
     if (contactMethod === 'telegram') {
-      const u = telegramUsername.trim();
-      const p = telegramPhone.trim();
-      if (!u && !p) {
+      const hasUser  = !isEmpty(tgUsername);
+      const hasPhone = !isEmpty(tgPhone);
+
+      if (!hasUser && !hasPhone) {
         setContactError(
           isRu ? 'Введите @username или номер телефона'
           : isEn ? 'Enter @username or phone number'
@@ -123,21 +146,18 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
         );
         return null;
       }
-      if (p && !isValidPhone(p)) {
-        setContactError(
-          isRu ? 'Введите корректный номер телефона'
-          : isEn ? 'Enter a valid phone number'
-          : 'Введіть коректний номер телефону'
-        );
-        return null;
+
+      if (hasPhone) {
+        const err = phoneError(tgPhone, isRu, isEn);
+        if (err) { setContactError(err); return null; }
       }
-      if (u && p) return `${u.startsWith('@') ? u : '@' + u} / ${p.startsWith('+') ? p : '+' + p}`;
-      if (u) return u.startsWith('@') ? u : '@' + u;
-      return p.startsWith('+') ? p : '+' + p;
+
+      if (hasUser && hasPhone) return `${tgUsername} / ${tgPhone}`;
+      return hasUser ? tgUsername : tgPhone;
     }
+
     if (contactMethod === 'whatsapp') {
-      const p = whatsappPhone.trim();
-      if (!p) {
+      if (isEmpty(waPhone)) {
         setContactError(
           isRu ? 'Введите номер телефона'
           : isEn ? 'Enter your phone number'
@@ -145,19 +165,13 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
         );
         return null;
       }
-      if (!isValidPhone(p)) {
-        setContactError(
-          isRu ? 'Введите корректный номер телефона'
-          : isEn ? 'Enter a valid phone number'
-          : 'Введіть коректний номер телефону'
-        );
-        return null;
-      }
-      return p.startsWith('+') ? p : '+' + p;
+      const err = phoneError(waPhone, isRu, isEn);
+      if (err) { setContactError(err); return null; }
+      return waPhone;
     }
+
     // instagram
-    const h = instagramHandle.trim();
-    if (!h) {
+    if (isEmpty(igHandle)) {
       setContactError(
         isRu ? 'Введите @username'
         : isEn ? 'Enter your @username'
@@ -165,12 +179,11 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
       );
       return null;
     }
-    return h.startsWith('@') ? h : '@' + h;
+    return igHandle;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const contactValue = buildContact();
     if (!contactValue) return;
 
@@ -189,9 +202,7 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
           language,
         }),
       });
-    } catch {
-      // still show success to user
-    }
+    } catch { /* show success anyway */ }
     setLoading(false);
     setSubmitted(true);
     onSuccess?.();
@@ -218,12 +229,14 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
     );
   }
 
-  const methodBtnBase =
-    'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border';
-  const methodBtnActive =
-    'bg-[#B8883A] text-white border-[#B8883A]';
-  const methodBtnInactive =
-    'bg-transparent text-[#7A6A58] border-[rgba(196,169,122,0.4)] hover:border-[#B8883A] hover:text-[#B8883A]';
+  const btnBase    = 'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border';
+  const btnActive  = 'bg-[#B8883A] text-white border-[#B8883A]';
+  const btnInactive = 'bg-transparent text-[#7A6A58] border-[rgba(196,169,122,0.4)] hover:border-[#B8883A] hover:text-[#B8883A]';
+
+  const switchMethod = (m: ContactMethod) => {
+    setContactMethod(m);
+    setContactError('');
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -249,39 +262,32 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
           {isRu ? 'Ваш контакт' : isEn ? 'Your contact' : 'Ваш контакт'}
         </label>
 
-        {/* Method selector buttons */}
+        {/* Method buttons */}
         <div className="flex gap-2 mb-3 flex-wrap">
-          <button
-            type="button"
-            onClick={() => { setContactMethod('telegram'); setContactError(''); }}
-            className={`${methodBtnBase} ${contactMethod === 'telegram' ? methodBtnActive : methodBtnInactive}`}
-          >
-            <TelegramIcon /> Telegram
-          </button>
-          <button
-            type="button"
-            onClick={() => { setContactMethod('whatsapp'); setContactError(''); }}
-            className={`${methodBtnBase} ${contactMethod === 'whatsapp' ? methodBtnActive : methodBtnInactive}`}
-          >
-            <WhatsAppIcon /> WhatsApp
-          </button>
-          <button
-            type="button"
-            onClick={() => { setContactMethod('instagram'); setContactError(''); }}
-            className={`${methodBtnBase} ${contactMethod === 'instagram' ? methodBtnActive : methodBtnInactive}`}
-          >
-            <InstagramIcon /> Instagram
-          </button>
+          {(['telegram', 'whatsapp', 'instagram'] as ContactMethod[]).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => switchMethod(m)}
+              className={`${btnBase} ${contactMethod === m ? btnActive : btnInactive}`}
+            >
+              {m === 'telegram' && <TelegramIcon />}
+              {m === 'whatsapp' && <WhatsAppIcon />}
+              {m === 'instagram' && <InstagramIcon />}
+              {m === 'telegram' ? 'Telegram' : m === 'whatsapp' ? 'WhatsApp' : 'Instagram'}
+            </button>
+          ))}
         </div>
 
-        {/* Telegram: username OR phone */}
+        {/* Telegram: @username OR +phone */}
         {contactMethod === 'telegram' && (
           <div className="space-y-2">
             <input
               type="text"
+              inputMode="text"
               placeholder="@username"
-              value={telegramUsername}
-              onChange={e => { setTelegramUsername(e.target.value); setContactError(''); }}
+              value={tgUsername}
+              onChange={e => handleUsernameChange(e.target.value, setTgUsername)}
               className="input-luxury w-full"
             />
             <div className="flex items-center gap-2">
@@ -293,32 +299,35 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
             </div>
             <input
               type="tel"
+              inputMode="numeric"
               placeholder="+380..."
-              value={telegramPhone}
-              onChange={e => { setTelegramPhone(e.target.value); setContactError(''); }}
+              value={tgPhone}
+              onChange={e => handlePhoneChange(e.target.value, setTgPhone)}
               className="input-luxury w-full"
             />
           </div>
         )}
 
-        {/* WhatsApp: phone only */}
+        {/* WhatsApp: +phone only */}
         {contactMethod === 'whatsapp' && (
           <input
             type="tel"
+            inputMode="numeric"
             placeholder="+380..."
-            value={whatsappPhone}
-            onChange={e => { setWhatsappPhone(e.target.value); setContactError(''); }}
+            value={waPhone}
+            onChange={e => handlePhoneChange(e.target.value, setWaPhone)}
             className="input-luxury w-full"
           />
         )}
 
-        {/* Instagram: handle only */}
+        {/* Instagram: @handle only */}
         {contactMethod === 'instagram' && (
           <input
             type="text"
+            inputMode="text"
             placeholder="@username"
-            value={instagramHandle}
-            onChange={e => { setInstagramHandle(e.target.value); setContactError(''); }}
+            value={igHandle}
+            onChange={e => handleUsernameChange(e.target.value, setIgHandle)}
             className="input-luxury w-full"
           />
         )}
@@ -368,11 +377,9 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
         <textarea
           rows={4}
           placeholder={
-            isRu
-              ? 'Кратко опишите ситуацию...'
-              : isEn
-              ? 'Briefly describe your situation...'
-              : 'Коротко опишіть ситуацію...'
+            isRu ? 'Кратко опишите ситуацию...'
+            : isEn ? 'Briefly describe your situation...'
+            : 'Коротко опишіть ситуацію...'
           }
           value={form.message}
           onChange={e => setForm({ ...form, message: e.target.value })}
