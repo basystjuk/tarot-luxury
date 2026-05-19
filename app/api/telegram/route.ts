@@ -2,10 +2,18 @@
  * Telegram webhook endpoint.
  *
  * Telegram sends every bot update here (POST).
- * We verify the secret header and silently ignore anyone
- * who is not the bot owner.
+ * Only chat IDs listed in TELEGRAM_CHAT_IDS can interact with the bot.
+ * Everyone else is silently ignored (200 returned so Telegram stops retrying).
  */
 import { NextRequest, NextResponse } from "next/server";
+
+/** Parse TELEGRAM_CHAT_IDS env var into a Set of string IDs */
+function allowedIds(): Set<string> {
+  const raw = process.env.TELEGRAM_CHAT_IDS ?? process.env.TELEGRAM_CHAT_ID ?? "";
+  return new Set(
+    raw.split(",").map(s => s.trim()).filter(Boolean)
+  );
+}
 
 export async function POST(req: NextRequest) {
   // ── Verify Telegram webhook secret ──────────────────────────────────────
@@ -13,8 +21,7 @@ export async function POST(req: NextRequest) {
   const incomingSecret = req.headers.get("x-telegram-bot-api-secret-token");
 
   if (!expectedSecret || incomingSecret !== expectedSecret) {
-    // Return 200 so Telegram doesn't retry, but do nothing
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }); // silent ignore
   }
 
   // ── Parse update ─────────────────────────────────────────────────────────
@@ -31,24 +38,22 @@ export async function POST(req: NextRequest) {
 
   if (!msg) return NextResponse.json({ ok: true });
 
-  const senderChatId  = String(msg.chat.id);
-  const ownerChatId   = process.env.TELEGRAM_CHAT_ID ?? "";
+  const senderChatId = String(msg.chat.id);
 
-  // ── Only the owner can interact with this bot ────────────────────────────
-  if (senderChatId !== ownerChatId) {
-    // Silently ignore — return 200 so Telegram doesn't keep retrying
-    return NextResponse.json({ ok: true });
+  // ── Block everyone not on the allowlist ──────────────────────────────────
+  if (!allowedIds().has(senderChatId)) {
+    return NextResponse.json({ ok: true }); // silent ignore
   }
 
-  // ── Owner commands (extend as needed) ───────────────────────────────────
+  // ── Commands for allowed users ───────────────────────────────────────────
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (token && msg.text === "/status") {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: ownerChatId,
-        text: "✅ Бот працює. Форми з сайту будуть приходити сюди.",
+        chat_id: senderChatId,
+        text:    "✅ Бот працює. Заявки з сайту будуть приходити сюди.",
       }),
     });
   }

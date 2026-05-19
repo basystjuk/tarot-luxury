@@ -10,10 +10,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const token  = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const token = process.env.TELEGRAM_BOT_TOKEN;
 
-    if (!token || !chatId) {
+    // Support both TELEGRAM_CHAT_IDS (comma-separated) and legacy TELEGRAM_CHAT_ID
+    const rawIds = process.env.TELEGRAM_CHAT_IDS ?? process.env.TELEGRAM_CHAT_ID ?? "";
+    const chatIds = rawIds.split(",").map(s => s.trim()).filter(Boolean);
+
+    if (!token || !chatIds.length) {
       return NextResponse.json({ ok: true });
     }
 
@@ -48,18 +51,21 @@ export async function POST(req: NextRequest) {
 
     const text = parts.join("\n");
 
-    const res = await fetch(
-      `https://api.telegram.org/bot${token}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
-      }
+    // Send to all allowed chat IDs
+    const results = await Promise.all(
+      chatIds.map(id =>
+        fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: id, text, parse_mode: "Markdown" }),
+        })
+      )
     );
 
-    if (!res.ok) {
-      console.error("Telegram error:", await res.text());
-      return NextResponse.json({ error: "Telegram error" }, { status: 500 });
+    const failed = results.filter(r => !r.ok);
+    if (failed.length) {
+      const errs = await Promise.all(failed.map(r => r.text()));
+      console.error("Telegram errors:", errs);
     }
 
     return NextResponse.json({ ok: true });

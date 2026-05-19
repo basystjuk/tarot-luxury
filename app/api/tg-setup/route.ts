@@ -4,9 +4,9 @@
  * Usage: GET /api/tg-setup?s=<TELEGRAM_WEBHOOK_SECRET>
  *
  * What it does:
- *   1. Reads recent Telegram updates to find the owner's chat_id
+ *   1. Shows ALL unique senders who have messaged the bot
+ *      (both you and the tarot reader should message the bot first)
  *   2. Registers the webhook at /api/telegram with the secret token
- *   3. Returns all info needed to finish configuration
  */
 import { NextRequest, NextResponse } from "next/server";
 
@@ -14,7 +14,6 @@ export async function GET(req: NextRequest) {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   const token  = process.env.TELEGRAM_BOT_TOKEN;
 
-  // ── Guard: require webhook secret as ?s= param ─────────────────────────
   if (!secret) {
     return NextResponse.json(
       { error: "TELEGRAM_WEBHOOK_SECRET is not set in Vercel env vars." },
@@ -31,48 +30,56 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ── Step 1: get updates to find owner chat_id ──────────────────────────
+  // ── Fetch recent updates ─────────────────────────────────────────────────
   const updResp = await fetch(
-    `https://api.telegram.org/bot${token}/getUpdates?limit=10&allowed_updates=["message"]`
+    `https://api.telegram.org/bot${token}/getUpdates?limit=50&allowed_updates=["message"]`
   );
   const upd = await updResp.json();
 
   if (!upd.ok) {
     return NextResponse.json({
-      error: "getUpdates failed — webhook may already be registered.",
+      error:   "getUpdates failed — webhook is probably already registered.",
       details: upd,
-      tip: "If the webhook is already set, check TELEGRAM_CHAT_ID in Vercel instead.",
+      tip:     "If webhook is already set, the chat_ids are already saved. Just check TELEGRAM_CHAT_IDS in Vercel.",
     });
   }
 
-  const messages = (upd.result ?? [])
-    .filter((u: Record<string, unknown>) => u.message)
-    .map((u: { message: { chat: { id: number; username?: string; first_name?: string } } }) => ({
-      chat_id:    u.message.chat.id,
-      username:   u.message.chat.username  ?? "(no username)",
-      first_name: u.message.chat.first_name ?? "",
-    }));
+  // Deduplicate by chat_id — keep only unique senders
+  const seen = new Set<number>();
+  const senders: { chat_id: number; username: string; first_name: string }[] = [];
 
-  if (!messages.length) {
+  for (const u of upd.result ?? []) {
+    const chat = u.message?.chat;
+    if (!chat || seen.has(chat.id)) continue;
+    seen.add(chat.id);
+    senders.push({
+      chat_id:    chat.id,
+      username:   chat.username   ?? "(no username)",
+      first_name: chat.first_name ?? "",
+    });
+  }
+
+  if (!senders.length) {
     return NextResponse.json({
-      step: "No messages found yet.",
-      action: "Send any message to @ellen_soul_taro_bot in Telegram, then reload this page.",
+      step:   "No messages found yet.",
+      action: "Both you AND the tarot reader should send any message to @ellen_soul_taro_bot, then reload this page.",
     });
   }
 
-  const owner = messages[0];
+  // Build the comma-separated value for TELEGRAM_CHAT_IDS
+  const chatIdsValue = senders.map(s => s.chat_id).join(",");
 
-  // ── Step 2: register webhook ───────────────────────────────────────────
+  // ── Register webhook ─────────────────────────────────────────────────────
   const siteUrl = req.nextUrl.origin;
-  const whResp = await fetch(
+  const whResp  = await fetch(
     `https://api.telegram.org/bot${token}/setWebhook`,
     {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        url: `${siteUrl}/api/telegram`,
-        secret_token: secret,
-        allowed_updates: ["message"],
+        url:                  `${siteUrl}/api/telegram`,
+        secret_token:         secret,
+        allowed_updates:      ["message"],
         drop_pending_updates: true,
       }),
     }
@@ -80,14 +87,14 @@ export async function GET(req: NextRequest) {
   const whResult = await whResp.json();
 
   return NextResponse.json({
-    "✅ Your chat_id": owner.chat_id,
-    "   username":     owner.username,
-    "   first_name":   owner.first_name,
-    "✅ Webhook":       whResult.description ?? whResult,
+    "👥 Senders found": senders,
+    "✅ Webhook":        whResult.description ?? whResult,
     "📋 NEXT STEPS": [
-      `1. vercel env add TELEGRAM_CHAT_ID   →  value: ${owner.chat_id}`,
+      `1. vercel env add TELEGRAM_CHAT_IDS  →  value: ${chatIdsValue}`,
+      "   (comma-separated, no spaces)",
       "2. vercel --prod deploy",
-      "3. DELETE the file  app/api/tg-setup/route.ts  and redeploy",
+      "3. Test: send /status to the bot — both people should get a reply",
+      "4. DELETE  app/api/tg-setup/route.ts  and redeploy",
     ],
   });
 }
