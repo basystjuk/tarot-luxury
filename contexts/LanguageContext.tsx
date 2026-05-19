@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useCallback, type ReactNode } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useParams } from 'next/navigation';
 import { type Language, getTranslation } from '@/lib/i18n/translations';
 
 interface LanguageContextValue {
@@ -21,8 +21,15 @@ function getLangFromPath(pathname: string): Language {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const params = useParams();
   const router = useRouter();
-  const language = getLangFromPath(pathname);
+
+  // useParams() is more reliable during client-side navigation than parsing pathname
+  const language: Language = (() => {
+    const p = params?.lang;
+    if (typeof p === 'string' && LOCALES.includes(p as Language)) return p as Language;
+    return getLangFromPath(pathname);
+  })();
 
   const setLanguage = useCallback((lang: Language) => {
     // Replace current lang segment in path
