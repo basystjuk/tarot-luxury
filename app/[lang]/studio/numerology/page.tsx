@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
+import {
+  TermHint,
+  CollapseSection,
+  LifePathHero,
+  AiIntroPanel,
+  ExtendedRow,
+  PlaneBars,
+} from "./_components";
+import { t as ts, hint as tHint, letterMeaning, planeDominantNote } from "./_strings";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -644,6 +653,356 @@ function NumberCard({ label, num, keyword, meaning, karmicKeyword, karmicMeaning
   );
 }
 
+// ─── Phase 3: progressive-reveal result view ────────────────────────────────
+// Hero (Life Path) is shown first with the AI intro above it; the four detail
+// sections expand on demand via native <details> elements.
+
+interface ResultViewProps {
+  result: NumerologyResult;
+  extended: {
+    pinnacles: [Pinnacle, Pinnacle, Pinnacle, Pinnacle];
+    challenges: [Challenge, Challenge, Challenge, Challenge];
+    cornerstone: LetterReading;
+    capstone: LetterReading;
+    firstVowel: LetterReading;
+    planeOfExpression: PlaneOfExpression;
+    masterPhase: MasterPhase;
+    age: number;
+  } | null;
+  data: NumberData;
+  language: "uk" | "ru" | "en";
+  isRu: boolean;
+  isEn: boolean;
+  t: (uk: string, ru: string, en: string) => string;
+  labels: Record<string, string>;
+  synthIntro: string | null;
+  synthPortrait: string | null;
+  loadingSynth: boolean;
+  synthError: boolean;
+  onRetrySynth: () => void;
+  expanded: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
+}
+
+function NumerologyResultView({
+  result, extended, data, language, isRu, isEn, t, labels,
+  synthIntro, synthPortrait, loadingSynth, synthError, onRetrySynth,
+  expanded, onExpand, onCollapse,
+}: ResultViewProps) {
+  const lifePathEntry = getEntry(data.lifePath, result.lifePath);
+  const lpKarmic = result.lifePathKarmic
+    ? getEntry(data.karmicDebt, result.lifePathKarmic)
+    : null;
+
+  const masterNote = extended?.masterPhase?.isMaster
+    ? (extended.masterPhase.currentlyActive
+        ? `${ts(language, "masterActive")} (${extended.masterPhase.masterNumber}/${extended.masterPhase.baseNumber})`
+        : `${ts(language, "masterDormant")} ${extended.masterPhase.activationAge} ${ts(language, "masterYears")} — ${extended.masterPhase.masterNumber}/${extended.masterPhase.baseNumber}`)
+    : null;
+
+  const activePinnacle  = extended?.pinnacles.find(p => extended.age >= p.startAge && (p.endAge === null || extended.age <= p.endAge));
+  const activeChallenge = extended?.challenges.find(c => extended.age >= c.startAge && (c.endAge === null || extended.age <= c.endAge));
+
+  function formatWindow(p: Pinnacle | Challenge): string {
+    const from = ts(language, "ageFrom");
+    const until = ts(language, "ageUntil");
+    if (p.endAge === null) return `${from} ${p.startAge}`;
+    return `${p.startAge}–${p.endAge} ${ts(language, "ageWindow")}`;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* ── 1. AI intro panel (above the hero) ──────────────────────────── */}
+      {synthIntro && <AiIntroPanel text={synthIntro} />}
+      {loadingSynth && !synthIntro && (
+        <div className="rounded-2xl p-5 border border-[rgba(196,169,122,0.2)] bg-[rgba(255,253,248,0.6)] flex items-center justify-center gap-3 text-[#C4A97A] text-sm">
+          <div className="w-4 h-4 border-2 border-[#C4A97A] border-t-transparent rounded-full animate-spin" />
+          {t("Формуємо твій портрет…", "Формируем твой портрет…", "Creating your portrait…")}
+        </div>
+      )}
+
+      {/* ── 2. Life Path Hero ────────────────────────────────────────────── */}
+      <LifePathHero
+        number={result.lifePath}
+        archetype={lifePathEntry.keyword}
+        description={lifePathEntry.meaning}
+        masterNote={masterNote}
+      />
+
+      {/* Karmic debt on Life Path — quiet badge under the hero */}
+      {lpKarmic && result.lifePathKarmic && (
+        <div className="rounded-xl p-4 border border-[rgba(212,168,83,0.25)] bg-[rgba(212,168,83,0.06)] text-center">
+          <p className="text-xs text-[#B8883A] tracking-widest uppercase mb-1">
+            {t("Карматичний борг", "Кармический долг", "Karmic Debt")} · {result.lifePathKarmic}
+          </p>
+          <p className="text-sm text-[#5C4530]" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1rem" }}>
+            <span className="font-medium">{lpKarmic.keyword}.</span> {lpKarmic.meaning}
+          </p>
+        </div>
+      )}
+
+      {/* ── 3. Expand button OR full breakdown ──────────────────────────── */}
+      {!expanded ? (
+        <button onClick={onExpand} className="btn-primary w-full">
+          <Sparkles size={15} />
+          {ts(language, "sectionExpand")}
+        </button>
+      ) : (
+        <div className="space-y-4">
+          {/* Core numbers */}
+          <CollapseSection
+            defaultOpen
+            title={<TermHint hint={tHint(language, "destiny")}>{ts(language, "sectionCore")}</TermHint>}
+          >
+            <ResultRow num={result.destiny}     label={labels.destiny}     entry={getEntry(data.destiny, result.destiny)}         hint={tHint(language, "destiny")}     karmic={result.destinyKarmic ? getEntry(data.karmicDebt, result.destinyKarmic) : null} karmicNum={result.destinyKarmic} t={t} />
+            <ResultRow num={result.soul}        label={labels.soul}        entry={getEntry(data.soul, result.soul)}                hint={tHint(language, "soul")} />
+            <ResultRow num={result.personality} label={labels.personality} entry={getEntry(data.personality, result.personality)}  hint={tHint(language, "personality")} />
+            <ResultRow num={result.birthday}    label={labels.birthday}    entry={getEntry(data.birthday, result.birthday)}        hint={tHint(language, "birthday")} />
+          </CollapseSection>
+
+          {/* Cyclical influences */}
+          <CollapseSection
+            title={<TermHint hint={tHint(language, "pinnacle")}>{ts(language, "sectionCycles")}</TermHint>}
+          >
+            <ResultRow num={result.personalYear} label={labels.personalYear} entry={getEntry(data.personalYear, result.personalYear)} hint={tHint(language, "personalYear")} />
+            <ResultRow num={result.maturity}     label={ts(language, "maturity")} entry={getEntry(data.maturity, result.maturity)}    hint={tHint(language, "maturity")} />
+
+            {/* Active Pinnacle */}
+            {activePinnacle && (
+              <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)]">
+                <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                  <TermHint hint={tHint(language, "pinnacle")}>{ts(language, "pinnacleHeading")}</TermHint>
+                </p>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl text-[#B8883A]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{activePinnacle.number}</span>
+                  <span className="text-sm text-[#7A6A58]">{formatWindow(activePinnacle)}</span>
+                </div>
+              </div>
+            )}
+            {activeChallenge && (
+              <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.18)]">
+                <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                  <TermHint hint={tHint(language, "challenge")}>{ts(language, "challengeHeading")}</TermHint>
+                </p>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl text-[#B8883A]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{activeChallenge.number}</span>
+                  <span className="text-sm text-[#7A6A58]">{formatWindow(activeChallenge)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* All 4 Pinnacles + Challenges */}
+            {extended && (
+              <details className="rounded-lg border border-[rgba(196,169,122,0.15)] bg-[rgba(255,253,248,0.5)]">
+                <summary className="px-4 py-2.5 cursor-pointer text-sm text-[#7A6A58] tracking-wide select-none">
+                  {ts(language, "pinnacleAllHeading")} / {ts(language, "challengeAllHeading")}
+                </summary>
+                <div className="px-4 pb-3">
+                  {extended.pinnacles.map((p, i) => (
+                    <ExtendedRow
+                      key={`p${i}`}
+                      label={`${ts(language, "pinnacleNum")} ${i + 1}`}
+                      value={`${p.number} · ${formatWindow(p)}`}
+                    />
+                  ))}
+                  {extended.challenges.map((c, i) => (
+                    <ExtendedRow
+                      key={`c${i}`}
+                      label={`${ts(language, "challengeNum")} ${i + 1}`}
+                      value={`${c.number} · ${formatWindow(c)}`}
+                    />
+                  ))}
+                </div>
+              </details>
+            )}
+          </CollapseSection>
+
+          {/* Gifts & trials */}
+          <CollapseSection
+            title={<TermHint hint={tHint(language, "giftOfElement")}>{ts(language, "sectionGiftsTrials")}</TermHint>}
+          >
+            {/* Gift of the Element (renamed Hidden Passion) */}
+            <ResultRow
+              num={result.hiddenPassion}
+              label={`${ts(language, "giftOfElement")} · ${ts(language, "giftOfElementSub")}`}
+              entry={{
+                keyword: (HIDDEN_PASSION_KEYWORDS[language] ?? HIDDEN_PASSION_KEYWORDS.uk)[result.hiddenPassion] ?? "",
+                meaning: (HIDDEN_PASSION_MEANING[language] ?? HIDDEN_PASSION_MEANING.uk)[result.hiddenPassion] ?? "",
+              }}
+              hint={tHint(language, "giftOfElement")}
+            />
+            <ResultRow
+              num={result.balance}
+              label={ts(language, "balance")}
+              entry={getEntry(data.balance, result.balance)}
+              hint={tHint(language, "balance")}
+            />
+            {/* Karmic lessons */}
+            <div className="rounded-xl p-4 bg-[rgba(212,168,83,0.06)] border border-[rgba(196,169,122,0.2)]">
+              <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                <TermHint hint={tHint(language, "karmicLessons")}>{ts(language, "karmicLessons")}</TermHint>
+              </p>
+              {result.karmicLessons.length > 0 ? (
+                <div className="space-y-2.5">
+                  {result.karmicLessons.map(n => (
+                    <div key={n} className="pl-3 border-l-2 border-[rgba(196,169,122,0.3)]">
+                      <p className="text-sm font-medium text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)" }}>
+                        {n} · {getEntry(data.karmicLessons, n).keyword}
+                      </p>
+                      <p className="text-xs text-[#7A6A58] leading-relaxed">
+                        {getEntry(data.karmicLessons, n).meaning}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[#7A6A58] italic" style={{ fontFamily: "var(--font-cormorant)" }}>
+                  {t("Усі вібрації 1–9 присутні — збалансований портрет.",
+                     "Все вибрации 1–9 присутствуют — сбалансированный портрет.",
+                     "All vibrations 1–9 are present — a balanced portrait.")}
+                </p>
+              )}
+            </div>
+          </CollapseSection>
+
+          {/* Name structure */}
+          <CollapseSection
+            title={<TermHint hint={tHint(language, "cornerstone")}>{ts(language, "sectionNameStructure")}</TermHint>}
+          >
+            {extended && (
+              <>
+                <LetterRow letter={extended.cornerstone} label={ts(language, "cornerstone")} hint={tHint(language, "cornerstone")} language={language} />
+                <LetterRow letter={extended.capstone}    label={ts(language, "capstone")}    hint={tHint(language, "capstone")}    language={language} />
+                <LetterRow letter={extended.firstVowel}  label={ts(language, "firstVowel")}  hint={tHint(language, "firstVowel")}  language={language} />
+
+                {/* Plane of Expression */}
+                <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.2)] mt-2">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-3">
+                    <TermHint hint={tHint(language, "planeOfExpression")}>{ts(language, "planeOfExpression")}</TermHint>
+                  </p>
+                  <PlaneBars
+                    data={extended.planeOfExpression}
+                    labels={{
+                      physical:  ts(language, "planePhysical"),
+                      mental:    ts(language, "planeMental"),
+                      emotional: ts(language, "planeEmotional"),
+                      intuitive: ts(language, "planeIntuitive"),
+                      dominantLabel: planeDominantNote(language, extended.planeOfExpression.dominant),
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </CollapseSection>
+
+          {/* Portrait (long AI text) */}
+          {synthPortrait && (
+            <div className="card-luxury border-[rgba(212,168,83,0.3)]">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#D4A853] to-[#9A6E28] flex items-center justify-center">
+                  <Sparkles size={16} className="text-white" />
+                </div>
+                <p className="text-lg text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                  {isRu ? "Личный портрет" : isEn ? "Personal portrait" : "Особистий портрет"}
+                </p>
+              </div>
+              <p className="text-[#5C4530] leading-relaxed whitespace-pre-line" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.1rem" }}>
+                {synthPortrait}
+              </p>
+            </div>
+          )}
+          {synthError && !synthPortrait && (
+            <div className="rounded-xl p-4 border border-[rgba(196,169,122,0.25)] text-center space-y-3">
+              <p className="text-sm text-[#9A8A78]">
+                {isRu ? "Не удалось загрузить портрет." : isEn ? "Could not load portrait." : "Не вдалось завантажити портрет."}
+              </p>
+              <button onClick={onRetrySynth} className="btn-outline text-sm px-4 py-2">
+                {isRu ? "Повторить" : isEn ? "Retry" : "Повторити"}
+              </button>
+            </div>
+          )}
+
+          <button onClick={onCollapse} className="block mx-auto text-sm text-[#9A8A78] hover:text-[#B8883A] transition-colors py-2">
+            ▴ {ts(language, "sectionCollapse")}
+          </button>
+        </div>
+      )}
+
+      <p className="text-xs text-[#7A6A58] text-center pt-2">
+        {isRu
+          ? "Нумерологический портрет рассчитан по системе Пифагора."
+          : isEn
+          ? "Numerological portrait calculated using the Pythagorean system."
+          : "Нумерологічний портрет розраховано за системою Піфагора."}
+      </p>
+    </div>
+  );
+}
+
+// ─── Small row used inside collapsible sections ─────────────────────────────
+function ResultRow({
+  num, label, entry, hint, karmic, karmicNum, t,
+}: {
+  num: number;
+  label: string;
+  entry: NumEntry;
+  hint?: string;
+  karmic?: NumEntry | null;
+  karmicNum?: number | null;
+  t?: (uk: string, ru: string, en: string) => string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-10 h-10 rounded-full bg-[rgba(212,168,83,0.15)] flex items-center justify-center flex-shrink-0">
+        <span className="text-[#D4A853]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{num}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-0.5">
+          {hint ? <TermHint hint={hint}>{label}</TermHint> : label}
+        </p>
+        <p className="text-base text-[#1C1512] mb-1" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+          {entry.keyword}
+        </p>
+        <p className="text-sm text-[#7A6A58] leading-relaxed">{entry.meaning}</p>
+        {karmic && karmicNum && t && (
+          <p className="text-xs text-[#B8883A] italic mt-2 pt-2 border-t border-[rgba(196,169,122,0.15)]" style={{ fontFamily: "var(--font-cormorant)" }}>
+            {t("Карматичний борг", "Кармический долг", "Karmic Debt")} {karmicNum}: {karmic.keyword}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LetterRow({
+  letter, label, hint, language,
+}: {
+  letter: LetterReading;
+  label: string;
+  hint: string;
+  language: "uk" | "ru" | "en";
+}) {
+  if (!letter.letter) return null;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFFAF0] to-[#F5EAD4] border border-[rgba(196,169,122,0.3)] flex items-center justify-center flex-shrink-0">
+        <span className="text-2xl text-[#B8883A] uppercase" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+          {letter.letter}
+        </span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-0.5">
+          <TermHint hint={hint}>{label}</TermHint>
+        </p>
+        <p className="text-sm text-[#5C4530]">
+          <span className="font-medium text-[#1C1512]">{letter.value}</span> · {letterMeaning(language, letter.value)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function NumerologyPage() {
   const { language } = useLanguage();
@@ -667,9 +1026,17 @@ export default function NumerologyPage() {
   } | null>(null);
   const [synthesis, setSynthesis] = useState<string | null>(null);
   const [synthIntro, setSynthIntro] = useState<string | null>(null);
+  const [synthPortrait, setSynthPortrait] = useState<string | null>(null);
   const [loadingSynth, setLoadingSynth] = useState(false);
   const [synthError, setSynthError] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
+  // Phase 3: progressive reveal. The hero (Life Path) is shown first; the
+  // four detail sections expand below on user request.
+  const [expanded, setExpanded] = useState(false);
+  // Auto-fire synthesis exactly once per form submit. The ref tracks which
+  // result-set we already auto-fired for, so flipping `expanded` doesn't
+  // re-trigger and React StrictMode double-effects don't duplicate calls.
+  const autoFiredFor = useRef<NumerologyResult | null>(null);
 
   const t = (uk: string, ru: string, en: string) => isRu ? ru : isEn ? en : uk;
 
@@ -707,7 +1074,10 @@ export default function NumerologyPage() {
     });
     setSynthesis(null);
     setSynthIntro(null);
+    setSynthPortrait(null);
     setSynthError(false);
+    setExpanded(false);
+    autoFiredFor.current = null; // allow auto-fire for the new result
   };
 
   const handleSynthesis = async () => {
@@ -763,6 +1133,7 @@ export default function NumerologyPage() {
       if (d.synthesis) {
         setSynthesis(d.synthesis);
         setSynthIntro(d.intro ?? null);
+        setSynthPortrait(d.portrait ?? d.synthesis);
       } else setSynthError(true);
     } catch {
       setSynthError(true);
@@ -770,6 +1141,19 @@ export default function NumerologyPage() {
       setLoadingSynth(false);
     }
   };
+
+  // Auto-fire AI synthesis once per submit — the new UX puts the AI intro
+  // ABOVE the hero, so it must be present immediately, not behind a click.
+  // Rate-limit (429) is handled silently; the hero still works without it.
+  useEffect(() => {
+    if (!result || !extended) return;
+    if (autoFiredFor.current === result) return;
+    autoFiredFor.current = result;
+    handleSynthesis();
+    // handleSynthesis is recreated each render but we intentionally only re-run
+    // when a fresh `result` arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, extended]);
 
   const labels = {
     lifePath:    isRu ? "Жизненный путь"  : isEn ? "Life Path"      : "Життєвий шлях",
@@ -860,178 +1244,24 @@ export default function NumerologyPage() {
 
           {result && (
             <AnimatedSection delay={0.1}>
-              <div className="space-y-6">
-                {/* 6 number badges */}
-                <div className="card-luxury">
-                  <div className="grid grid-cols-3 gap-6 py-4">
-                    <NumberBadge num={result.lifePath}    keyword={getEntry(data.lifePath,    result.lifePath).keyword}    label={labels.lifePath} />
-                    <NumberBadge num={result.destiny}     keyword={getEntry(data.destiny,     result.destiny).keyword}     label={labels.destiny} />
-                    <NumberBadge num={result.soul}        keyword={getEntry(data.soul,        result.soul).keyword}        label={labels.soul} />
-                    <NumberBadge num={result.personality} keyword={getEntry(data.personality, result.personality).keyword} label={labels.personality} />
-                    <NumberBadge num={result.birthday}    keyword={getEntry(data.birthday,    result.birthday).keyword}    label={labels.birthday} />
-                    <NumberBadge num={result.personalYear}keyword={getEntry(data.personalYear,result.personalYear).keyword}label={labels.personalYear} />
-                  </div>
-                </div>
-
-                {/* 6 interpretation cards */}
-                <NumberCard
-                  label={labels.lifePath} num={result.lifePath}
-                  {...getEntry(data.lifePath, result.lifePath)}
-                  karmicNum={result.lifePathKarmic}
-                  karmicKeyword={result.lifePathKarmic ? getEntry(data.karmicDebt, result.lifePathKarmic).keyword : undefined}
-                  karmicMeaning={result.lifePathKarmic ? getEntry(data.karmicDebt, result.lifePathKarmic).meaning : undefined}
-                />
-                <NumberCard
-                  label={labels.destiny} num={result.destiny}
-                  {...getEntry(data.destiny, result.destiny)}
-                  karmicNum={result.destinyKarmic}
-                  karmicKeyword={result.destinyKarmic ? getEntry(data.karmicDebt, result.destinyKarmic).keyword : undefined}
-                  karmicMeaning={result.destinyKarmic ? getEntry(data.karmicDebt, result.destinyKarmic).meaning : undefined}
-                />
-                <NumberCard label={labels.soul}        num={result.soul}        {...getEntry(data.soul,        result.soul)} />
-                <NumberCard label={labels.personality} num={result.personality} {...getEntry(data.personality, result.personality)} />
-                <NumberCard label={labels.birthday}    num={result.birthday}    {...getEntry(data.birthday,    result.birthday)} />
-                <NumberCard label={labels.personalYear}num={result.personalYear}{...getEntry(data.personalYear,result.personalYear)} />
-
-                {/* Additional numbers */}
-                <p className="text-xs text-[#C4A97A] tracking-widest uppercase mt-4 mb-2">
-                  {t("Додаткові числа","Дополнительные числа","Additional numbers")}
-                </p>
-
-                <div className="card-luxury">
-                  <div className="grid grid-cols-2 gap-6 py-4">
-                    <NumberBadge
-                      num={result.maturity}
-                      keyword={getEntry(data.maturity, result.maturity).keyword}
-                      label={t("Зрілість (після 35)","Зрелость (после 35)","Maturity (after 35)")}
-                    />
-                    <NumberBadge
-                      num={result.balance}
-                      keyword={getEntry(data.balance, result.balance).keyword}
-                      label={t("Баланс (ініціали)","Баланс (инициалы)","Balance (initials)")}
-                    />
-                  </div>
-                </div>
-
-                <NumberCard
-                  label={t("Зрілість · Шлях + Доля","Зрелость · Путь + Судьба","Maturity · Path + Destiny")}
-                  num={result.maturity}
-                  keyword={getEntry(data.maturity, result.maturity).keyword}
-                  meaning={getEntry(data.maturity, result.maturity).meaning}
-                />
-
-                <NumberCard
-                  label={t("Баланс · стратегія в кризі","Баланс · стратегия в кризисе","Balance · stress strategy")}
-                  num={result.balance}
-                  keyword={getEntry(data.balance, result.balance).keyword}
-                  meaning={getEntry(data.balance, result.balance).meaning}
-                />
-
-                {/* Hidden Passion */}
-                <NumberCard
-                  label={t("Прихована пристрасть · вроджений талант","Скрытая страсть · врождённый талант","Hidden Passion · innate talent")}
-                  num={result.hiddenPassion}
-                  keyword={(HIDDEN_PASSION_KEYWORDS[language] ?? HIDDEN_PASSION_KEYWORDS.uk)[result.hiddenPassion] ?? ""}
-                  meaning={(HIDDEN_PASSION_MEANING[language] ?? HIDDEN_PASSION_MEANING.uk)[result.hiddenPassion] ?? ""}
-                />
-
-                {/* Karmic lessons card */}
-                <div className="card-luxury border-[rgba(196,169,122,0.3)]">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-[rgba(212,168,83,0.15)] flex items-center justify-center flex-shrink-0">
-                      <span className="text-[#D4A853]">☽</span>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase">
-                        {t("Карматичні уроки","Кармические уроки","Karmic Lessons")}
-                      </p>
-                      <p className="text-lg text-[#1C1512]" style={{fontFamily:"var(--font-cormorant)",fontWeight:500}}>
-                        {result.karmicLessons.length > 0
-                          ? t(`Відсутні вібрації: ${result.karmicLessons.join(", ")}`,`Отсутствующие вибрации: ${result.karmicLessons.join(", ")}`,`Absent vibrations: ${result.karmicLessons.join(", ")}`)
-                          : t("Всі вібрації присутні","Все вибрации присутствуют","All vibrations present")}
-                      </p>
-                    </div>
-                  </div>
-                  {result.karmicLessons.length > 0 ? (
-                    <div className="space-y-3">
-                      {result.karmicLessons.map(n => (
-                        <div key={n} className="pl-3 border-l-2 border-[rgba(196,169,122,0.3)]">
-                          <p className="text-sm font-medium text-[#1C1512] mb-0.5" style={{fontFamily:"var(--font-cormorant)"}}>
-                            {n} · {getEntry(data.karmicLessons, n).keyword}
-                          </p>
-                          <p className="text-xs text-[#7A6A58] leading-relaxed">
-                            {getEntry(data.karmicLessons, n).meaning}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[#7A6A58] italic" style={{fontFamily:"var(--font-cormorant)"}}>
-                      {t("У твоєму імені присутні всі вібрації 1–9 — збалансований нумерологічний портрет.",
-                         "В твоём имени присутствуют все вибрации 1–9 — сбалансированный нумерологический портрет.",
-                         "All vibrations 1–9 are present in your name — a balanced numerological portrait.")}
-                    </p>
-                  )}
-                </div>
-
-                {/* AI synthesis */}
-                <div className="card-luxury border-[rgba(212,168,83,0.3)]">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#D4A853] to-[#9A6E28] flex items-center justify-center">
-                      <Sparkles size={16} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase">
-                        {isRu ? "Портрет" : isEn ? "Portrait" : "Портрет"}
-                      </p>
-                      <p className="text-lg text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-                        {isRu ? "Личный нумерологический портрет" : isEn ? "Personal numerological portrait" : "Особистий нумерологічний портрет"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {!synthesis && !loadingSynth && (
-                    <button onClick={handleSynthesis} className="btn-primary w-full">
-                      <Sparkles size={15} />
-                      {isRu ? "Получить портрет" : isEn ? "Get portrait" : "Отримати портрет"}
-                    </button>
-                  )}
-
-                  {loadingSynth && (
-                    <div className="flex items-center justify-center gap-3 py-6 text-[#C4A97A]">
-                      <div className="w-4 h-4 border-2 border-[#C4A97A] border-t-transparent rounded-full animate-spin" />
-                      <span className="text-sm">
-                        {isRu ? "Формируем портрет…" : isEn ? "Creating portrait…" : "Формуємо портрет…"}
-                      </span>
-                    </div>
-                  )}
-
-                  {synthesis && (
-                    <p className="text-[#5C4530] leading-relaxed text-base" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.1rem" }}>
-                      {synthesis}
-                    </p>
-                  )}
-
-                  {synthError && (
-                    <div className="space-y-3">
-                      <p className="text-sm text-[#9A8A78]">
-                        {isRu ? "Не удалось создать портрет. Попробуйте снова." : isEn ? "Could not create portrait. Please try again." : "Не вдалось створити портрет. Спробуйте ще раз."}
-                      </p>
-                      <button onClick={handleSynthesis} className="btn-outline text-sm px-4 py-2">
-                        {isRu ? "Повторить" : isEn ? "Retry" : "Повторити"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <p className="text-xs text-[#7A6A58] text-center">
-                  {isRu
-                    ? "Нумерологический портрет рассчитан по системе Пифагора."
-                    : isEn
-                    ? "Numerological portrait calculated using the Pythagorean system."
-                    : "Нумерологічний портрет розраховано за системою Піфагора."}
-                </p>
-              </div>
+              <NumerologyResultView
+                result={result}
+                extended={extended}
+                data={data}
+                language={language}
+                isRu={isRu}
+                isEn={isEn}
+                t={t}
+                labels={labels}
+                synthIntro={synthIntro}
+                synthPortrait={synthPortrait}
+                loadingSynth={loadingSynth}
+                synthError={synthError}
+                onRetrySynth={handleSynthesis}
+                expanded={expanded}
+                onExpand={() => setExpanded(true)}
+                onCollapse={() => setExpanded(false)}
+              />
             </AnimatedSection>
           )}
 
