@@ -1447,10 +1447,10 @@ export default function NumerologyPage() {
             </h1>
             <p className="text-xl text-[#7A6A58] leading-relaxed">
               {isRu
-                ? "Глубокий нумерологический портрет: 18 чисел, активные циклы жизни, лучшие даты месяца и персональный AI-разбор."
+                ? "Глубокий нумерологический портрет: 18 чисел, активные циклы жизни, лучшие даты месяца и персональный разбор."
                 : isEn
-                ? "A deep numerological portrait: 18 numbers, active life cycles, the best dates of the month and a personal AI reading."
-                : "Глибокий нумерологічний портрет: 18 чисел, активні цикли життя, найкращі дати місяця та персональний AI-розбір."}
+                ? "A deep numerological portrait: 18 numbers, active life cycles, the best dates of the month and a personal reading."
+                : "Глибокий нумерологічний портрет: 18 чисел, активні цикли життя, найкращі дати місяця та персональний розбір."}
             </p>
           </AnimatedSection>
         </div>
@@ -1482,11 +1482,10 @@ export default function NumerologyPage() {
                       uppercase title onto two lines. */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
                     <div className="flex flex-col">
-                      <div className="min-h-[2.4rem] mb-1.5">
-                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap">
+                      <div className="mb-1.5">
+                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap text-center">
                           {isRu ? "Фамилия" : isEn ? "Last name" : "Прізвище"}
                         </span>
-                        <span className="text-[10px] text-transparent italic block leading-tight">·</span>
                       </div>
                       <input type="text" required
                         autoComplete="family-name"
@@ -1496,11 +1495,10 @@ export default function NumerologyPage() {
                         className="input-luxury" />
                     </div>
                     <div className="flex flex-col">
-                      <div className="min-h-[2.4rem] mb-1.5">
-                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap">
+                      <div className="mb-1.5">
+                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap text-center">
                           {isRu ? "Имя" : isEn ? "First name" : "Ім'я"}
                         </span>
-                        <span className="text-[10px] text-transparent italic block leading-tight">·</span>
                       </div>
                       <input type="text" required
                         autoComplete="given-name"
@@ -1510,12 +1508,9 @@ export default function NumerologyPage() {
                         className="input-luxury" />
                     </div>
                     <div className="flex flex-col">
-                      <div className="min-h-[2.4rem] mb-1.5">
-                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap">
+                      <div className="mb-1.5">
+                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap text-center">
                           {isRu ? "Отчество" : isEn ? "Middle name" : "По-батькові"}
-                        </span>
-                        <span className="text-[10px] text-[#C4A97A] italic block leading-tight">
-                          {t("необов'язково", "необязательно", "optional")}
                         </span>
                       </div>
                       <input type="text"
