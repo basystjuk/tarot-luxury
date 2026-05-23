@@ -273,6 +273,39 @@ h1, h2, h3, h4, h5, h6 {
 }
 .animate-bounce-soft { animation: bounceSoft 2s ease-in-out infinite; }
 
+/* ─── Daily Card — ritual breathing orb (3s pause before flip) ─────── */
+@keyframes dailyCardBreath {
+  0%   { transform: scale(0.82); box-shadow: 0 0 0 0 rgba(196,169,122,0.45); opacity: 0.85; }
+  50%  { transform: scale(1.08); box-shadow: 0 0 28px 14px rgba(196,169,122,0.15); opacity: 1; }
+  100% { transform: scale(0.82); box-shadow: 0 0 0 0 rgba(196,169,122,0.45); opacity: 0.85; }
+}
+@keyframes dailyCardBreathFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.daily-card-breath {
+  animation: dailyCardBreathFade 600ms ease-out both;
+}
+.daily-card-breath-orb {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #E8D5B0 0%, #C4A97A 55%, #8E6F42 100%);
+  border: 1.5px solid rgba(196,169,122,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: dailyCardBreath 3s ease-in-out infinite;
+}
+.daily-card-breath-orb-glyph {
+  color: #FFF8E7;
+  font-size: 26px;
+  text-shadow: 0 1px 3px rgba(80,55,20,0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .daily-card-breath-orb { animation: none; }
+}
+
 /* ─── Misc ──────────────────────────────────────────────────────────── */
 .gradient-text {
   background: linear-gradient(135deg, var(--gold-500) 0%, var(--gold-400) 50%, var(--gold-300) 100%);

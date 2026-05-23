@@ -8,7 +8,9 @@ import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { pickCard, getCardName, TAROT_CARDS } from "@/lib/data/tarot-cards";
 
-type Step = "form" | "reading" | "result";
+type Step = "form" | "breathing" | "reading" | "result";
+
+const RITUAL_MS = 3000;
 
 interface Reading {
   meaning: string;
@@ -90,6 +92,9 @@ export default function DailyCardPage() {
       hint:      ["Зосередьтесь на своєму питанні і відкрийте карту",
                   "Сосредоточьтесь на своём вопросе и откройте карту",
                   "Focus on your question and reveal your card"],
+      breath:    ["Зробіть глибокий вдих… Подумайте про своє питання…",
+                  "Сделайте глубокий вдох… Подумайте о своём вопросе…",
+                  "Take a deep breath… Hold your question in your heart…"],
       reveal:    ["Дізнатися передбачення",                        "Узнать предсказание",                             "Reveal My Reading"],
       loading:   ["Зірки читають твою карту…",                     "Звёзды читают твою карту…",                       "The stars are reading your card…"],
       meanLbl:   ["Значення",                                      "Значение",                                        "Meaning"],
@@ -117,7 +122,17 @@ export default function DailyCardPage() {
       card.suit === "swords" ? "Air" :
       card.suit === "pentacles" ? "Earth" : "";
 
-    // Fire fetch before state updates for minimum latency
+    // ── Ritual pause: 3 seconds to breathe and focus on the question ──
+    // Skip ritual on retry (netError) — user is already in flow
+    const isRetry = flipped;
+    if (!isRetry) {
+      setStep("breathing");
+      await new Promise<void>(r => setTimeout(r, RITUAL_MS));
+    }
+
+    // Fire fetch AFTER the ritual — keeps the rate-limit decision aligned
+    // with the user's actual reveal intent, and avoids wasted API calls
+    // if they navigate away during the breathing pause.
     const fetchPromise = fetch("/api/tarot-reading", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -276,6 +291,25 @@ export default function DailyCardPage() {
               </AnimatedSection>
             )}
 
+            {/* Ritual pause — breathing step */}
+            {step === "breathing" && (
+              <div className="flex flex-col items-center gap-5 px-4 text-center daily-card-breath">
+                <div className="daily-card-breath-orb" aria-hidden="true">
+                  <span className="daily-card-breath-orb-glyph">✦</span>
+                </div>
+                <p
+                  className="text-[#7A6A58] italic max-w-sm tracking-wide"
+                  style={{
+                    fontFamily: "var(--font-cormorant)",
+                    fontSize: "1.15rem",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {t("breath")}
+                </p>
+              </div>
+            )}
+
             {/* Card — always mounted */}
             {flipCard}
 
@@ -334,13 +368,18 @@ export default function DailyCardPage() {
                     {/* Affirmation */}
                     {reading.affirmation && (
                       <div
-                        className="p-6 rounded-2xl border border-[rgba(196,169,122,0.2)]"
-                        style={{ background: "linear-gradient(135deg,#2D2218,#1C1512)" }}
+                        className="p-6 rounded-2xl border border-[rgba(196,169,122,0.35)]"
+                        style={{ background: "linear-gradient(135deg,#C4A97A 0%,#A07F50 100%)" }}
                       >
-                        <p className="text-[11px] text-[#C4A97A] tracking-widest uppercase mb-4 text-center underline underline-offset-4">{t("affLbl")}</p>
+                        <p className="text-[11px] text-white/85 tracking-widest uppercase mb-4 text-center underline underline-offset-4">{t("affLbl")}</p>
                         <p
-                          className="text-white/85 italic"
-                          style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.05rem", lineHeight: 1.6 }}
+                          className="text-white italic"
+                          style={{
+                            fontFamily: "var(--font-cormorant)",
+                            fontSize: "1.05rem",
+                            lineHeight: 1.6,
+                            textShadow: "0 1px 2px rgba(80,55,20,0.25)",
+                          }}
                         >
                           &ldquo;{reading.affirmation}&rdquo;
                         </p>
