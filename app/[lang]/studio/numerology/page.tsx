@@ -5,6 +5,20 @@ import { Sparkles } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
+import {
+  calcPinnacles,
+  calcChallenges,
+  calcCornerstone,
+  calcCapstone,
+  calcFirstVowel,
+  calcPlaneOfExpression,
+  calcMasterPhase,
+  type Pinnacle,
+  type Challenge,
+  type LetterReading,
+  type PlaneOfExpression,
+  type MasterPhase,
+} from "@/lib/numerology/calculators";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface NumEntry { keyword: string; meaning: string }
@@ -639,7 +653,20 @@ export default function NumerologyPage() {
 
   const [form, setForm] = useState({ name: "", day: "", month: "", year: "" });
   const [result, setResult] = useState<NumerologyResult | null>(null);
+  // Phase 2: extended numbers — computed alongside the core result so the AI
+  // synthesis (and the upcoming Phase 3 UI) can use them.
+  const [extended, setExtended] = useState<{
+    pinnacles: [Pinnacle, Pinnacle, Pinnacle, Pinnacle];
+    challenges: [Challenge, Challenge, Challenge, Challenge];
+    cornerstone: LetterReading;
+    capstone: LetterReading;
+    firstVowel: LetterReading;
+    planeOfExpression: PlaneOfExpression;
+    masterPhase: MasterPhase;
+    age: number;
+  } | null>(null);
   const [synthesis, setSynthesis] = useState<string | null>(null);
+  const [synthIntro, setSynthIntro] = useState<string | null>(null);
   const [loadingSynth, setLoadingSynth] = useState(false);
   const [synthError, setSynthError] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
@@ -666,7 +693,20 @@ export default function NumerologyPage() {
       balance: calcBalance(form.name),
       hiddenPassion: calcHiddenPassion(form.name),
     });
+    // Phase 2: extended computations (no UI change yet — fed to AI synthesis)
+    const age = Math.max(0, new Date().getFullYear() - y);
+    setExtended({
+      pinnacles:         calcPinnacles(d, m, y, lpEx.num),
+      challenges:        calcChallenges(d, m, y, lpEx.num),
+      cornerstone:       calcCornerstone(form.name),
+      capstone:          calcCapstone(form.name),
+      firstVowel:        calcFirstVowel(form.name),
+      planeOfExpression: calcPlaneOfExpression(form.name),
+      masterPhase:       calcMasterPhase(lpEx.num, age),
+      age,
+    });
     setSynthesis(null);
+    setSynthIntro(null);
     setSynthError(false);
   };
 
@@ -696,11 +736,34 @@ export default function NumerologyPage() {
           age: Math.max(0, new Date().getFullYear() - parseInt(form.year)),
           hiddenPassion: result.hiddenPassion,
           hiddenPassionKeyword: (HIDDEN_PASSION_KEYWORDS[language] ?? HIDDEN_PASSION_KEYWORDS.uk)[result.hiddenPassion] ?? "",
+          // Phase 2 extensions — extra context for richer AI synthesis
+          pinnacles:  extended?.pinnacles,
+          challenges: extended?.challenges,
+          cornerstone: extended?.cornerstone,
+          capstone:    extended?.capstone,
+          firstVowel:  extended?.firstVowel,
+          planeOfExpression: extended?.planeOfExpression && {
+            physical:  extended.planeOfExpression.physical,
+            mental:    extended.planeOfExpression.mental,
+            emotional: extended.planeOfExpression.emotional,
+            intuitive: extended.planeOfExpression.intuitive,
+            dominant:  extended.planeOfExpression.dominant,
+          },
+          masterPhase: extended?.masterPhase?.isMaster
+            ? {
+                masterNumber:    extended.masterPhase.masterNumber,
+                baseNumber:      extended.masterPhase.baseNumber,
+                activationAge:   extended.masterPhase.activationAge,
+                currentlyActive: extended.masterPhase.currentlyActive,
+              }
+            : null,
         }),
       });
       const d = await res.json();
-      if (d.synthesis) setSynthesis(d.synthesis);
-      else setSynthError(true);
+      if (d.synthesis) {
+        setSynthesis(d.synthesis);
+        setSynthIntro(d.intro ?? null);
+      } else setSynthError(true);
     } catch {
       setSynthError(true);
     } finally {
