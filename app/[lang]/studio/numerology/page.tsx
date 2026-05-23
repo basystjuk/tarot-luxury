@@ -59,6 +59,43 @@ interface NumerologyResult {
   hiddenPassion: number;
 }
 
+// ── Portrait cache (24h per person + DOB + language) ────────────────────────
+// AI synthesis is rate-limited to 1 call per IP per Kyiv day. To keep the UX
+// sane when the user tweaks the form (e.g. corrects a typo), we cache the
+// portrait per (language, name, DOB) and reuse it on identical submits within
+// the same Kyiv day — no API call required, no 429.
+function getKyivDay(): string {
+  try {
+    return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+function makeCacheKey(opts: {
+  language: string;
+  lastName: string; firstName: string; middleName: string;
+  day: string; month: string; year: string;
+}): string {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const name = `${norm(opts.lastName)}|${norm(opts.firstName)}|${norm(opts.middleName)}`;
+  return `numerology:portrait:v1:${opts.language}|${opts.day}|${opts.month}|${opts.year}|${name}`;
+}
+interface PortraitCache { intro: string; portrait: string; day: string }
+function readPortraitCache(key: string): PortraitCache | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as PortraitCache;
+    if (v.day !== getKyivDay()) { localStorage.removeItem(key); return null; }
+    return v;
+  } catch { return null; }
+}
+function writePortraitCache(key: string, value: { intro: string; portrait: string }): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({ ...value, day: getKyivDay() }));
+  } catch {}
+}
+
 // ── Letter values (Pythagorean, adapted) ─────────────────────────────────────
 // ь та ъ НЕ рахуються — вони не несуть звуку
 const LETTER_VALUES: Record<string, number> = {
@@ -685,6 +722,7 @@ interface ResultViewProps {
   synthPortrait: string | null;
   loadingSynth: boolean;
   synthError: boolean;
+  rateLimited: boolean;
   onRetrySynth: () => void;
   expanded: boolean;
   onExpand: () => void;
@@ -693,7 +731,7 @@ interface ResultViewProps {
 
 function NumerologyResultView({
   result, extended, birthDay, birthMonth, data, language, isRu, isEn, t, labels,
-  synthIntro, synthPortrait, loadingSynth, synthError, onRetrySynth,
+  synthIntro, synthPortrait, loadingSynth, synthError, rateLimited, onRetrySynth,
   expanded, onExpand, onCollapse,
 }: ResultViewProps) {
   const lifePathEntry = getEntry(data.lifePath, result.lifePath);
@@ -755,7 +793,76 @@ function NumerologyResultView({
           {ts(language, "sectionExpand")}
         </button>
       ) : (
-        <div className="space-y-4">
+        // Mobile = vertical stack. Desktop (lg+) = 3 columns:
+        //   left   = personal portrait (sticky)
+        //   center = numbers stack (the long, scrollable axis)
+        //   right  = personal-days calendar (sticky)
+        // The `order-*` classes drive the mobile sequence the user requested:
+        //   portrait → calendar → core → cyclical → gifts → name structure.
+        // On lg+ we drop those orders so the natural DOM flow forms the grid.
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-5 lg:items-start space-y-4 lg:space-y-0">
+          {/* ── Left column: personal portrait ──────────────────────────── */}
+          <div className="order-1 lg:order-none space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
+            <PortraitPanel
+              synthPortrait={synthPortrait}
+              loadingSynth={loadingSynth}
+              synthError={synthError}
+              rateLimited={rateLimited}
+              onRetrySynth={onRetrySynth}
+              isRu={isRu}
+              isEn={isEn}
+              t={t}
+            />
+          </div>
+
+          {/* ── Right column on desktop (rendered SECOND mobile-wise so it appears between portrait and numbers) ── */}
+          {birthDay > 0 && birthMonth > 0 && (
+            <div className="order-2 lg:order-3 space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
+              <CollapseSection
+                defaultOpen
+                title={t("Найкращі дати цього місяця", "Лучшие даты этого месяца", "Best Dates This Month")}
+              >
+                {(() => {
+                  const now = new Date();
+                  const year = now.getFullYear();
+                  const monthIdx = now.getMonth();
+                  const month = monthIdx + 1;
+                  const days = calcPersonalDays(birthDay, birthMonth, year, month);
+                  const localeMap: Record<string, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
+                  const monthName = now.toLocaleString(localeMap[language] ?? "uk-UA", { month: "long" });
+                  const weekdayShort: [string, string, string, string, string, string, string] =
+                    language === "ru" ? ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
+                    : language === "en" ? ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+                    : ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
+                  return (
+                    <>
+                      <p className="text-xs text-[#7A6A58] mb-4 leading-relaxed">
+                        {t(
+                          "Виділені дні (1 · 5 · 9) — найкращі для важливих рішень: 1 — початки, 5 — рух і подорожі, 9 — завершення.",
+                          "Выделенные дни (1 · 5 · 9) — лучшие для важных решений: 1 — начала, 5 — движение и путешествия, 9 — завершения.",
+                          "Highlighted days (1 · 5 · 9) are best for important decisions: 1 = beginnings, 5 = motion & travel, 9 = completion.",
+                        )}
+                      </p>
+                      <PersonalDaysCalendar
+                        days={days}
+                        year={year}
+                        month={month}
+                        language={language}
+                        monthName={monthName}
+                        weekdayShort={weekdayShort}
+                        todayDay={now.getDate()}
+                      />
+                    </>
+                  );
+                })()}
+              </CollapseSection>
+            </div>
+          )}
+
+          {/* ── Center column: numbers stack ──────────────────────────────
+              Mobile order = 3 (after portrait + calendar). Desktop = order-2
+              by document flow (calendar moved to order-3 above).            */}
+          <div className="order-3 lg:order-2 space-y-4 min-w-0">
           {/* Core numbers */}
           <CollapseSection
             defaultOpen
@@ -901,80 +1008,14 @@ function NumerologyResultView({
               </>
             )}
           </CollapseSection>
-
-          {/* Personal Days calendar — best dates for action this month */}
-          {birthDay > 0 && birthMonth > 0 && (
-            <CollapseSection
-              defaultOpen
-              title={t("Найкращі дати цього місяця", "Лучшие даты этого месяца", "Best Dates This Month")}
-            >
-              {(() => {
-                const now = new Date();
-                const year = now.getFullYear();
-                const monthIdx = now.getMonth(); // 0-11
-                const month = monthIdx + 1;
-                const days = calcPersonalDays(birthDay, birthMonth, year, month);
-                const localeMap: Record<string, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
-                const monthName = now.toLocaleString(localeMap[language] ?? "uk-UA", { month: "long" });
-                const weekdayShort: [string, string, string, string, string, string, string] =
-                  language === "ru" ? ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
-                  : language === "en" ? ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
-                  : ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
-                return (
-                  <>
-                    <p className="text-xs text-[#7A6A58] mb-4 leading-relaxed">
-                      {t(
-                        "Виділені дні (1 · 5 · 9) — найкращі для важливих рішень: 1 — початки, 5 — рух і подорожі, 9 — завершення.",
-                        "Выделенные дни (1 · 5 · 9) — лучшие для важных решений: 1 — начала, 5 — движение и путешествия, 9 — завершения.",
-                        "Highlighted days (1 · 5 · 9) are best for important decisions: 1 = beginnings, 5 = motion & travel, 9 = completion.",
-                      )}
-                    </p>
-                    <PersonalDaysCalendar
-                      days={days}
-                      year={year}
-                      month={month}
-                      language={language}
-                      monthName={monthName}
-                      weekdayShort={weekdayShort}
-                      todayDay={now.getDate()}
-                    />
-                  </>
-                );
-              })()}
-            </CollapseSection>
-          )}
-
-          {/* Portrait (long AI text) */}
-          {synthPortrait && (
-            <div className="card-luxury border-[rgba(212,168,83,0.3)]">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#D4A853] to-[#9A6E28] flex items-center justify-center">
-                  <Sparkles size={16} className="text-white" />
-                </div>
-                <p className="text-lg text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-                  {isRu ? "Личный портрет" : isEn ? "Personal portrait" : "Особистий портрет"}
-                </p>
-              </div>
-              <p className="text-[#5C4530] leading-relaxed whitespace-pre-line" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.1rem" }}>
-                {synthPortrait}
-              </p>
-            </div>
-          )}
-          {synthError && !synthPortrait && (
-            <div className="rounded-xl p-4 border border-[rgba(196,169,122,0.25)] text-center space-y-3">
-              <p className="text-sm text-[#9A8A78]">
-                {isRu ? "Не удалось загрузить портрет." : isEn ? "Could not load portrait." : "Не вдалось завантажити портрет."}
-              </p>
-              <button onClick={onRetrySynth} className="btn-outline text-sm px-4 py-2">
-                {isRu ? "Повторить" : isEn ? "Retry" : "Повторити"}
-              </button>
-            </div>
-          )}
-
-          <button onClick={onCollapse} className="block mx-auto text-sm text-[#9A8A78] hover:text-[#B8883A] transition-colors py-2">
-            ▴ {ts(language, "sectionCollapse")}
-          </button>
+          </div>{/* /center column */}
         </div>
+      )}
+
+      {expanded && (
+        <button onClick={onCollapse} className="block mx-auto text-sm text-[#9A8A78] hover:text-[#B8883A] transition-colors py-2">
+          ▴ {ts(language, "sectionCollapse")}
+        </button>
       )}
 
       <p className="text-xs text-[#7A6A58] text-center pt-2">
@@ -1051,6 +1092,109 @@ function LetterRow({
   );
 }
 
+// ─── Personal portrait card — handles all 4 states ─────────────────────────
+// 1. Portrait text present → render it.
+// 2. Rate-limited (429) and no cached portrait → friendly "1 per day" copy.
+// 3. Generic error → message + retry button.
+// 4. Loading → skeleton placeholder (kept in this column so users see WHERE
+//    the portrait will land, instead of the page appearing empty).
+function PortraitPanel({
+  synthPortrait,
+  loadingSynth,
+  synthError,
+  rateLimited,
+  onRetrySynth,
+  isRu,
+  isEn,
+  t,
+}: {
+  synthPortrait: string | null;
+  loadingSynth: boolean;
+  synthError: boolean;
+  rateLimited: boolean;
+  onRetrySynth: () => void;
+  isRu: boolean;
+  isEn: boolean;
+  t: (uk: string, ru: string, en: string) => string;
+}) {
+  const heading = (
+    <div className="flex items-center gap-3 mb-4">
+      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#D4A853] to-[#9A6E28] flex items-center justify-center">
+        <Sparkles size={16} className="text-white" />
+      </div>
+      <p className="text-lg text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+        {isRu ? "Личный портрет" : isEn ? "Personal portrait" : "Особистий портрет"}
+      </p>
+    </div>
+  );
+
+  if (synthPortrait) {
+    return (
+      <div className="card-luxury border-[rgba(212,168,83,0.3)]">
+        {heading}
+        <p
+          className="text-[#5C4530] leading-relaxed whitespace-pre-line"
+          style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.1rem" }}
+        >
+          {synthPortrait}
+        </p>
+      </div>
+    );
+  }
+
+  if (rateLimited) {
+    // Cache lookup already missed (we only get here on 429), so the user is
+    // submitting a DIFFERENT person/DOB than the one they already used today.
+    return (
+      <div className="card-luxury border-[rgba(212,168,83,0.3)]">
+        {heading}
+        <div className="rounded-xl p-5 bg-[rgba(212,168,83,0.08)] border border-[rgba(196,169,122,0.25)] space-y-2">
+          <p className="text-sm text-[#5C4530] leading-relaxed">
+            {t(
+              "Сьогодні ви вже сформували один портрет. Для нової людини портрет доступний завтра. На одну людину — один портрет на добу; повторні запити для тих самих ПІБ і дати народження зберігаються і доступні протягом дня.",
+              "Сегодня вы уже сформировали один портрет. Для нового человека портрет будет доступен завтра. На одного человека — один портрет в сутки; повторные запросы для тех же ФИО и даты рождения сохраняются и доступны в течение дня.",
+              "You've already generated one portrait today. A portrait for a different person becomes available tomorrow. One portrait per person per day; identical name + DOB requests are cached and remain available throughout the day.",
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (synthError) {
+    return (
+      <div className="card-luxury border-[rgba(212,168,83,0.3)]">
+        {heading}
+        <div className="rounded-xl p-4 border border-[rgba(196,169,122,0.25)] text-center space-y-3">
+          <p className="text-sm text-[#9A8A78]">
+            {isRu ? "Не удалось загрузить портрет." : isEn ? "Could not load portrait." : "Не вдалось завантажити портрет."}
+          </p>
+          <button onClick={onRetrySynth} className="btn-outline text-sm px-4 py-2">
+            {isRu ? "Повторить" : isEn ? "Retry" : "Повторити"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingSynth) {
+    return (
+      <div className="card-luxury border-[rgba(212,168,83,0.3)]">
+        {heading}
+        <div className="space-y-2.5 animate-pulse">
+          <div className="h-3 rounded bg-[rgba(196,169,122,0.18)]" />
+          <div className="h-3 rounded bg-[rgba(196,169,122,0.18)] w-[92%]" />
+          <div className="h-3 rounded bg-[rgba(196,169,122,0.18)] w-[88%]" />
+          <div className="h-3 rounded bg-[rgba(196,169,122,0.18)] w-[95%]" />
+          <div className="h-3 rounded bg-[rgba(196,169,122,0.18)] w-[80%]" />
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function NumerologyPage() {
   const { language } = useLanguage();
@@ -1058,7 +1202,14 @@ export default function NumerologyPage() {
   const isEn = language === "en";
   const data = isRu ? DATA_RU : isEn ? DATA_EN : DATA_UK;
 
-  const [form, setForm] = useState({ name: "", day: "", month: "", year: "" });
+  const [form, setForm] = useState({
+    lastName: "", firstName: "", middleName: "",
+    day: "", month: "", year: "",
+  });
+  // Assembled full name in the canonical order the calculators expect:
+  // [firstName, middleName, lastName] — so Cornerstone/Capstone/FirstVowel
+  // operate on the FIRST NAME (the first space-separated token).
+  const fullName = `${form.firstName} ${form.middleName} ${form.lastName}`.trim().replace(/\s+/g, " ");
   const [result, setResult] = useState<NumerologyResult | null>(null);
   // Phase 2: extended numbers — computed alongside the core result so the AI
   // synthesis (and the upcoming Phase 3 UI) can use them.
@@ -1077,6 +1228,9 @@ export default function NumerologyPage() {
   const [synthPortrait, setSynthPortrait] = useState<string | null>(null);
   const [loadingSynth, setLoadingSynth] = useState(false);
   const [synthError, setSynthError] = useState(false);
+  // Separate from synthError so we can show a friendlier "1 portrait/day" copy
+  // instead of the generic "could not load" + retry button.
+  const [rateLimited, setRateLimited] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
   // Phase 3: progressive reveal. The hero (Life Path) is shown first; the
   // four detail sections expand below on user request.
@@ -1090,33 +1244,33 @@ export default function NumerologyPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.day || !form.month || !form.year) return;
+    // First name + last name are required; patronymic is optional.
+    if (!form.firstName || !form.lastName || !form.day || !form.month || !form.year) return;
     const d = parseInt(form.day);
     const m = parseInt(form.month);
     const y = parseInt(form.year);
     const lpEx = calcLifePathEx(d, m, y);
-    const destEx = calcDestinyEx(form.name);
+    const destEx = calcDestinyEx(fullName);
     setResult({
       lifePath: lpEx.num, lifePathKarmic: lpEx.karmic,
       destiny: destEx.num, destinyKarmic: destEx.karmic,
-      soul: calcSoul(form.name),
-      personality: calcPersonality(form.name),
+      soul: calcSoul(fullName),
+      personality: calcPersonality(fullName),
       birthday: calcBirthday(d),
       personalYear: calcPersonalYear(d, m),
       maturity: calcMaturity(lpEx.num, destEx.num),
-      karmicLessons: calcKarmicLessons(form.name),
-      balance: calcBalance(form.name),
-      hiddenPassion: calcHiddenPassion(form.name),
+      karmicLessons: calcKarmicLessons(fullName),
+      balance: calcBalance(fullName),
+      hiddenPassion: calcHiddenPassion(fullName),
     });
-    // Phase 2: extended computations (no UI change yet — fed to AI synthesis)
     const age = Math.max(0, new Date().getFullYear() - y);
     setExtended({
       pinnacles:         calcPinnacles(d, m, y, lpEx.num),
       challenges:        calcChallenges(d, m, y, lpEx.num),
-      cornerstone:       calcCornerstone(form.name),
-      capstone:          calcCapstone(form.name),
-      firstVowel:        calcFirstVowel(form.name),
-      planeOfExpression: calcPlaneOfExpression(form.name),
+      cornerstone:       calcCornerstone(fullName),
+      capstone:          calcCapstone(fullName),
+      firstVowel:        calcFirstVowel(fullName),
+      planeOfExpression: calcPlaneOfExpression(fullName),
       masterPhase:       calcMasterPhase(lpEx.num, age),
       age,
     });
@@ -1124,21 +1278,41 @@ export default function NumerologyPage() {
     setSynthIntro(null);
     setSynthPortrait(null);
     setSynthError(false);
+    setRateLimited(false);
     setExpanded(false);
     autoFiredFor.current = null; // allow auto-fire for the new result
   };
 
   const handleSynthesis = async () => {
     if (!result) return;
+
+    // Cache hit → restore instantly, skip the network and the rate-limit.
+    // Hash = language + DOB + normalized full name; TTL = current Kyiv day.
+    const cacheKey = makeCacheKey({
+      language,
+      lastName: form.lastName, firstName: form.firstName, middleName: form.middleName,
+      day: form.day, month: form.month, year: form.year,
+    });
+    const cached = readPortraitCache(cacheKey);
+    if (cached) {
+      setSynthIntro(cached.intro || null);
+      setSynthPortrait(cached.portrait);
+      setSynthesis(cached.portrait);
+      setSynthError(false);
+      setRateLimited(false);
+      return;
+    }
+
     setLoadingSynth(true);
     setSynthError(false);
+    setRateLimited(false);
     try {
       const res = await fetch("/api/numerology-synthesis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           language,
-          name: form.name.split(" ")[0],
+          name: form.firstName || fullName.split(" ")[0],
           lifePath: result.lifePath,       lifePathKeyword: getEntry(data.lifePath, result.lifePath).keyword,
           destiny:  result.destiny,        destinyKeyword:  getEntry(data.destiny,  result.destiny).keyword,
           soul:     result.soul,           soulKeyword:     getEntry(data.soul,     result.soul).keyword,
@@ -1177,11 +1351,21 @@ export default function NumerologyPage() {
             : null,
         }),
       });
+      if (res.status === 429) {
+        // Today's portrait was already created (for a different person, since
+        // we already checked the cache). Show the friendly message — NOT the
+        // generic error + retry, which would be misleading.
+        setRateLimited(true);
+        return;
+      }
       const d = await res.json();
       if (d.synthesis) {
+        const portrait = d.portrait ?? d.synthesis;
+        const intro = d.intro ?? "";
         setSynthesis(d.synthesis);
-        setSynthIntro(d.intro ?? null);
-        setSynthPortrait(d.portrait ?? d.synthesis);
+        setSynthIntro(intro || null);
+        setSynthPortrait(portrait);
+        writePortraitCache(cacheKey, { intro, portrait });
       } else setSynthError(true);
     } catch {
       setSynthError(true);
@@ -1239,6 +1423,8 @@ export default function NumerologyPage() {
       <GoldDivider />
 
       <section className="section-padding bg-[#FDFBF7]">
+        {/* Form stays narrow (max-w-2xl). The result block below is wider
+            on lg+ to fit the desktop 3-column layout. */}
         <div className="max-w-2xl mx-auto px-6">
           <AnimatedSection>
             <div className="card-luxury mb-8">
@@ -1254,11 +1440,44 @@ export default function NumerologyPage() {
                   <span className="text-[10px] text-[#C4A97A] italic font-normal block mb-2">
                     {t("ПІБ повністю — для числа Долі, Душі, Балансу","ФИО полностью — для числа Судьбы, Души, Баланса","Full name — for Destiny, Soul, Balance")}
                   </span>
-                  <input type="text" required
-                    placeholder={isRu ? "Имя Отчество Фамилия" : isEn ? "First Middle Last" : "Ім'я По-батькові Прізвище"}
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="input-luxury" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-[#9A8A78] tracking-wide mb-1.5 uppercase">
+                        {isRu ? "Фамилия" : isEn ? "Last name" : "Прізвище"}
+                      </span>
+                      <input type="text" required
+                        autoComplete="family-name"
+                        placeholder={isRu ? "Иванова" : isEn ? "Smith" : "Іваненко"}
+                        value={form.lastName}
+                        onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                        className="input-luxury" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-[#9A8A78] tracking-wide mb-1.5 uppercase">
+                        {isRu ? "Имя" : isEn ? "First name" : "Ім'я"}
+                      </span>
+                      <input type="text" required
+                        autoComplete="given-name"
+                        placeholder={isRu ? "Анна" : isEn ? "Anna" : "Анна"}
+                        value={form.firstName}
+                        onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                        className="input-luxury" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-[#9A8A78] tracking-wide mb-1.5 uppercase">
+                        {isRu ? "Отчество" : isEn ? "Middle name" : "По-батькові"}
+                        <span className="text-[#C4A97A] normal-case italic ml-1">
+                          {t("(необов'язково)", "(необязательно)", "(optional)")}
+                        </span>
+                      </span>
+                      <input type="text"
+                        autoComplete="additional-name"
+                        placeholder={isRu ? "Сергеевна" : isEn ? "—" : "Сергіївна"}
+                        value={form.middleName}
+                        onChange={(e) => setForm({ ...form, middleName: e.target.value })}
+                        className="input-luxury" />
+                    </div>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 sm:gap-4 items-start">
                   {[
@@ -1284,13 +1503,17 @@ export default function NumerologyPage() {
                   ))}
                 </div>
                 <button type="submit" className="btn-primary w-full">
-                  {isRu ? "Розрахувати портрет" : isEn ? "Calculate portrait" : "Розрахувати портрет"}
+                  {isRu ? "Рассчитать портрет" : isEn ? "Calculate portrait" : "Розрахувати портрет"}
                 </button>
               </form>
             </div>
           </AnimatedSection>
+        </div>
 
-          {result && (
+        {result && (
+          // Wider container on lg+ so the 3-column desktop layout (portrait |
+          // numbers | calendar) has room to breathe. Mobile stays at 2xl.
+          <div className="max-w-2xl lg:max-w-6xl mx-auto px-6">
             <AnimatedSection delay={0.1}>
               <NumerologyResultView
                 result={result}
@@ -1307,14 +1530,17 @@ export default function NumerologyPage() {
                 synthPortrait={synthPortrait}
                 loadingSynth={loadingSynth}
                 synthError={synthError}
+                rateLimited={rateLimited}
                 onRetrySynth={handleSynthesis}
                 expanded={expanded}
                 onExpand={() => setExpanded(true)}
                 onCollapse={() => setExpanded(false)}
               />
             </AnimatedSection>
-          )}
+          </div>
+        )}
 
+        <div className="max-w-2xl mx-auto px-6">
           {/* How are numbers calculated? */}
           <div className="mt-8 border-t border-[rgba(196,169,122,0.2)] pt-6">
             <button

@@ -8,38 +8,90 @@
  * routing, no global state.
  */
 
-import { useState, useId } from "react";
+import { useState, useId, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Info, ChevronDown } from "lucide-react";
 import type { PersonalDay } from "@/lib/numerology/calculators";
 
 // ─── TermHint — tooltip on tap (mobile) / hover (desktop) ──────────────────
+// Rendered via React Portal into <body> so it never clips inside parent
+// containers with overflow:hidden or transforms (e.g. inside a closed
+// <details> summary). Position is computed relative to the trigger button
+// and clamped to the viewport so it stays fully visible on every edge.
+// `textTransform: none` + `normal-case` prevent inheritance from labels
+// styled with the `uppercase` class.
 export function TermHint({ children, hint }: { children: React.ReactNode; hint: string }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const id = useId();
+
+  useEffect(() => setMounted(true), []);
+
+  const openTip = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const tipWidth = Math.min(280, window.innerWidth - 16);
+    const center = rect.left + rect.width / 2;
+    let left = center - tipWidth / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - tipWidth - 8));
+    setPos({ top: rect.bottom + 8, left, width: tipWidth });
+    setOpen(true);
+  }, []);
+
+  const closeTip = useCallback(() => setOpen(false), []);
+
+  // Close on scroll/resize — trigger may move and the fixed-position tooltip
+  // would drift. Cheaper than recomputing on every scroll event.
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("scroll", closeTip, true);
+    window.addEventListener("resize", closeTip);
+    return () => {
+      window.removeEventListener("scroll", closeTip, true);
+      window.removeEventListener("resize", closeTip);
+    };
+  }, [open, closeTip]);
+
   return (
-    <span className="relative inline-flex items-center gap-1 align-middle">
+    <span className="inline-flex items-center gap-1 align-middle">
       {children}
       <button
+        ref={btnRef}
         type="button"
-        aria-describedby={id}
+        aria-describedby={open ? id : undefined}
         aria-label={hint}
-        onClick={(e) => { e.preventDefault(); setOpen(v => !v); }}
-        onBlur={() => setOpen(false)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onClick={(e) => { e.preventDefault(); open ? closeTip() : openTip(); }}
+        onBlur={closeTip}
+        onMouseEnter={openTip}
+        onMouseLeave={closeTip}
         className="inline-flex items-center justify-center text-[#C4A97A] hover:text-[#B8883A] transition-colors flex-shrink-0"
       >
         <Info size={13} aria-hidden="true" />
       </button>
-      {open && (
+      {mounted && open && pos && createPortal(
         <span
           id={id}
           role="tooltip"
-          className="absolute z-20 left-1/2 -translate-x-1/2 top-full mt-2 w-56 sm:w-64 p-3 rounded-lg bg-[#1C1512] text-white/95 text-xs leading-snug shadow-xl border border-[rgba(196,169,122,0.4)] pointer-events-none"
-          style={{ fontFamily: "var(--font-cormorant)", fontSize: "13px" }}
+          style={{
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            width: pos.width,
+            zIndex: 9999,
+            fontFamily: "var(--font-cormorant)",
+            fontSize: "13px",
+            textTransform: "none",
+            letterSpacing: "normal",
+            lineHeight: 1.45,
+          }}
+          className="p-3 rounded-lg bg-[#1C1512] text-white/95 shadow-2xl border border-[rgba(196,169,122,0.4)] pointer-events-none normal-case"
         >
           {hint}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   );
@@ -58,7 +110,7 @@ export function CollapseSection({
   return (
     <details
       open={defaultOpen}
-      className="group rounded-2xl border border-[rgba(196,169,122,0.25)] bg-[rgba(255,253,248,0.7)] overflow-hidden transition-colors hover:border-[rgba(196,169,122,0.45)]"
+      className="group rounded-2xl border border-[rgba(196,169,122,0.25)] bg-[rgba(255,253,248,0.7)] transition-colors hover:border-[rgba(196,169,122,0.45)]"
     >
       <summary
         className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer list-none select-none"
