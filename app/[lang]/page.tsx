@@ -1,26 +1,12 @@
-import { list } from "@vercel/blob";
 import HomePageClient from "./HomePageClient";
 
-const FALLBACK_PHOTO = "/images/ellen-soul-hero.jpg";
+// Hero photo is served as a static asset (4 pre-generated sizes in /public).
+// Blob-uploaded admin photos are intentionally NOT used for the hero — direct
+// Blob URLs require a healthy public store, and using /_next/image to proxy
+// them adds 1-2s LCP delay on cold paths. To swap the hero photo, replace
+// public/images/ellen-soul-hero-{280,310,560,620}.jpg via git.
+const HERO_PHOTO = "/images/ellen-soul-hero.jpg";
 
-// ISR: regenerate at most once per hour, then serve from edge cache.
-// Admin photo uploads appear within 1h without manual revalidation.
-export const revalidate = 3600;
-
-async function getPhotoUrl(): Promise<string> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return FALLBACK_PHOTO;
-  try {
-    const { blobs } = await list({ prefix: "ellen-soul-taro-konsultant" });
-    const sorted = blobs.sort(
-      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-    );
-    return sorted[0]?.url ?? FALLBACK_PHOTO;
-  } catch {
-    return FALLBACK_PHOTO;
-  }
-}
-
-export default async function HomePage() {
-  const photoUrl = await getPhotoUrl();
-  return <HomePageClient photoUrl={photoUrl} />;
+export default function HomePage() {
+  return <HomePageClient photoUrl={HERO_PHOTO} />;
 }
