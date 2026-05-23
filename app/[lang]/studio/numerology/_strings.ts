@@ -185,6 +185,134 @@ export function letterMeaning(lang: Lang, value: number): string {
   return lang === "ru" ? row[1] : lang === "en" ? row[2] : row[0];
 }
 
+// ─── Pinnacle meanings — what the number says and what to do in this cycle ─
+// Decoz tradition. Each Pinnacle = a major life theme (10-30 years). For UI:
+// `keyword` = 1-3 word headline, `advice` = 1-2 sentence actionable note.
+interface CycleMeaning { keyword: string; advice: string }
+type CycleEntry = { uk: CycleMeaning; ru: CycleMeaning; en: CycleMeaning };
+
+const PINNACLE_MEANINGS: Record<number, CycleEntry> = {
+  1: {
+    uk: { keyword: "Самостійність",         advice: "Період, коли ти вчишся стояти на своїх ногах. Час брати ініціативу й приймати рішення без озирання на інших." },
+    ru: { keyword: "Самостоятельность",     advice: "Период, когда ты учишься стоять на своих ногах. Время брать инициативу и принимать решения без оглядки на других." },
+    en: { keyword: "Self-reliance",         advice: "A period of learning to stand on your own. Take initiative and make decisions without leaning on others." },
+  },
+  2: {
+    uk: { keyword: "Партнерство",           advice: "Час співпраці й тонкого відчуття людей. Стосунки, союзи й угоди принесуть тобі найбільший зріст — не поспішай." },
+    ru: { keyword: "Партнёрство",           advice: "Время сотрудничества и тонкого ощущения людей. Отношения, союзы и соглашения принесут тебе наибольший рост — не спеши." },
+    en: { keyword: "Partnership",           advice: "A time of cooperation and sensitivity. Relationships, alliances and agreements will bring the greatest growth — don't rush." },
+  },
+  3: {
+    uk: { keyword: "Творчий розквіт",       advice: "Час самовираження, мистецтва й соціальної активності. Дозволь собі помилки — кожне слово та жест зараз працює на тебе." },
+    ru: { keyword: "Творческий расцвет",    advice: "Время самовыражения, искусства и социальной активности. Позволь себе ошибки — каждое слово и жест сейчас работает на тебя." },
+    en: { keyword: "Creative bloom",        advice: "A time of expression, art and social life. Allow yourself mistakes — every word and gesture works for you now." },
+  },
+  4: {
+    uk: { keyword: "Будівництво",           advice: "Період методичної праці. Те, що ти закладеш зараз, стане базою на десятиліття. Уникай швидких обхідних шляхів." },
+    ru: { keyword: "Строительство",         advice: "Период методичного труда. То, что ты заложишь сейчас, станет базой на десятилетия. Избегай быстрых обходных путей." },
+    en: { keyword: "Foundation building",   advice: "A period of methodical work. What you build now becomes a base for decades. Avoid shortcuts." },
+  },
+  5: {
+    uk: { keyword: "Рух і зміни",           advice: "Час подорожей, переїздів, перемін. Гнучкість важливіша за плани — будь готовим до несподіванок, вони ведуть тебе вперед." },
+    ru: { keyword: "Движение и перемены",   advice: "Время путешествий, переездов, перемен. Гибкость важнее планов — будь готов к неожиданностям, они ведут тебя вперёд." },
+    en: { keyword: "Motion and change",     advice: "A time of travel, relocation, change. Flexibility matters more than plans — embrace the unexpected, it moves you forward." },
+  },
+  6: {
+    uk: { keyword: "Сім'я і служіння",      advice: "Дім, родина, спільнота — головний фокус. Час брати на себе турботу про близьких: це не тягар, а джерело сили." },
+    ru: { keyword: "Семья и служение",      advice: "Дом, семья, сообщество — главный фокус. Время брать на себя заботу о близких: это не бремя, а источник силы." },
+    en: { keyword: "Family and service",    advice: "Home, family, community — the central focus. Take on care for those close to you; it's not a burden but a source of strength." },
+  },
+  7: {
+    uk: { keyword: "Внутрішня глибина",     advice: "Час навчання, аналізу, духовної практики. Уникай поверхневих контактів — справжнє знання приходить в усамітненні." },
+    ru: { keyword: "Внутренняя глубина",    advice: "Время обучения, анализа, духовной практики. Избегай поверхностных контактов — настоящее знание приходит в уединении." },
+    en: { keyword: "Inner depth",           advice: "A time of study, analysis, spiritual practice. Avoid shallow contacts — real knowing comes in solitude." },
+  },
+  8: {
+    uk: { keyword: "Сила і успіх",          advice: "Час матеріального прориву. Дій сміливо у фінансах, бізнесі, кар'єрі — період підтримує великі рішення та відчутні результати." },
+    ru: { keyword: "Сила и успех",          advice: "Время материального прорыва. Действуй смело в финансах, бизнесе, карьере — период поддерживает большие решения и осязаемые результаты." },
+    en: { keyword: "Power and success",     advice: "A time of material breakthrough. Move boldly in finance, business, career — the cycle supports big decisions and tangible results." },
+  },
+  9: {
+    uk: { keyword: "Завершення циклу",      advice: "Час закривати старі цикли й віддавати світу те, що накопичено. Чим більше відпускаєш, тим легше йдеш далі." },
+    ru: { keyword: "Завершение цикла",      advice: "Время закрывать старые циклы и отдавать миру накопленное. Чем больше отпускаешь, тем легче идёшь дальше." },
+    en: { keyword: "Cycle completion",      advice: "A time to close old cycles and give back what you've gathered. The more you release, the lighter your path." },
+  },
+  11: {
+    uk: { keyword: "Інтуїтивне пробудження",advice: "Період підвищеної духовної чутливості. Інтуїція стає головним інструментом — час бути проводником для інших." },
+    ru: { keyword: "Интуитивное пробуждение",advice:"Период повышенной духовной чувствительности. Интуиция становится главным инструментом — время быть проводником для других." },
+    en: { keyword: "Intuitive awakening",   advice: "A period of heightened spiritual sensitivity. Intuition becomes your main tool — a time to guide others." },
+  },
+  22: {
+    uk: { keyword: "Великий задум",         advice: "Час реалізації масштабних мрій. Те, що інші вважають нереальним, для тебе досяжне — дій великими кроками." },
+    ru: { keyword: "Великий замысел",       advice: "Время реализации масштабных мечт. То, что другие считают нереальным, для тебя достижимо — действуй большими шагами." },
+    en: { keyword: "Great vision",          advice: "A time to manifest large dreams. What others call impossible is within reach — move in big steps." },
+  },
+  33: {
+    uk: { keyword: "Серце і служіння",      advice: "Рідкісний цикл служіння через любов. Час бути вчителем, цілителем, провідником для багатьох." },
+    ru: { keyword: "Сердце и служение",     advice: "Редкий цикл служения через любовь. Время быть учителем, целителем, проводником для многих." },
+    en: { keyword: "Heart and service",     advice: "A rare cycle of service through love. A time to be a teacher, healer, guide to many." },
+  },
+};
+
+const CHALLENGE_MEANINGS: Record<number, CycleEntry> = {
+  0: {
+    uk: { keyword: "Свобода вибору",        advice: "У тебе всі можливості й немає чітких обмежень. Виклик — самостійно обрати напрям і не загубитись у варіантах." },
+    ru: { keyword: "Свобода выбора",        advice: "У тебя все возможности и нет чётких ограничений. Вызов — самостоятельно выбрать направление и не потеряться в вариантах." },
+    en: { keyword: "Freedom of choice",     advice: "All options are open with no fixed limits. The challenge is to choose your direction without getting lost in possibilities." },
+  },
+  1: {
+    uk: { keyword: "Незалежність",          advice: "Тебе тягне покладатись на інших або ховатись за чужими рішеннями. Виклик — повірити у власну волю й голос." },
+    ru: { keyword: "Независимость",         advice: "Тебя тянет полагаться на других или прятаться за чужими решениями. Вызов — поверить в собственную волю и голос." },
+    en: { keyword: "Independence",          advice: "A pull to lean on others or hide behind their decisions. The challenge: trust your own will and voice." },
+  },
+  2: {
+    uk: { keyword: "Баланс чутливості",     advice: "Надмірна вразливість до критики або одержимість думкою інших. Виклик — знайти внутрішню опору, що не залежить від оточення." },
+    ru: { keyword: "Баланс чувствительности",advice:"Чрезмерная уязвимость к критике или одержимость мнением других. Вызов — найти внутреннюю опору, не зависящую от окружения." },
+    en: { keyword: "Sensitivity balance",   advice: "Over-sensitivity to criticism or obsession with others' opinions. The challenge: find inner ground that doesn't depend on surroundings." },
+  },
+  3: {
+    uk: { keyword: "Самовираження",         advice: "Страх показати справжнього себе або розпорошення на дрібниці. Виклик — знайти свій голос і фокус для творчості." },
+    ru: { keyword: "Самовыражение",         advice: "Страх показать настоящего себя или распыление на мелочи. Вызов — найти свой голос и фокус для творчества." },
+    en: { keyword: "Self-expression",       advice: "Fear of showing the real you, or scattering on trivia. The challenge: find your voice and creative focus." },
+  },
+  4: {
+    uk: { keyword: "Дисципліна",            advice: "Безлад, ліньки, ухиляння від рутинних справ. Виклик — навчитись систематично доводити справи до кінця." },
+    ru: { keyword: "Дисциплина",            advice: "Беспорядок, лень, уклонение от рутинных дел. Вызов — научиться систематически доводить дела до конца." },
+    en: { keyword: "Discipline",            advice: "Disorder, laziness, avoiding routine. The challenge: learn to finish what you start, systematically." },
+  },
+  5: {
+    uk: { keyword: "Поміркованість",        advice: "Імпульсивність, надмір змін, нездатність усидіти на місці. Виклик — використовувати свободу конструктивно." },
+    ru: { keyword: "Умеренность",           advice: "Импульсивность, избыток перемен, неспособность усидеть на месте. Вызов — использовать свободу конструктивно." },
+    en: { keyword: "Moderation",            advice: "Impulsiveness, too much change, restlessness. The challenge: turn freedom into something constructive." },
+  },
+  6: {
+    uk: { keyword: "Прийняття",             advice: "Перфекціонізм у стосунках, нав'язування «правильного» іншим. Виклик — приймати людей такими, як вони є." },
+    ru: { keyword: "Принятие",              advice: "Перфекционизм в отношениях, навязывание «правильного» другим. Вызов — принимать людей такими, какие они есть." },
+    en: { keyword: "Acceptance",            advice: "Perfectionism in relationships, imposing your 'right way' on others. The challenge: accept people as they are." },
+  },
+  7: {
+    uk: { keyword: "Відкритість",           advice: "Замкненість, скептицизм, страх показати вразливість. Виклик — довіритись комусь і відкрити серце." },
+    ru: { keyword: "Открытость",            advice: "Замкнутость, скептицизм, страх показать уязвимость. Вызов — довериться кому-то и открыть сердце." },
+    en: { keyword: "Openness",              advice: "Withdrawal, scepticism, fear of vulnerability. The challenge: trust someone and open your heart." },
+  },
+  8: {
+    uk: { keyword: "Сила без надлишку",     advice: "Або одержимість матеріальним, або страх грошей і влади. Виклик — знайти здоровий баланс із силою та статусом." },
+    ru: { keyword: "Сила без излишка",      advice: "Или одержимость материальным, или страх денег и власти. Вызов — найти здоровый баланс с силой и статусом." },
+    en: { keyword: "Power without excess",  advice: "Either obsession with material gain or fear of money and power. The challenge: find a healthy balance with strength and status." },
+  },
+};
+
+export function pinnacleMeaning(lang: Lang, num: number): CycleMeaning {
+  const row = PINNACLE_MEANINGS[num];
+  if (!row) return { keyword: "", advice: "" };
+  return row[lang] ?? row.uk;
+}
+export function challengeMeaning(lang: Lang, num: number): CycleMeaning {
+  const row = CHALLENGE_MEANINGS[num];
+  if (!row) return { keyword: "", advice: "" };
+  return row[lang] ?? row.uk;
+}
+
 // Plane-of-expression "dominant" sentence
 export function planeDominantNote(lang: Lang, dominant: string): string {
   const map: Record<string, Trio> = {

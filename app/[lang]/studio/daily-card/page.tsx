@@ -365,20 +365,26 @@ export default function DailyCardPage() {
                         <p className="text-[#5C4530] text-sm leading-relaxed">{reading.advice}</p>
                       </div>
                     )}
-                    {/* Affirmation */}
+                    {/* Affirmation — powder-rose to break the all-gold rhythm
+                        and keep the text comfortably readable. */}
                     {reading.affirmation && (
                       <div
-                        className="p-6 rounded-2xl border border-[rgba(196,169,122,0.35)]"
-                        style={{ background: "linear-gradient(135deg,#C4A97A 0%,#A07F50 100%)" }}
+                        className="p-6 rounded-2xl border"
+                        style={{
+                          background: "linear-gradient(135deg, #F2DCD0 0%, #E8C7B9 100%)",
+                          borderColor: "rgba(196,150,135,0.4)",
+                        }}
                       >
-                        <p className="text-[11px] text-white/85 tracking-widest uppercase mb-4 text-center underline underline-offset-4">{t("affLbl")}</p>
+                        <p className="text-[11px] tracking-widest uppercase mb-4 text-center underline underline-offset-4" style={{ color: "#7A4636" }}>
+                          {t("affLbl")}
+                        </p>
                         <p
-                          className="text-white italic"
+                          className="italic"
                           style={{
                             fontFamily: "var(--font-cormorant)",
                             fontSize: "1.05rem",
                             lineHeight: 1.6,
-                            textShadow: "0 1px 2px rgba(80,55,20,0.25)",
+                            color: "#3A2418",
                           }}
                         >
                           &ldquo;{reading.affirmation}&rdquo;

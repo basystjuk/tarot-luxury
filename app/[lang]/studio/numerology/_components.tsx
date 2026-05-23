@@ -152,13 +152,14 @@ export function LifePathHero({
             background: "radial-gradient(circle at 32% 30%, #F5E5BD 0%, #D4A853 45%, #9A6E28 100%)",
           }}
         >
+          {/* Neutral sans-serif for numbers — refined but not antique-italic */}
           <span
-            className="text-white"
+            className="text-white tabular-nums"
             style={{
-              fontFamily: "var(--font-cormorant)",
-              fontWeight: 500,
+              fontWeight: 300,
               fontSize: number >= 10 ? "3.5rem" : "4.5rem",
               lineHeight: 1,
+              letterSpacing: "-0.02em",
               textShadow: "0 2px 8px rgba(80,55,20,0.35)",
             }}
           >
@@ -188,16 +189,25 @@ export function LifePathHero({
 }
 
 // ─── AI Intro Panel — shown above the hero once synthesis arrives ──────────
+// Powder-rose palette: distinct from the gold accents used everywhere else,
+// soft enough to read effortlessly. Dark warm-brown text on a blush gradient
+// — no shadows, no inverted text, no clash with the cream page background.
 export function AiIntroPanel({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl p-6 sm:p-7 border border-[rgba(196,169,122,0.35)] bg-gradient-to-br from-[#C4A97A] to-[#A07F50] text-white shadow-[0_10px_30px_rgba(160,127,80,0.25)]">
+    <div
+      className="rounded-2xl p-6 sm:p-7 border shadow-[0_8px_24px_rgba(180,130,120,0.12)]"
+      style={{
+        background: "linear-gradient(135deg, #F2DCD0 0%, #E8C7B9 100%)",
+        borderColor: "rgba(196,150,135,0.35)",
+      }}
+    >
       <p
         className="italic"
         style={{
           fontFamily: "var(--font-cormorant)",
           fontSize: "1.15rem",
           lineHeight: 1.6,
-          textShadow: "0 1px 2px rgba(80,55,20,0.25)",
+          color: "#3A2418",
         }}
       >
         {text}
@@ -279,16 +289,68 @@ export function PlaneBars({
 
 const FAVOURABLE = new Set([1, 5, 9]);
 
+// Powder palette — each Personal-Day number gets its own saturated muted
+// hue. Avoids "all gold" monotony while staying away from the bright/
+// pastel territory the user dislikes. Best days (1, 5, 9) get the most
+// vivid options; ordinary days get softer neutrals.
+const PD_COLOR: Record<number, { bg: string; text: string }> = {
+  1: { bg: "linear-gradient(135deg,#C97F73,#A85E55)", text: "#FFFFFF" }, // dusty rose — initiation
+  2: { bg: "linear-gradient(135deg,#C8B2C2,#9B8BA8)", text: "#3A2C3A" }, // muted mauve — partnership
+  3: { bg: "linear-gradient(135deg,#D6AF95,#B58A70)", text: "#3C2418" }, // terracotta — creativity
+  4: { bg: "linear-gradient(135deg,#B6BFA9,#8FA084)", text: "#2C3328" }, // sage — work
+  5: { bg: "linear-gradient(135deg,#86A8B5,#638C9A)", text: "#FFFFFF" }, // dusty teal — movement
+  6: { bg: "linear-gradient(135deg,#D8A398,#BC7D72)", text: "#3A1F1A" }, // blush coral — care
+  7: { bg: "linear-gradient(135deg,#A695B0,#7F6E91)", text: "#FFFFFF" }, // muted plum — reflection
+  8: { bg: "linear-gradient(135deg,#B89878,#947453)", text: "#FFFFFF" }, // warm clay — power
+  9: { bg: "linear-gradient(135deg,#9F7C8E,#7D5B6D)", text: "#FFFFFF" }, // dusky rose — completion
+};
+
 const PD_LABEL: Record<number, [string, string, string]> = {
-  1: ["початки, нові проєкти", "начала, новые проекты", "beginnings, new projects"],
-  2: ["партнерство, переговори", "партнёрство, переговоры", "partnership, negotiations"],
-  3: ["творчість, спілкування", "творчество, общение", "creativity, communication"],
-  4: ["робота, структура", "работа, структура", "work, structure"],
-  5: ["рух, подорожі, зміни", "движение, путешествия, перемены", "motion, travel, change"],
-  6: ["дім, сім'я, турбота", "дом, семья, забота", "home, family, care"],
-  7: ["рефлексія, навчання", "рефлексия, обучение", "reflection, study"],
-  8: ["великі рішення, гроші", "большие решения, деньги", "big decisions, money"],
-  9: ["завершення, відпускання", "завершение, отпускание", "completion, letting go"],
+  1: [
+    "нові починання — старт справ, перші кроки, ініціатива",
+    "новые начинания — старт дел, первые шаги, инициатива",
+    "new beginnings — starting things, first steps, initiative",
+  ],
+  2: [
+    "партнерство — переговори, союзи, тонкі стосунки",
+    "партнёрство — переговоры, союзы, тонкие отношения",
+    "partnership — negotiations, alliances, subtle relationships",
+  ],
+  3: [
+    "творчість — самовираження, спілкування, презентації",
+    "творчество — самовыражение, общение, презентации",
+    "creativity — self-expression, communication, presentations",
+  ],
+  4: [
+    "робота — рутина, структура, методична праця",
+    "работа — рутина, структура, методичный труд",
+    "work — routine, structure, methodical effort",
+  ],
+  5: [
+    "рух — подорожі, важливі зміни, гнучкі рішення",
+    "движение — путешествия, важные перемены, гибкие решения",
+    "movement — travel, important changes, flexible decisions",
+  ],
+  6: [
+    "дім — сім'я, турбота про близьких, гармонія",
+    "дом — семья, забота о близких, гармония",
+    "home — family, care for loved ones, harmony",
+  ],
+  7: [
+    "рефлексія — навчання, аналіз, тиха внутрішня робота",
+    "рефлексия — обучение, анализ, тихая внутренняя работа",
+    "reflection — study, analysis, quiet inner work",
+  ],
+  8: [
+    "сила — фінанси, великі рішення, кар'єрні кроки",
+    "сила — финансы, большие решения, карьерные шаги",
+    "power — finance, big decisions, career moves",
+  ],
+  9: [
+    "завершення — підсумки, відпускання, закриття циклів",
+    "завершение — итоги, отпускание, закрытие циклов",
+    "completion — wrapping up, letting go, closing cycles",
+  ],
 };
 
 function getPdLabel(n: number, language: "uk" | "ru" | "en"): string {
@@ -350,22 +412,27 @@ export function PersonalDaysCalendar({
           if (!cell) return <div key={i} aria-hidden="true" />;
           const isFav = FAVOURABLE.has(cell.number);
           const isToday = todayDay === cell.day;
+          const color = PD_COLOR[cell.number];
           return (
             <div
               key={i}
               title={`${cell.day}: ${getPdLabel(cell.number, language)}`}
               className={[
-                "aspect-square rounded-lg flex flex-col items-center justify-center transition-all",
+                "aspect-square rounded-lg flex flex-col items-center justify-center transition-all tabular-nums",
                 isFav
-                  ? "bg-gradient-to-br from-[#D4A853] to-[#9A6E28] text-white shadow-[0_3px_10px_rgba(180,140,60,0.3)]"
+                  ? "shadow-[0_3px_10px_rgba(120,80,60,0.18)]"
                   : "bg-[rgba(255,253,248,0.5)] border border-[rgba(196,169,122,0.15)] text-[#7A6A58]",
                 isToday ? "ring-2 ring-[#1C1512] ring-offset-1" : "",
               ].join(" ")}
+              style={isFav && color ? { background: color.bg, color: color.text } : undefined}
             >
-              <span className={`text-[10px] sm:text-xs ${isFav ? "opacity-90" : "opacity-60"}`}>
+              <span className={`text-[10px] sm:text-xs ${isFav ? "opacity-85" : "opacity-60"}`}>
                 {cell.day}
               </span>
-              <span className={`text-sm sm:text-base ${isFav ? "font-medium" : ""}`} style={{ fontFamily: "var(--font-cormorant)" }}>
+              <span
+                className={`text-sm sm:text-base ${isFav ? "font-medium" : ""}`}
+                style={{ letterSpacing: "-0.01em", fontWeight: isFav ? 500 : 400 }}
+              >
                 {cell.number}
               </span>
             </div>
@@ -373,15 +440,23 @@ export function PersonalDaysCalendar({
         })}
       </div>
 
-      {/* Best dates summary */}
+      {/* Best dates summary — each digit in its own powder hue */}
       <div className="space-y-2.5 pt-2">
         {([1, 5, 9] as const).map(n => (
           best[n].length > 0 && (
             <div key={n} className="flex items-baseline gap-3 text-sm">
-              <span className="w-7 h-7 rounded-full bg-gradient-to-br from-[#D4A853] to-[#9A6E28] text-white flex items-center justify-center flex-shrink-0" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 tabular-nums"
+                style={{
+                  background: PD_COLOR[n]?.bg,
+                  color: PD_COLOR[n]?.text,
+                  fontWeight: 500,
+                  letterSpacing: "-0.01em",
+                }}
+              >
                 {n}
               </span>
-              <span className="text-[#5C4530] flex-1">
+              <span className="text-[#5C4530] flex-1 leading-relaxed">
                 <span className="font-medium text-[#1C1512]">{best[n].join(", ")}</span>
                 <span className="text-[#7A6A58]"> · {getPdLabel(n, language)}</span>
               </span>

@@ -11,7 +11,7 @@ import {
   PlaneBars,
   PersonalDaysCalendar,
 } from "./_components";
-import { t as ts, hint as tHint, letterMeaning, planeDominantNote } from "./_strings";
+import { t as ts, hint as tHint, letterMeaning, planeDominantNote, pinnacleMeaning, challengeMeaning } from "./_strings";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -800,7 +800,7 @@ function NumerologyResultView({
         // The `order-*` classes drive the mobile sequence the user requested:
         //   portrait → calendar → core → cyclical → gifts → name structure.
         // On lg+ we drop those orders so the natural DOM flow forms the grid.
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-5 lg:items-start space-y-4 lg:space-y-0">
+        <div className="lg:grid lg:grid-cols-3 lg:gap-5 lg:items-start space-y-4 lg:space-y-0">
           {/* ── Left column: personal portrait ──────────────────────────── */}
           <div className="order-1 lg:order-none space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
             <PortraitPanel
@@ -881,51 +881,87 @@ function NumerologyResultView({
             <ResultRow num={result.personalYear} label={labels.personalYear} entry={getEntry(data.personalYear, result.personalYear)} hint={tHint(language, "personalYear")} />
             <ResultRow num={result.maturity}     label={ts(language, "maturity")} entry={getEntry(data.maturity, result.maturity)}    hint={tHint(language, "maturity")} />
 
-            {/* Active Pinnacle */}
-            {activePinnacle && (
-              <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)]">
-                <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
-                  <TermHint hint={tHint(language, "pinnacle")}>{ts(language, "pinnacleHeading")}</TermHint>
-                </p>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl text-[#B8883A]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{activePinnacle.number}</span>
-                  <span className="text-sm text-[#7A6A58]">{formatWindow(activePinnacle)}</span>
+            {/* Active Pinnacle — number + keyword + concrete advice for now */}
+            {activePinnacle && (() => {
+              const m = pinnacleMeaning(language, activePinnacle.number);
+              return (
+                <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)]">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                    <TermHint hint={tHint(language, "pinnacle")}>{ts(language, "pinnacleHeading")}</TermHint>
+                  </p>
+                  <div className="flex items-baseline gap-3 mb-2 tabular-nums">
+                    <span className="text-3xl text-[#B8883A]" style={{ fontWeight: 300, letterSpacing: "-0.02em" }}>{activePinnacle.number}</span>
+                    <span className="text-sm text-[#7A6A58]">{formatWindow(activePinnacle)}</span>
+                  </div>
+                  {m.keyword && (
+                    <>
+                      <p className="text-base text-[#1C1512] mb-1" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                        {m.keyword}
+                      </p>
+                      <p className="text-sm text-[#5C4530] leading-relaxed">{m.advice}</p>
+                    </>
+                  )}
                 </div>
-              </div>
-            )}
-            {activeChallenge && (
-              <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.18)]">
-                <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
-                  <TermHint hint={tHint(language, "challenge")}>{ts(language, "challengeHeading")}</TermHint>
-                </p>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl text-[#B8883A]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{activeChallenge.number}</span>
-                  <span className="text-sm text-[#7A6A58]">{formatWindow(activeChallenge)}</span>
+              );
+            })()}
+            {activeChallenge && (() => {
+              const m = challengeMeaning(language, activeChallenge.number);
+              return (
+                <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.18)]">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                    <TermHint hint={tHint(language, "challenge")}>{ts(language, "challengeHeading")}</TermHint>
+                  </p>
+                  <div className="flex items-baseline gap-3 mb-2 tabular-nums">
+                    <span className="text-3xl text-[#B8883A]" style={{ fontWeight: 300, letterSpacing: "-0.02em" }}>{activeChallenge.number}</span>
+                    <span className="text-sm text-[#7A6A58]">{formatWindow(activeChallenge)}</span>
+                  </div>
+                  {m.keyword && (
+                    <>
+                      <p className="text-base text-[#1C1512] mb-1" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                        {m.keyword}
+                      </p>
+                      <p className="text-sm text-[#5C4530] leading-relaxed">{m.advice}</p>
+                    </>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
-            {/* All 4 Pinnacles + Challenges */}
+            {/* All 4 Pinnacles + Challenges — each with its own keyword/advice */}
             {extended && (
               <details className="rounded-lg border border-[rgba(196,169,122,0.15)] bg-[rgba(255,253,248,0.5)]">
                 <summary className="px-4 py-2.5 cursor-pointer text-sm text-[#7A6A58] tracking-wide select-none">
                   {ts(language, "pinnacleAllHeading")} / {ts(language, "challengeAllHeading")}
                 </summary>
-                <div className="px-4 pb-3">
-                  {extended.pinnacles.map((p, i) => (
-                    <ExtendedRow
-                      key={`p${i}`}
-                      label={`${ts(language, "pinnacleNum")} ${i + 1}`}
-                      value={`${p.number} · ${formatWindow(p)}`}
-                    />
-                  ))}
-                  {extended.challenges.map((c, i) => (
-                    <ExtendedRow
-                      key={`c${i}`}
-                      label={`${ts(language, "challengeNum")} ${i + 1}`}
-                      value={`${c.number} · ${formatWindow(c)}`}
-                    />
-                  ))}
+                <div className="px-4 pb-3 space-y-3">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase pt-2">{ts(language, "pinnacleAllHeading")}</p>
+                  {extended.pinnacles.map((p, i) => {
+                    const m = pinnacleMeaning(language, p.number);
+                    return (
+                      <div key={`p${i}`} className="pl-3 border-l-2 border-[rgba(196,169,122,0.3)]">
+                        <p className="text-sm text-[#1C1512] mb-0.5 tabular-nums">
+                          <span className="font-medium">{ts(language, "pinnacleNum")} {i + 1}: {p.number}</span>
+                          <span className="text-[#9A8A78] font-normal"> · {formatWindow(p)}</span>
+                          {m.keyword && <span className="text-[#7A6A58]"> · {m.keyword}</span>}
+                        </p>
+                        {m.advice && <p className="text-xs text-[#7A6A58] leading-relaxed">{m.advice}</p>}
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase pt-3">{ts(language, "challengeAllHeading")}</p>
+                  {extended.challenges.map((c, i) => {
+                    const m = challengeMeaning(language, c.number);
+                    return (
+                      <div key={`c${i}`} className="pl-3 border-l-2 border-[rgba(196,169,122,0.3)]">
+                        <p className="text-sm text-[#1C1512] mb-0.5 tabular-nums">
+                          <span className="font-medium">{ts(language, "challengeNum")} {i + 1}: {c.number}</span>
+                          <span className="text-[#9A8A78] font-normal"> · {formatWindow(c)}</span>
+                          {m.keyword && <span className="text-[#7A6A58]"> · {m.keyword}</span>}
+                        </p>
+                        {m.advice && <p className="text-xs text-[#7A6A58] leading-relaxed">{m.advice}</p>}
+                      </div>
+                    );
+                  })}
                 </div>
               </details>
             )}
@@ -960,7 +996,7 @@ function NumerologyResultView({
                 <div className="space-y-2.5">
                   {result.karmicLessons.map(n => (
                     <div key={n} className="pl-3 border-l-2 border-[rgba(196,169,122,0.3)]">
-                      <p className="text-sm font-medium text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)" }}>
+                      <p className="text-sm font-medium text-[#1C1512] tabular-nums">
                         {n} · {getEntry(data.karmicLessons, n).keyword}
                       </p>
                       <p className="text-xs text-[#7A6A58] leading-relaxed">
@@ -1044,7 +1080,7 @@ function ResultRow({
   return (
     <div className="flex items-start gap-3">
       <div className="w-10 h-10 rounded-full bg-[rgba(212,168,83,0.15)] flex items-center justify-center flex-shrink-0">
-        <span className="text-[#D4A853]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{num}</span>
+        <span className="text-[#B8883A] tabular-nums" style={{ fontWeight: 400, letterSpacing: "-0.01em", fontSize: "1rem" }}>{num}</span>
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-0.5">
@@ -1085,7 +1121,7 @@ function LetterRow({
           <TermHint hint={hint}>{label}</TermHint>
         </p>
         <p className="text-sm text-[#5C4530]">
-          <span className="font-medium text-[#1C1512]">{letter.value}</span> · {letterMeaning(language, letter.value)}
+          <span className="font-medium text-[#1C1512] tabular-nums">{letter.value}</span> · {letterMeaning(language, letter.value)}
         </p>
       </div>
     </div>
@@ -1411,10 +1447,10 @@ export default function NumerologyPage() {
             </h1>
             <p className="text-xl text-[#7A6A58] leading-relaxed">
               {isRu
-                ? "Шесть ключевых чисел вашего нумерологического портрета по имени и дате рождения."
+                ? "Глубокий нумерологический портрет: 18 чисел, активные циклы жизни, лучшие даты месяца и персональный AI-разбор."
                 : isEn
-                ? "Six key numbers of your numerological portrait by name and date of birth."
-                : "Шість ключових чисел вашого нумерологічного портрету за ім'ям і датою народження."}
+                ? "A deep numerological portrait: 18 numbers, active life cycles, the best dates of the month and a personal AI reading."
+                : "Глибокий нумерологічний портрет: 18 чисел, активні цикли життя, найкращі дати місяця та персональний AI-розбір."}
             </p>
           </AnimatedSection>
         </div>
@@ -1440,11 +1476,18 @@ export default function NumerologyPage() {
                   <span className="text-[10px] text-[#C4A97A] italic font-normal block mb-2">
                     {t("ПІБ повністю — для числа Долі, Душі, Балансу","ФИО полностью — для числа Судьбы, Души, Баланса","Full name — for Destiny, Soul, Balance")}
                   </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Three columns at sm+; each label has fixed min-height so
+                      the inputs stay aligned even when one label wraps. The
+                      optional-note goes on its own line to avoid pushing the
+                      uppercase title onto two lines. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-[#9A8A78] tracking-wide mb-1.5 uppercase">
-                        {isRu ? "Фамилия" : isEn ? "Last name" : "Прізвище"}
-                      </span>
+                      <div className="min-h-[2.4rem] mb-1.5">
+                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap">
+                          {isRu ? "Фамилия" : isEn ? "Last name" : "Прізвище"}
+                        </span>
+                        <span className="text-[10px] text-transparent italic block leading-tight">·</span>
+                      </div>
                       <input type="text" required
                         autoComplete="family-name"
                         placeholder={isRu ? "Иванова" : isEn ? "Smith" : "Іваненко"}
@@ -1453,9 +1496,12 @@ export default function NumerologyPage() {
                         className="input-luxury" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-[#9A8A78] tracking-wide mb-1.5 uppercase">
-                        {isRu ? "Имя" : isEn ? "First name" : "Ім'я"}
-                      </span>
+                      <div className="min-h-[2.4rem] mb-1.5">
+                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap">
+                          {isRu ? "Имя" : isEn ? "First name" : "Ім'я"}
+                        </span>
+                        <span className="text-[10px] text-transparent italic block leading-tight">·</span>
+                      </div>
                       <input type="text" required
                         autoComplete="given-name"
                         placeholder={isRu ? "Анна" : isEn ? "Anna" : "Анна"}
@@ -1464,12 +1510,14 @@ export default function NumerologyPage() {
                         className="input-luxury" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[10px] text-[#9A8A78] tracking-wide mb-1.5 uppercase">
-                        {isRu ? "Отчество" : isEn ? "Middle name" : "По-батькові"}
-                        <span className="text-[#C4A97A] normal-case italic ml-1">
-                          {t("(необов'язково)", "(необязательно)", "(optional)")}
+                      <div className="min-h-[2.4rem] mb-1.5">
+                        <span className="text-[10px] text-[#9A8A78] tracking-wide uppercase block whitespace-nowrap">
+                          {isRu ? "Отчество" : isEn ? "Middle name" : "По-батькові"}
                         </span>
-                      </span>
+                        <span className="text-[10px] text-[#C4A97A] italic block leading-tight">
+                          {t("необов'язково", "необязательно", "optional")}
+                        </span>
+                      </div>
                       <input type="text"
                         autoComplete="additional-name"
                         placeholder={isRu ? "Сергеевна" : isEn ? "—" : "Сергіївна"}
@@ -1513,7 +1561,7 @@ export default function NumerologyPage() {
         {result && (
           // Wider container on lg+ so the 3-column desktop layout (portrait |
           // numbers | calendar) has room to breathe. Mobile stays at 2xl.
-          <div className="max-w-2xl lg:max-w-6xl mx-auto px-6">
+          <div className="max-w-2xl lg:max-w-7xl mx-auto px-6">
             <AnimatedSection delay={0.1}>
               <NumerologyResultView
                 result={result}
