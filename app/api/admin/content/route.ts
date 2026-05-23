@@ -25,8 +25,9 @@ export async function POST(req: NextRequest) {
   // (The previous del-then-put dance was racy: Blob storage is eventually
   // consistent, so list/del after a recent write sometimes still saw the
   // old blob and the put would fail with BlobAlreadyExistsError.)
+  const payload = JSON.stringify(body);
   try {
-    const blob = await put(CONTENT_BLOB, JSON.stringify(body), {
+    const blob = await put(CONTENT_BLOB, payload, {
       access: "public",
       addRandomSuffix: false,
       allowOverwrite: true,
@@ -34,7 +35,18 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, url: blob.url });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown blob error";
-    return NextResponse.json({ error: "blob_write_failed", message }, { status: 500 });
+    // Surface a useful diagnostic to both Vercel logs and the admin UI —
+    // without it, all the user sees is "❌ Помилка" with no clue why.
+    const name = err instanceof Error ? err.name : "UnknownError";
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[admin/content] blob write failed:", {
+      name,
+      message,
+      payloadBytes: payload.length,
+    });
+    return NextResponse.json(
+      { error: "blob_write_failed", name, message, payloadBytes: payload.length },
+      { status: 500 }
+    );
   }
 }

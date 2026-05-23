@@ -30,6 +30,22 @@ const ADMIN_PASSWORD = "ellensoul2025";
 const STORAGE_KEY = "ellen_admin_testimonials";
 const DEFAULT_PHOTO = "/images/ellen-soul-taro-konsultant.jpg";
 
+/** Best-effort extraction of a useful error message from a non-ok Response. */
+async function readErrorDetail(res: Response): Promise<string> {
+  try {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      const j = await res.json();
+      const msg = j?.message || j?.error || JSON.stringify(j);
+      return `${res.status}: ${msg}`;
+    }
+    const txt = await res.text();
+    return `${res.status}: ${txt.slice(0, 220) || res.statusText}`;
+  } catch {
+    return `${res.status}: ${res.statusText || "Unknown"}`;
+  }
+}
+
 // ─── Auth Screen ────────────────────────────────────────────────────────────
 function AuthScreen({ onLogin }: { onLogin: () => void }) {
   const [pass, setPass] = useState("");
@@ -475,6 +491,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   // Global save indicator
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // Last save-error detail (HTTP status + server message). Cleared on next save.
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Refs to always have latest values for publishContent
   const svcRef = useRef(DEFAULT_SERVICES);
   const orgRef = useRef(DEFAULT_ORG);
@@ -590,6 +608,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     if (patch.about) aboutRef.current = patch.about;
     if (patch.studio_tools) studioRef.current = patch.studio_tools;
     setSaving("saving");
+    setSaveError(null);
     try {
       const res = await fetch("/api/admin/content", {
         method: "POST",
@@ -610,8 +629,18 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           ai_prompts: aiPromptsRef.current,
         }),
       });
-      setSaving(res.ok ? "saved" : "error");
-    } catch {
+      if (res.ok) {
+        setSaving("saved");
+      } else {
+        const detail = await readErrorDetail(res);
+        setSaveError(detail);
+        console.error("[admin save] failed:", res.status, detail);
+        setSaving("error");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSaveError(`Network: ${msg}`);
+      console.error("[admin save] threw:", e);
       setSaving("error");
     }
     setTimeout(() => setSaving("idle"), 2500);
@@ -641,6 +670,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     };
     studioRef.current = studioTools;
     setSaving("saving");
+    setSaveError(null);
     try {
       const res = await fetch("/api/admin/content", {
         method: "POST",
@@ -661,8 +691,18 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           ai_prompts: aiPromptsRef.current,
         }),
       });
-      setSaving(res.ok ? "saved" : "error");
-    } catch {
+      if (res.ok) {
+        setSaving("saved");
+      } else {
+        const detail = await readErrorDetail(res);
+        setSaveError(detail);
+        console.error("[admin save] failed:", res.status, detail);
+        setSaving("error");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSaveError(`Network: ${msg}`);
+      console.error("[admin save] threw:", e);
       setSaving("error");
     }
     setTimeout(() => setSaving("idle"), 2500);
@@ -794,7 +834,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </span>
           )}
           {saving === "error" && (
-            <span className="text-xs text-red-400">Помилка збереження</span>
+            <span
+              className="text-xs text-red-400 max-w-[60vw] truncate"
+              title={saveError ?? "Невідома помилка"}
+            >
+              ❌ {saveError ?? "Помилка збереження"}
+            </span>
           )}
         </div>
         <button

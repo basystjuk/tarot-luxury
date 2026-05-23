@@ -24,14 +24,21 @@ export const ALL_TOOL_IDS: ToolId[] = [
 ];
 
 /**
- * Defaults. Anything not yet ready (`natal-chart`) ships as disabled so the
- * first deploy doesn't expose a half-built tool.
+ * Defaults. Anything not yet ready ships as disabled so the public never
+ * sees a half-built tool.
+ *
+ * Currently OFF (in active polish — owner can re-enable from admin once
+ * admin save is verified working):
+ *   - daily-card
+ *   - compatibility
+ *   - moon-phase
+ *   - natal-chart  (no AI integration yet)
  */
 export const DEFAULT_TOOLS_ENABLED: Record<ToolId, boolean> = {
-  "daily-card": true,
+  "daily-card": false,
   numerology: true,
-  compatibility: true,
-  "moon-phase": true,
+  compatibility: false,
+  "moon-phase": false,
   "natal-chart": false,
 };
 

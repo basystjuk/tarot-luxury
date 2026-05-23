@@ -29,10 +29,21 @@ export async function GET(req: NextRequest) {
     const res = await fetch(blob.url, { cache: "no-store" });
     const data = await res.json();
     // Merge tools_enabled so newly added tool IDs always have a default.
+    // Blob values normally win — but for tools the owner explicitly switched
+    // off in code (DEFAULT_TOOLS_ENABLED === false) we keep them off, even
+    // if a stale blob entry says otherwise. This is the safety net for
+    // "code-disabled" tools that shouldn't surface to the public.
+    const blobToolsEnabled = (data?.tools_enabled ?? {}) as Partial<typeof DEFAULT_TOOLS_ENABLED>;
+    const effectiveToolsEnabled = { ...DEFAULT_TOOLS_ENABLED, ...blobToolsEnabled };
+    for (const [id, defaultOn] of Object.entries(DEFAULT_TOOLS_ENABLED)) {
+      if (defaultOn === false) {
+        effectiveToolsEnabled[id as keyof typeof DEFAULT_TOOLS_ENABLED] = false;
+      }
+    }
     const merged = {
       ...defaults(),
       ...data,
-      tools_enabled: { ...DEFAULT_TOOLS_ENABLED, ...(data?.tools_enabled ?? {}) },
+      tools_enabled: effectiveToolsEnabled,
     };
     return respond(merged);
   } catch {
