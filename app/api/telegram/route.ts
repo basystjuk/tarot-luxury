@@ -105,6 +105,7 @@ async function saveVideoList(videos: VideoEntry[]): Promise<void> {
     access: "public",
     contentType: "application/json",
     addRandomSuffix: false,
+    allowOverwrite: true,
   });
 }
 
@@ -128,6 +129,7 @@ async function processChannelPost(post: TgChannelPost): Promise<void> {
           access: "public",
           contentType: "image/jpeg",
           addRandomSuffix: false,
+          allowOverwrite: true,
         });
         thumbUrl = uploaded.url;
       }
@@ -167,6 +169,7 @@ async function processChannelPost(post: TgChannelPost): Promise<void> {
         access: "public",
         contentType: "image/jpeg",
         addRandomSuffix: false,
+        allowOverwrite: true,
       });
       thumbUrl = uploaded.url;
     }

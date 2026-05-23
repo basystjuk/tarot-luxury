@@ -29,6 +29,7 @@ async function writeMeta(meta: GalleryMeta): Promise<void> {
   await put(META_PATHNAME, json, {
     access: "public",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "application/json",
   });
 }

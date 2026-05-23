@@ -1,4 +1,4 @@
-import { put, list, del } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
@@ -21,18 +21,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Delete old content blob
+  // In @vercel/blob v2, putting a fixed-name blob requires allowOverwrite.
+  // (The previous del-then-put dance was racy: Blob storage is eventually
+  // consistent, so list/del after a recent write sometimes still saw the
+  // old blob and the put would fail with BlobAlreadyExistsError.)
   try {
-    const { blobs } = await list({ prefix: CONTENT_BLOB });
-    if (blobs.length > 0) await del(blobs.map((b) => b.url));
-  } catch {}
-
-  // Write new blob
-  const blob = await put(
-    CONTENT_BLOB,
-    JSON.stringify(body),
-    { access: "public", addRandomSuffix: false, contentType: "application/json" }
-  );
-
-  return NextResponse.json({ ok: true, url: blob.url });
+    const blob = await put(CONTENT_BLOB, JSON.stringify(body), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+    });
+    return NextResponse.json({ ok: true, url: blob.url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown blob error";
+    return NextResponse.json({ error: "blob_write_failed", message }, { status: 500 });
+  }
 }
