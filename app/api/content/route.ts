@@ -5,24 +5,26 @@ import { testimonials as DEFAULT_TESTIMONIALS } from "@/lib/data/testimonials";
 
 const CONTENT_BLOB = "site-content.json";
 
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(defaults(), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(defaults(), { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
   }
 
   try {
     const { blobs } = await list({ prefix: CONTENT_BLOB });
     const blob = blobs[0];
     if (!blob) {
-      return NextResponse.json(defaults(), { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json(defaults(), { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
     }
     const res = await fetch(blob.url, { cache: "no-store" });
     const data = await res.json();
-    return NextResponse.json({ ...defaults(), ...data }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { ...defaults(), ...data },
+      { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
+    );
   } catch {
-    return NextResponse.json(defaults(), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(defaults(), { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
   }
 }
 

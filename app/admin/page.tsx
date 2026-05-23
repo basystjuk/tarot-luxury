@@ -321,7 +321,51 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio">("testimonials");
+
+  // Gallery state
+  interface GalleryItem { url: string; pathname: string; position?: "top" | "center" | "bottom"; }
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const loadGallery = useCallback(async () => {
+    try {
+      const res = await fetch("/api/gallery");
+      const d = await res.json();
+      if (d.items) setGalleryItems(d.items);
+    } catch {}
+  }, []);
+
+  const uploadGalleryPhoto = async (file: File) => {
+    setGalleryUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/admin/gallery", { method: "POST", headers: { "x-admin-password": ADMIN_PASSWORD }, body: fd });
+      if (res.ok) await loadGallery();
+    } finally {
+      setGalleryUploading(false);
+    }
+  };
+
+  const updateGalleryPosition = async (pathname: string, position: "top" | "center" | "bottom") => {
+    try {
+      await fetch("/api/admin/gallery", {
+        method: "PATCH",
+        headers: { "x-admin-password": ADMIN_PASSWORD, "Content-Type": "application/json" },
+        body: JSON.stringify({ pathname, position }),
+      });
+      setGalleryItems(prev => prev.map(i => i.pathname === pathname ? { ...i, position } : i));
+    } catch {}
+  };
+
+  const deleteGalleryPhoto = async (pathname: string) => {
+    try {
+      await fetch(`/api/admin/gallery?pathname=${encodeURIComponent(pathname)}`, { method: "DELETE", headers: { "x-admin-password": ADMIN_PASSWORD } });
+      setGalleryItems(prev => prev.filter(i => i.pathname !== pathname));
+    } catch {}
+  };
 
   // Services state
   const [svcList, setSvcList] = useState<ServiceItem[]>(DEFAULT_SERVICES);
@@ -719,7 +763,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio"] as const).map((tab) => (
+          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -730,6 +774,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               }`}
             >
               {tab === "photo" ? "📷 Фото"
+                : tab === "gallery" ? "🖼 Галерея"
                 : tab === "testimonials" ? "⭐ Відгуки"
                 : tab === "blog" ? "📝 Блог"
                 : tab === "services" ? "🛎 Послуги"
@@ -843,6 +888,95 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Gallery Tab ── */}
+        {activeTab === "gallery" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Галерея фото</h2>
+                <p className="text-white/40 text-sm">Фото відображаються на сторінці «Про мене» у горизонтальній стрічці</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={loadGallery}
+                  className="px-4 py-2 rounded-xl border border-white/20 text-white/60 hover:text-white hover:border-white/40 text-sm transition-colors"
+                >
+                  ↻ Оновити
+                </button>
+                <button
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={galleryUploading}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  <Upload size={14} /> {galleryUploading ? "Завантаження…" : "Додати фото"}
+                </button>
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) { await uploadGalleryPhoto(file); e.target.value = ""; }
+                  }}
+                />
+              </div>
+            </div>
+
+            {galleryItems.length === 0 ? (
+              <div className="text-center py-16 text-white/30 text-sm border border-white/10 rounded-2xl">
+                Немає фото. Натисніть «Додати фото» щоб завантажити.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {galleryItems.map((item) => (
+                  <div key={item.pathname} className="flex flex-col gap-2">
+                    <div className="relative group rounded-xl overflow-hidden aspect-[3/4] bg-white/5 border border-white/10">
+                      <Image
+                        src={item.url}
+                        alt="gallery"
+                        fill
+                        className={`object-cover ${
+                          item.position === "center" ? "object-center"
+                          : item.position === "bottom" ? "object-bottom"
+                          : "object-top"
+                        }`}
+                        sizes="200px"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors duration-200 flex items-center justify-center">
+                        <button
+                          onClick={() => deleteGalleryPhoto(item.pathname)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity w-9 h-9 rounded-full bg-red-500/80 hover:bg-red-500 flex items-center justify-center text-white"
+                          title="Видалити"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Position controls */}
+                    <div className="flex gap-1">
+                      {(["top", "center", "bottom"] as const).map((pos) => (
+                        <button
+                          key={pos}
+                          onClick={() => updateGalleryPosition(item.pathname, pos)}
+                          title={pos === "top" ? "Зверху" : pos === "center" ? "По центру" : "Знизу"}
+                          className={`flex-1 py-1 rounded-lg text-xs transition-colors ${
+                            (item.position ?? "top") === pos
+                              ? "bg-[#D4A853] text-white"
+                              : "bg-white/10 text-white/40 hover:bg-white/20 hover:text-white/70"
+                          }`}
+                        >
+                          {pos === "top" ? "↑" : pos === "center" ? "·" : "↓"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

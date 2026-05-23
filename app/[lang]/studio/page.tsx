@@ -22,21 +22,22 @@ export default function StudioPage() {
       .catch(() => {});
   }, []);
 
+  // Порядок: Карта дня → Нумерологія → Карта сумісності → Місячний гороскоп
   const tools = isRu ? [
-    { href: `/${language}/studio/moon-phase`, title: "Лунный гороскоп", subtitle: "Лунный", description: "Узнайте текущую фазу Луны, процент освещения и дату следующего новолуния и полнолуния.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
-    { href: `/${language}/studio/compatibility`, title: "Совместимость знаков", subtitle: "Астрология", description: "Проверьте астрологическую совместимость двух знаков Зодиака. Сильные стороны, вызовы и общая оценка пары.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
-    { href: `/${language}/studio/daily-card`, title: "Карта дня", subtitle: "Таро", description: "Ежедневная карта Старшего Аркана — ваш ориентир и медитация на сегодня. Обновляется каждый день.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
-    { href: `/${language}/studio/numerology`, title: "Нумерология", subtitle: "Нумерология", description: "Ваше число Судьбы и число Жизненного Пути по имени и дате рождения. С детальной интерпретацией.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
+    { href: `/${language}/studio/daily-card`,   title: "Карта дня",              subtitle: "Таро",          description: "Ежедневная карта Таро — ваш ориентир и медитация на сегодня. Персональное предсказание от Ellen Soul.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
+    { href: `/${language}/studio/numerology`,    title: "Нумерология",            subtitle: "Нумерология",   description: "Ваше число Судьбы, число Пути, Душа, Личность и карматические уроки по имени и дате рождения.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
+    { href: `/${language}/studio/compatibility`, title: "Карта совместимости",    subtitle: "Астрология · Нумерология", description: "Знаки зодиака и числа судьбы двух людей — полный анализ совместимости пары.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
+    { href: `/${language}/studio/moon-phase`,    title: "Місячний провідник",     subtitle: "Луна · Астрология", description: "Точная фаза и знак Луны на любую дату. Личное лунное послание от Ellen Soul.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
   ] : isEn ? [
-    { href: `/${language}/studio/moon-phase`, title: "Moon Horoscope", subtitle: "Lunar", description: "Find the current Moon phase, illumination percentage and dates of the next new moon and full moon.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
-    { href: `/${language}/studio/compatibility`, title: "Sign Compatibility", subtitle: "Astrology", description: "Check the astrological compatibility of two Zodiac signs. Strengths, challenges and overall couple rating.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
-    { href: `/${language}/studio/daily-card`, title: "Card of the Day", subtitle: "Tarot", description: "Daily Major Arcana card — your guide and meditation for today. Updated every day.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
-    { href: `/${language}/studio/numerology`, title: "Numerology", subtitle: "Numerology", description: "Your Destiny number and Life Path number by name and date of birth. With a detailed interpretation.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
+    { href: `/${language}/studio/daily-card`,   title: "Card of the Day",         subtitle: "Tarot",         description: "Daily Tarot card — your guide and meditation for today. Personal reading from Ellen Soul.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
+    { href: `/${language}/studio/numerology`,    title: "Numerology",              subtitle: "Numerology",    description: "Your Destiny, Life Path, Soul, Personality numbers and karmic lessons by name and date of birth.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
+    { href: `/${language}/studio/compatibility`, title: "Compatibility Map",        subtitle: "Astrology · Numerology", description: "Zodiac signs and destiny numbers of two people — full couple compatibility analysis.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
+    { href: `/${language}/studio/moon-phase`,    title: "Moon Guide",              subtitle: "Moon · Astrology", description: "The precise Moon phase and sign for any date. A personal lunar message from Ellen Soul.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
   ] : [
-    { href: `/${language}/studio/moon-phase`, title: "Місячний гороскоп", subtitle: "Місячний", description: "Дізнайтесь поточну фазу Місяця, відсоток освітлення та дату наступного новомісяця і повного місяця.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
-    { href: `/${language}/studio/compatibility`, title: "Сумісність знаків", subtitle: "Астрологічний", description: "Перевірте астрологічну сумісність двох знаків Зодіаку. Сильні сторони, виклики та загальна оцінка пари.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
-    { href: `/${language}/studio/daily-card`, title: "Карта дня", subtitle: "Таро", description: "Щоденна карта Старшого Аркану — ваш орієнтир та медитація на сьогодні. Оновлюється щодня.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
-    { href: `/${language}/studio/numerology`, title: "Нумерологія", subtitle: "Нумерологія", description: "Ваше число Долі та число Життєвого Шляху за ім'ям і датою народження. З детальною інтерпретацією.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
+    { href: `/${language}/studio/daily-card`,   title: "Карта дня",              subtitle: "Таро",          description: "Щоденна карта Таро — ваш орієнтир та медитація на сьогодні. Персональне передбачення від Ellen Soul.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
+    { href: `/${language}/studio/numerology`,    title: "Нумерологія",            subtitle: "Нумерологія",   description: "Ваше число Долі, число Шляху, Душа, Особистість та карматичні уроки за ім'ям і датою народження.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
+    { href: `/${language}/studio/compatibility`, title: "Карта сумісності",       subtitle: "Астрологія · Нумерологія", description: "Знаки зодіаку та числа долі двох людей — повний аналіз сумісності пари.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
+    { href: `/${language}/studio/moon-phase`,    title: "Місячний провідник",     subtitle: "Місяць · Астрологія", description: "Точна фаза і знак Місяця на будь-яку дату. Особисте місячне послання від Ellen Soul.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
   ];
 
   return (

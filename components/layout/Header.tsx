@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,17 +14,62 @@ export default function Header() {
   const { openBooking } = useModal();
   const pathname = usePathname();
 
+  // Порядок: Головна - Про мене - Щоденник таролога - Soul Studio - Послуги - Підказки - Контакти
   const navLinks = [
-    { href: `/${language}`, label: t('nav.home') },
-    { href: `/${language}/about`, label: t('nav.about') },
+    { href: `/${language}`,          label: t('nav.home') },
+    { href: `/${language}/about`,    label: t('nav.about') },
+    { href: `/${language}/blog`,     label: t('nav.blog') },
+    { href: `/${language}/studio`,   label: t('nav.studio') },
     { href: `/${language}/services`, label: t('nav.services') },
-    { href: `/${language}/blog`, label: t('nav.blog') },
-    { href: `/${language}/studio`, label: t('nav.studio') },
+    { href: `/${language}/faq`,      label: language === 'ru' ? 'Подсказки' : language === 'en' ? 'Tips' : 'Підказки' },
     { href: `/${language}/contacts`, label: t('nav.contacts') },
-    { href: `/${language}/faq`, label: language === 'ru' ? 'Подсказки' : language === 'en' ? 'Tips' : 'Підказки' },
   ];
+
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Scroll-based section tracking (home page only)
+  const [activeSection, setActiveSection] = useState<string>('');
+  const isHome = pathname === `/${language}` || pathname === `/${language}/`;
+
+  useEffect(() => {
+    if (!isHome) { setActiveSection(''); return; }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const section = (entry.target as HTMLElement).dataset.navSection;
+            if (section) setActiveSection(section);
+          }
+        });
+      },
+      { rootMargin: '-45% 0px -45% 0px' }
+    );
+    const timer = setTimeout(() => {
+      document.querySelectorAll('[data-nav-section]').forEach(el => observer.observe(el));
+    }, 150);
+    return () => { clearTimeout(timer); observer.disconnect(); };
+  }, [pathname, language, isHome]);
+
+  // Determine if a nav link is active
+  const isActive = (href: string): boolean => {
+    if (isHome) {
+      const sectionHref: Record<string, string> = {
+        studio:   `/${language}/studio`,
+        services: `/${language}/services`,
+        faq:      `/${language}/faq`,
+      };
+      if (activeSection && sectionHref[activeSection] === href) return true;
+      if (!activeSection || activeSection === 'hero') {
+        return href === `/${language}` || href === `/${language}/`;
+      }
+      return false;
+    }
+    if (href === `/${language}` || href === `/${language}/`) {
+      return pathname === `/${language}` || pathname === `/${language}/`;
+    }
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   useEffect(() => {
     const onScroll = () => {
@@ -46,9 +91,7 @@ export default function Header() {
 
   return (
     <>
-      <motion.header
-        animate={{ y: 0 }}
-        transition={{ duration: 0.4, ease: [0.19, 1, 0.22, 1] }}
+      <header
         className={cn(
           "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
           scrolled
@@ -74,12 +117,17 @@ export default function Header() {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-8">
+          <nav className="hidden lg:flex items-center gap-7">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-[#5C4530] hover:text-[#B8883A] transition-colors tracking-wide"
+                className={cn(
+                  "text-sm font-medium transition-colors tracking-wide relative",
+                  isActive(link.href)
+                    ? "text-[#B8883A] after:absolute after:-bottom-1 after:left-0 after:right-0 after:h-px after:bg-[#D4A853]/60"
+                    : "text-[#5C4530] hover:text-[#B8883A]"
+                )}
                 style={{ fontFamily: "var(--font-jost, 'Jost')" }}
               >
                 {link.label}
@@ -118,7 +166,7 @@ export default function Header() {
             </button>
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Mobile Overlay */}
       <AnimatePresence>
@@ -160,7 +208,10 @@ export default function Header() {
                     <Link
                       href={link.href}
                       onClick={() => setMenuOpen(false)}
-                      className="block py-4 border-b border-white/10 text-3xl text-white/80 hover:text-[#D4A853] transition-colors"
+                      className={cn(
+                        "block py-4 border-b border-white/10 text-3xl transition-colors",
+                        isActive(link.href) ? "text-[#D4A853]" : "text-white/80 hover:text-[#D4A853]"
+                      )}
                       style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 300 }}
                     >
                       {link.label}
@@ -168,17 +219,17 @@ export default function Header() {
                   </motion.div>
                 ))}
 
-                {/* Language Switcher */}
-                <div className="flex items-center gap-0 ml-4 text-xs tracking-widest font-light select-none">
+                {/* Language Switcher — завжди латиницею */}
+                <div className="flex items-center gap-0 ml-4 mt-3 text-xs tracking-widest font-light select-none">
                   {(['uk', 'ru', 'en'] as const).map((lang, i, arr) => (
                     <React.Fragment key={lang}>
                       <button
                         onClick={() => { setLanguage(lang); setMenuOpen(false); }}
-                        className={`px-1 py-0.5 transition-colors duration-200 ${
+                        className={`px-1.5 py-0.5 transition-colors duration-200 ${
                           language === lang ? 'text-[#C9A96E] font-semibold' : 'text-white/50 hover:text-white/80'
                         }`}
                       >
-                        {lang === 'uk' ? 'УКР' : lang === 'ru' ? 'РУС' : 'ENG'}
+                        {lang === 'uk' ? 'ua' : lang}
                       </button>
                       {i < arr.length - 1 && <span className="text-white/30">|</span>}
                     </React.Fragment>

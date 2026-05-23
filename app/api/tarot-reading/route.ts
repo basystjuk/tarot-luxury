@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 
-// Simple in-memory rate limiter: max 3 requests per IP per 24h
-const ipMap = new Map<string, { count: number; resetAt: number }>();
+export const maxDuration = 30;
+
+// Rate limit: 1 reading per IP per Kyiv calendar day
+const ipMap = new Map<string, { day: string }>();
+
+function getKyivDay(): string {
+  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
+}
 
 function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
+  const today = getKyivDay();
   const entry = ipMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipMap.set(ip, { count: 1, resetAt: now + 24 * 60 * 60 * 1000 });
+  if (!entry || entry.day !== today) {
+    ipMap.set(ip, { day: today });
     return true;
   }
-  if (entry.count >= 3) return false;
-  entry.count++;
-  return true;
+  return false;
 }
 
 export async function POST(req: NextRequest) {
@@ -22,25 +26,65 @@ export async function POST(req: NextRequest) {
 
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
-      { error: "rate_limit", message: "Ліміт 3 запити на добу вичерпано." },
+      { error: "rate_limit", message: "Ліміт 1 запит на добу вичерпано." },
       { status: 429 }
     );
   }
 
-  const { name, cardName, zodiac, language } = await req.json();
+  const { cardName, language, arcanaType, suitElement } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
   }
 
-  const langLabel = language === "ru" ? "русском" : language === "en" ? "English" : "українській";
+  // System: Rider-Waite expert, no Ellen Soul mention in output, strict language
+  const SYSTEM_PROMPT =
+    language === "en"
+      ? "You are an expert tarot reader with deep knowledge of Rider-Waite-Smith symbolism and classical Tarot interpretation. Your style is warm, feminine, poetic and intimate. Write exclusively in English — not a single word, hieroglyph or character from any other language or script."
+      : language === "ru"
+      ? "Ты — эксперт-таролог с глубоким знанием символизма колоды Райдера-Уайта и её классических трактовок. Стиль: тёплый, женственный, поэтичный, интимный. Пиши исключительно на русском языке — ни единого иероглифа, латинского слова или символа из другого алфавита, кроме названия карты."
+      : "Ти — експерт-таролог з глибоким знанням символізму колоди Райдера-Уайта та її класичних трактувань. Стиль: тепло, жіночно, поетично, інтимно. Пиши виключно українською мовою — жодного ієрогліфа, латинського слова або символу іншого алфавіту, крім назви карти.";
+
+  // Arcana + suit element context block
+  const isMajor = arcanaType === "major";
+  const arcanaBlockUk = isMajor
+    ? "Це карта Старших Арканів — архетипічна сила, велика тема життя, духовний урок або поворотний момент."
+    : `Це карта Молодших Арканів масті ${suitElement ?? ""} — повсякденна енергія, конкретна ситуація, сфера: ${suitElement === "Fire" ? "дія, воля, проєкти" : suitElement === "Water" ? "емоції, почуття, стосунки" : suitElement === "Air" ? "думки, рішення, комунікація" : "матерія, тіло, ресурси"}.`;
+  const arcanaBlockRu = isMajor
+    ? "Это карта Старших Арканов — архетипическая сила, большая тема жизни, духовный урок или поворотный момент."
+    : `Это карта Младших Арканов масти ${suitElement ?? ""} — повседневная энергия, конкретная ситуация, сфера: ${suitElement === "Fire" ? "действие, воля, проекты" : suitElement === "Water" ? "эмоции, чувства, отношения" : suitElement === "Air" ? "мысли, решения, коммуникация" : "материя, тело, ресурсы"}.`;
+  const arcanaBlockEn = isMajor
+    ? "This is a Major Arcana card — archetypal power, a great life theme, spiritual lesson or turning point."
+    : `This is a Minor Arcana card of the ${suitElement ?? ""} suit — everyday energy, concrete situation, sphere: ${suitElement === "Fire" ? "action, will, projects" : suitElement === "Water" ? "emotions, feelings, relationships" : suitElement === "Air" ? "thoughts, decisions, communication" : "matter, body, resources"}.`;
+
   const prompt =
     language === "en"
-      ? `You are a wise and mystical tarot reader. The person's name is ${name}, their zodiac sign is ${zodiac}. The drawn card is "${cardName}". Give a personal tarot reading in English. Structure: 1) Meaning (2-3 sentences, personal and specific to their sign), 2) Advice (1-2 sentences), 3) Affirmation (one powerful sentence starting with "I"). Be mystical, warm, and insightful. No headers, just flowing text separated by line breaks.`
+      ? `The drawn card is "${cardName}" (upright). ${arcanaBlockEn}
+
+Interpret it using the classical Rider-Waite-Smith symbolism — the imagery, colours and figures in the card. Write EXCLUSIVELY in English — absolutely no other language, script or hieroglyphs. Card name always in its original English: "${cardName}". Structure — three paragraphs separated by blank lines, no headers, no greetings:
+1) Meaning (2–3 sentences — the card's classical Rider-Waite energy, begin directly with the interpretation, do NOT start with "This card tells me" or "This card speaks" or similar preamble; honour the arcana type above)
+2) Advice (1–2 sentences maximum — a soulful, concrete nudge for today)
+3) Affirmation (ONE short, powerful sentence starting with the word "I", NO MORE THAN 15 WORDS, directly connected to this card's energy)
+
+Style: intimate, poetic, mystical.`
       : language === "ru"
-      ? `Ты — мудрая и мистическая таролог. Имя человека: ${name}, знак зодиака: ${zodiac}. Выпавшая карта: «${cardName}». Дай личное предсказание на русском языке. Структура: 1) Значение (2-3 предложения, личное и с учётом знака), 2) Совет (1-2 предложения), 3) Аффирмация (одно сильное предложение, начинающееся с «Я»). Будь мистической, тёплой и проницательной. Без заголовков, просто текст разделённый переносами.`
-      : `Ти — мудра і містична таролог. Ім'я людини: ${name}, знак зодіаку: ${zodiac}. Витягнута карта: «${cardName}». Дай особисте передбачення українською мовою. Структура: 1) Значення (2-3 речення, особисте з урахуванням знаку), 2) Порада (1-2 речення), 3) Аффірмація (одне сильне речення, що починається з «Я»). Будь містичною, теплою та проникливою. Без заголовків, просто текст розділений переносами.`;
+      ? `Выпавшая карта: «${cardName}» (прямое положение). ${arcanaBlockRu}
+
+Интерпретируй её, опираясь на классический символизм колоды Райдера-Уайта — образы, цвета и фигуры на карте. Пиши ИСКЛЮЧИТЕЛЬНО на русском языке — абсолютно никаких иероглифов, латиницы или других алфавитов, кроме названия карты. Название карты всегда в оригинале: «${cardName}». Структура — три абзаца, разделённых пустыми строками, без заголовков, без вступления:
+1) Значение (2–3 предложения — классическая энергия карты Райдера-Уайта; начинай СРАЗУ с трактовки, без «Эта карта говорит мне»; учитывай тип аркана выше)
+2) Совет (максимум 1–2 предложения — душевный конкретный совет на сегодня)
+3) Аффирмация (ОДНО короткое мощное предложение, начинается со слова «Я», НЕ БОЛЕЕ 15 СЛОВ, связано с энергией ${cardName})
+
+Стиль: интимный, поэтичный, мистический.`
+      : `Витягнута карта: «${cardName}» (пряме положення). ${arcanaBlockUk}
+
+Інтерпретуй її, спираючись на класичний символізм колоди Райдера-Уайта — образи, кольори та фігури на карті. Пиши ВИКЛЮЧНО українською мовою — абсолютно жодних ієрогліфів, латиниці або інших алфавітів, крім назви карти. Назву карти завжди в оригіналі: «${cardName}». Структура — три абзаци, розділені порожніми рядками, без заголовків, без вступу:
+1) Значення (2–3 речення — класична енергія карти Райдера-Уайта; починай ОДРАЗУ з трактовки, без «Ця карта говорить мені»; враховуй тип аркана вище)
+2) Порада (максимум 1–2 речення — душевна конкретна порада на сьогодні)
+3) Аффірмація (ОДНЕ коротке потужне речення, починається зі слова «Я», НЕ БІЛЬШЕ 15 СЛІВ, пов'язане з енергією ${cardName})
+
+Стиль: інтимний, поетичний, містичний.`;
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -51,8 +95,11 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 400,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 650,
         temperature: 0.85,
       }),
     });
@@ -66,7 +113,6 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content ?? "";
 
-    // Split into 3 parts: meaning, advice, affirmation
     const parts = text.split(/\n\n+/).filter((s: string) => s.trim());
     return NextResponse.json({
       meaning:     parts[0] ?? text,

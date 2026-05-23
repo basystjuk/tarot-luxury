@@ -15,7 +15,10 @@ export async function GET() {
       new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
     );
     const url = sorted[0]?.url ?? FALLBACK;
-    return NextResponse.json({ url }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { url },
+      { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
+    );
   } catch {
     return NextResponse.json({ url: FALLBACK });
   }

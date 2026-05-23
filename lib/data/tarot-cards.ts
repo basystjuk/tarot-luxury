@@ -106,12 +106,73 @@ export function getZodiacSign(day: number, month: number): string {
   return "Pisces";
 }
 
-export function pickCard(name: string, birthDay: number, birthMonth: number, birthYear: number): TarotCard {
+export function pickCard(): TarotCard {
   const now = new Date();
-  const nameScore  = name.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const birthScore = birthDay + birthMonth + (birthYear % 100);
-  const timeScore  = now.getFullYear() + (now.getMonth() + 1) + now.getDate()
-                   + now.getHours() + now.getMinutes() + now.getSeconds();
-  const idx = (nameScore + birthScore + timeScore) % 78;
+  const idx = (now.getFullYear() + (now.getMonth() + 1) + now.getDate()
+             + now.getMinutes() + now.getSeconds()) % 78;
   return TAROT_CARDS[idx];
+}
+
+// ── Localised card names ──────────────────────────────────────────────────────
+
+const MAJOR_NAMES: Record<number, { uk: string; ru: string }> = {
+  0:  { uk: "Блазень",          ru: "Шут" },
+  1:  { uk: "Маг",              ru: "Маг" },
+  2:  { uk: "Верховна Жриця",   ru: "Верховная Жрица" },
+  3:  { uk: "Імператриця",      ru: "Императрица" },
+  4:  { uk: "Імператор",        ru: "Император" },
+  5:  { uk: "Ієрофант",         ru: "Иерофант" },
+  6:  { uk: "Закохані",         ru: "Влюблённые" },
+  7:  { uk: "Колісниця",        ru: "Колесница" },
+  8:  { uk: "Сила",             ru: "Сила" },
+  9:  { uk: "Відлюдник",        ru: "Отшельник" },
+  10: { uk: "Колесо Фортуни",   ru: "Колесо Фортуны" },
+  11: { uk: "Справедливість",   ru: "Справедливость" },
+  12: { uk: "Повішений",        ru: "Повешенный" },
+  13: { uk: "Смерть",           ru: "Смерть" },
+  14: { uk: "Поміркованість",   ru: "Умеренность" },
+  15: { uk: "Диявол",           ru: "Дьявол" },
+  16: { uk: "Вежа",             ru: "Башня" },
+  17: { uk: "Зірка",            ru: "Звезда" },
+  18: { uk: "Місяць",           ru: "Луна" },
+  19: { uk: "Сонце",            ru: "Солнце" },
+  20: { uk: "Суд",              ru: "Суд" },
+  21: { uk: "Світ",             ru: "Мир" },
+};
+
+const RANK_NAMES: Record<string, { uk: string; ru: string }> = {
+  Ace:    { uk: "Туз",       ru: "Туз" },
+  Two:    { uk: "Двійка",    ru: "Двойка" },
+  Three:  { uk: "Трійка",    ru: "Тройка" },
+  Four:   { uk: "Четвірка",  ru: "Четвёрка" },
+  Five:   { uk: "П'ятірка",  ru: "Пятёрка" },
+  Six:    { uk: "Шістка",    ru: "Шестёрка" },
+  Seven:  { uk: "Сімка",     ru: "Семёрка" },
+  Eight:  { uk: "Вісімка",   ru: "Восьмёрка" },
+  Nine:   { uk: "Дев'ятка",  ru: "Девятка" },
+  Ten:    { uk: "Десятка",   ru: "Десятка" },
+  Page:   { uk: "Паж",       ru: "Паж" },
+  Knight: { uk: "Лицар",     ru: "Рыцарь" },
+  Queen:  { uk: "Королева",  ru: "Королева" },
+  King:   { uk: "Король",    ru: "Король" },
+};
+
+const SUIT_NAMES: Record<string, { uk: string; ru: string }> = {
+  Wands:     { uk: "Жезлів",     ru: "Жезлов" },
+  Cups:      { uk: "Кубків",     ru: "Кубков" },
+  Swords:    { uk: "Мечів",      ru: "Мечей" },
+  Pentacles: { uk: "Пентаклів",  ru: "Пентаклей" },
+};
+
+export function getCardName(card: TarotCard, lang: string): string {
+  if (lang === "en") return card.nameEn;
+  if (card.suit === "major") {
+    const n = MAJOR_NAMES[card.index];
+    return n ? (lang === "ru" ? n.ru : n.uk) : card.nameEn;
+  }
+  const [rank, suit] = card.nameEn.split(" of ");
+  const r = RANK_NAMES[rank];
+  const s = SUIT_NAMES[suit];
+  if (!r || !s) return card.nameEn;
+  return lang === "ru" ? `${r.ru} ${s.ru}` : `${r.uk} ${s.uk}`;
 }

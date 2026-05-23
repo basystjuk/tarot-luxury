@@ -34,7 +34,7 @@ export default function Footer() {
   const isEn = language === 'en';
 
   return (
-    <footer className="bg-[#1C1512] text-white/70">
+    <footer className="bg-[#1C1512] text-white/90">
       <div className="h-px bg-gradient-to-r from-transparent via-[#C4A97A] to-transparent" />
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-10">
@@ -54,7 +54,7 @@ export default function Footer() {
               таро · психологія
             </span>
           </div>
-          <p className="text-sm leading-relaxed text-white/50 mb-8 max-w-xs">
+          <p className="text-sm leading-relaxed text-white/75 mb-8 max-w-xs">
             {isRu
               ? "Помогаю найти ответы через язык карт и глубинную психологию."
               : isEn
@@ -68,7 +68,7 @@ export default function Footer() {
               href="https://instagram.com/ellen_soul_taro"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
+              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/70 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
               aria-label="Instagram"
             >
               <InstagramIcon />
@@ -77,7 +77,7 @@ export default function Footer() {
               href="https://www.tiktok.com/@ellen_soul_taro"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
+              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/70 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
               aria-label="TikTok"
             >
               <TikTokIcon />
@@ -86,7 +86,7 @@ export default function Footer() {
               href="https://t.me/ellen_soul_taro"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
+              className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/70 hover:text-[#D4A853] hover:border-[#D4A853] transition-all duration-300"
               aria-label="Telegram"
             >
               <TelegramIcon />
@@ -96,7 +96,7 @@ export default function Footer() {
 
         <div className="h-px bg-white/8 mb-8" />
 
-        <div className="flex flex-col items-center gap-3 text-xs text-white/30 text-center">
+        <div className="flex flex-col items-center gap-3 text-xs text-white/60 text-center">
           <p>© {new Date().getFullYear()} Ellen Soul. Усі права захищено.</p>
           <p>Made with 💙💛 Ukraine</p>
         </div>

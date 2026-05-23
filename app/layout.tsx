@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -7,6 +8,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import BookingModal from '@/components/ui/BookingModal';
 import QuickContactModal from '@/components/ui/QuickContactModal';
+import { Analytics } from "@vercel/analytics/next";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin", "cyrillic"],
@@ -24,6 +26,9 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
+  verification: {
+    google: "uOeNH2M5FM74fR_GB7chXlyrt8WdR6RA_fJFnq6l0qM",
+  },
   title: {
     default: "Ellen Soul — Таролог онлайн | Розклади таро на відносини",
     template: "%s | Ellen Soul",
@@ -82,6 +87,14 @@ export default function RootLayout({
       lang="uk"
       className={`${cormorant.variable} ${jost.variable} h-full antialiased`}
     >
+      <head>
+        {/* dns-prefetch only: GTM/GA are deferred (strategy=lazyOnload), full
+            preconnect would waste connection budget for the LCP critical path.
+            next/font handles font preconnects automatically; Blob is fetched
+            server-side via the Next.js image optimiser (same-origin to browser). */}
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+      </head>
       <body className="min-h-full flex flex-col bg-[#FDFBF7] text-[#1C1512]">
         <LanguageProvider>
           <ModalProvider>
@@ -92,6 +105,14 @@ export default function RootLayout({
             <QuickContactModal />
           </ModalProvider>
         </LanguageProvider>
+        <Analytics />
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-CMP800PXJZ" strategy="lazyOnload" />
+        <Script id="google-analytics" strategy="lazyOnload">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-CMP800PXJZ');
+        `}</Script>
       </body>
     </html>
   );
