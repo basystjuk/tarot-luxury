@@ -12,6 +12,12 @@ import {
   type ServiceItem,
   type OrgItem,
 } from "@/lib/data/services";
+import {
+  ALL_TOOL_IDS,
+  DEFAULT_TOOLS_ENABLED,
+  TOOL_LABELS,
+  type ToolId,
+} from "@/lib/tools-config";
 
 const ADMIN_PASSWORD = "ellensoul2025";
 const STORAGE_KEY = "ellen_admin_testimonials";
@@ -321,7 +327,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access">("testimonials");
 
   // Gallery state
   interface GalleryItem { url: string; pathname: string; position?: "top" | "center" | "bottom"; }
@@ -441,6 +447,16 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [studioTools, setStudioTools] = useState<StudioTool[]>(DEFAULT_STUDIO_TOOLS);
   const studioRef = useRef<StudioTool[]>(DEFAULT_STUDIO_TOOLS);
 
+  // ── Tools enable/disable + Preview mode ────────────────────────────────
+  // toolsEnabled maps each tool slug to a boolean. Saved into the same
+  // site-content.json blob via /api/admin/content. Preview mode is a
+  // per-browser cookie set via /api/admin/preview.
+  const [toolsEnabled, setToolsEnabled] = useState<Record<ToolId, boolean>>(DEFAULT_TOOLS_ENABLED);
+  const toolsEnabledRef = useRef<Record<ToolId, boolean>>(DEFAULT_TOOLS_ENABLED);
+  const [previewOn, setPreviewOn] = useState(false);
+  const [previewSaving, setPreviewSaving] = useState(false);
+  const [accessSaved, setAccessSaved] = useState(false);
+
   // Global save indicator
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // Refs to always have latest values for publishContent
@@ -522,6 +538,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           aboutRef.current = a;
         }
         if (d.studio_tools?.length) { setStudioTools(d.studio_tools); studioRef.current = d.studio_tools; }
+        if (d.tools_enabled) {
+          const merged = { ...DEFAULT_TOOLS_ENABLED, ...d.tools_enabled } as Record<ToolId, boolean>;
+          setToolsEnabled(merged);
+          toolsEnabledRef.current = merged;
+        }
+        setPreviewOn(Boolean(d.preview));
       })
       .catch(() => {});
     fetch("/api/photo")
@@ -564,6 +586,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           home: homeRef.current,
           about: aboutRef.current,
           studio_tools: studioRef.current,
+          tools_enabled: toolsEnabledRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -613,6 +636,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           home: homeRef.current,
           about: aboutRef.current,
           studio_tools: studioRef.current,
+          tools_enabled: toolsEnabledRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -763,7 +787,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio"] as const).map((tab) => (
+          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -782,7 +806,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : tab === "contacts" ? "📞 Контакти"
                 : tab === "home" ? "🏠 Головна"
                 : tab === "about" ? "👤 Про мене"
-                : "🔮 Студія"}
+                : tab === "studio" ? "🔮 Студія"
+                : "🎛 Доступ"}
             </button>
           ))}
         </div>
@@ -1627,6 +1652,108 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
             >
               <Save size={14} /> Зберегти всі зміни
+            </button>
+          </div>
+        )}
+
+        {/* ── Access Tab — toggle tools + preview mode ────────────────── */}
+        {activeTab === "access" && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Доступ до інструментів</h2>
+              <p className="text-white/40 text-sm">
+                Вимкнені інструменти зникають з Soul Studio, з головної та показують «Скоро» за прямим URL.
+                У режимі прев&apos;ю ти бачиш їх усі та можеш необмежено генерувати AI-розклади.
+              </p>
+            </div>
+
+            {/* Preview mode */}
+            <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-5 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-white/90 text-sm font-medium mb-1">Режим прев&apos;ю</p>
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    Зберігається у cookie цього браузера на 90 днів. Працює з будь-якої мережі.
+                    Знімає денні ліміти на AI у твоєму браузері — публіка не бачить.
+                  </p>
+                </div>
+                <button
+                  disabled={previewSaving}
+                  onClick={async () => {
+                    setPreviewSaving(true);
+                    try {
+                      const res = await fetch("/api/admin/preview", {
+                        method: "POST",
+                        headers: { "x-admin-password": ADMIN_PASSWORD, "Content-Type": "application/json" },
+                        body: JSON.stringify({ enabled: !previewOn }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setPreviewOn(Boolean(data.preview));
+                      }
+                    } finally {
+                      setPreviewSaving(false);
+                    }
+                  }}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                    previewOn
+                      ? "bg-[#3A7A4E] hover:bg-[#2F6240] text-white"
+                      : "bg-white/10 hover:bg-white/20 text-white/70"
+                  }`}
+                >
+                  {previewSaving ? "..." : previewOn ? "Прев'ю УВІМКНЕНО" : "Увімкнути прев'ю"}
+                </button>
+              </div>
+            </div>
+
+            {/* Tool toggles */}
+            <div className="space-y-3">
+              <p className="text-white/60 text-xs uppercase tracking-widest">Інструменти Soul Studio</p>
+              {ALL_TOOL_IDS.map((id) => {
+                const labels = TOOL_LABELS[id];
+                const enabled = toolsEnabled[id] ?? DEFAULT_TOOLS_ENABLED[id];
+                return (
+                  <div
+                    key={id}
+                    className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-4 flex items-center justify-between gap-4"
+                  >
+                    <div>
+                      <p className="text-white/90 text-sm font-medium">{labels.uk}</p>
+                      <p className="text-white/40 text-xs">
+                        /studio/{id} · {labels.ru} · {labels.en}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const next = { ...toolsEnabledRef.current, [id]: !enabled };
+                        toolsEnabledRef.current = next;
+                        setToolsEnabled(next);
+                      }}
+                      className={`relative w-12 h-7 rounded-full transition-colors ${
+                        enabled ? "bg-[#3A7A4E]" : "bg-white/15"
+                      }`}
+                      aria-label={`Toggle ${id}`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
+                          enabled ? "translate-x-5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={async () => {
+                await saveAllContent();
+                setAccessSaved(true);
+                setTimeout(() => setAccessSaved(false), 2000);
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+            >
+              <Save size={14} /> {accessSaved ? "Збережено ✓" : "Зберегти налаштування"}
             </button>
           </div>
         )}

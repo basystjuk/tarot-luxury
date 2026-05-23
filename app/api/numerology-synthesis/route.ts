@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
+import { isPreviewFromRequest } from "@/lib/preview";
 
 export const maxDuration = 30;
 
@@ -206,7 +207,8 @@ export async function POST(req: NextRequest) {
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
 
-  if (!checkRateLimit(ip)) {
+  // Preview-cookie bypass: lets the owner iterate without burning quota.
+  if (!isPreviewFromRequest(req) && !checkRateLimit(ip)) {
     return NextResponse.json(
       { error: "rate_limit", message: "Ліміт 1 синтез на добу вичерпано. Повертайтесь завтра 🌙" },
       { status: 429 }

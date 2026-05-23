@@ -1,35 +1,48 @@
-import { list, head } from "@vercel/blob";
-import { NextResponse } from "next/server";
+import { list } from "@vercel/blob";
+import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_SERVICES, DEFAULT_ORG } from "@/lib/data/services";
 import { testimonials as DEFAULT_TESTIMONIALS } from "@/lib/data/testimonials";
+import { DEFAULT_TOOLS_ENABLED } from "@/lib/tools-config";
+import { isPreviewFromRequest } from "@/lib/preview";
 
 const CONTENT_BLOB = "site-content.json";
+// Short edge cache so admin tool-toggles propagate within ~60s.
+// Preview-mode callers always bypass cache (per-request cookie).
+const PUBLIC_CACHE = "public, s-maxage=60, stale-while-revalidate=300";
+const PREVIEW_CACHE = "private, no-store";
 
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const preview = isPreviewFromRequest(req);
+  const cacheHeader = preview ? PREVIEW_CACHE : PUBLIC_CACHE;
+  const respond = (payload: Record<string, unknown>) =>
+    NextResponse.json({ ...payload, preview }, { headers: { "Cache-Control": cacheHeader } });
+
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(defaults(), { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
+    return respond(defaults());
   }
 
   try {
     const { blobs } = await list({ prefix: CONTENT_BLOB });
     const blob = blobs[0];
-    if (!blob) {
-      return NextResponse.json(defaults(), { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
-    }
+    if (!blob) return respond(defaults());
     const res = await fetch(blob.url, { cache: "no-store" });
     const data = await res.json();
-    return NextResponse.json(
-      { ...defaults(), ...data },
-      { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
-    );
+    // Merge tools_enabled so newly added tool IDs always have a default.
+    const merged = {
+      ...defaults(),
+      ...data,
+      tools_enabled: { ...DEFAULT_TOOLS_ENABLED, ...(data?.tools_enabled ?? {}) },
+    };
+    return respond(merged);
   } catch {
-    return NextResponse.json(defaults(), { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
+    return respond(defaults());
   }
 }
 
 function defaults() {
   return {
+    tools_enabled: DEFAULT_TOOLS_ENABLED,
     services: DEFAULT_SERVICES,
     org: DEFAULT_ORG,
     testimonials: DEFAULT_TESTIMONIALS,

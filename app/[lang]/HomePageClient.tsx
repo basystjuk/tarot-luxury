@@ -9,6 +9,7 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useLanguage } from '@/hooks/useLanguage';
+import { isToolEnabled, type ToolId } from "@/lib/tools-config";
 
 export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
   const { language } = useLanguage();
@@ -19,11 +20,17 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
     story_text_uk: string; story_text_ru: string; story_text_en: string;
     quote_uk: string; quote_ru: string; quote_en: string;
   } | null>(null);
+  const [toolsEnabled, setToolsEnabled] = React.useState<Partial<Record<ToolId, boolean>> | null>(null);
+  const [previewMode, setPreviewMode] = React.useState(false);
 
   React.useEffect(() => {
     fetch("/api/content")
       .then(r => r.json())
-      .then(d => { if (d.about) setApiAbout(d.about); })
+      .then(d => {
+        if (d.about) setApiAbout(d.about);
+        if (d.tools_enabled) setToolsEnabled(d.tools_enabled);
+        setPreviewMode(Boolean(d.preview));
+      })
       .catch(() => {});
   }, []);
 
@@ -316,7 +323,12 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
           {/* Mobile: horizontal scroll carousel / Desktop: 4-column grid */}
           <div className="-mx-6 lg:mx-0">
             <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory px-6 pb-4 lg:grid lg:grid-cols-4 lg:gap-6 lg:overflow-visible lg:pb-0" style={{ scrollbarWidth: "none" }}>
-              {studioTools.map((tool, i) => (
+              {studioTools
+                .filter((tool) => {
+                  const id = tool.href.split('/').pop() as ToolId;
+                  return previewMode || isToolEnabled(id, toolsEnabled);
+                })
+                .map((tool, i) => (
                 <AnimatedSection key={tool.href} delay={i * 0.1} className="snap-start flex-shrink-0 w-[78vw] sm:w-[56vw] lg:w-auto">
                   <Link href={tool.href} className="group block h-full">
                     <div className="h-full flex flex-col p-7 rounded-2xl border border-[rgba(196,169,122,0.2)] bg-white/60 hover:bg-white/90 hover:border-[rgba(196,169,122,0.4)] transition-all duration-300 shadow-sm">
