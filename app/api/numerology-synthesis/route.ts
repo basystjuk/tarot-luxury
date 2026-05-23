@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
+import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
+import { loadPromptOverrides } from "@/lib/server-content";
 
 export const maxDuration = 30;
 
@@ -59,20 +61,19 @@ interface SynthesisRequest {
   masterPhase?: { masterNumber: 11 | 22 | 33; baseNumber: 2 | 4 | 6; activationAge: number; currentlyActive: boolean } | null;
 }
 
-const SYSTEM: Record<string, string> = {
-  uk: "Ти — нумеролог. Пишеш персональні нумерологічні портрети. Стиль: тепло, проникливо, конкретно. Шукай протиріччя та гармонії між числами. Звертайся напряму на 'ти'. Без загальних фраз. Без рекомендацій звертатись до спеціалістів. ВАЖЛИВО: відповідь має дві секції, розділені рядком ---. Перша секція (intro): рівно 2 короткі речення у форматі: \"{Ім'я}, ти прийшла/прийшов у цей світ як [архетип]. Сьогодні актуально: [3 ключові тези через кому].\" Друга секція (portrait): 6-8 речень живого нумерологічного портрета. Пиши виключно українською мовою — жодних ієрогліфів, латиниці або символів інших алфавітів.",
-  ru: "Ты — нумеролог. Пишешь персональные нумерологические портреты. Стиль: тепло, проницательно, конкретно. Ищи противоречия и гармонии между числами. Обращайся напрямую на 'ты'. Без общих фраз. Без рекомендаций. ВАЖНО: ответ имеет две секции, разделённые строкой ---. Первая секция (intro): ровно 2 коротких предложения в формате: \"{Имя}, ты пришла/пришёл в этот мир как [архетип]. Сегодня актуально: [3 ключевые тезиса через запятую].\" Вторая секция (portrait): 6-8 предложений живого нумерологического портрета. Пиши исключительно на русском языке — никаких иероглифов, латиницы или символов других алфавитов.",
-  en: "You are a numerologist. Write personalised numerological portraits. Style: warm, insightful, specific. Look for tensions and harmonies between the numbers. Address the person directly as 'you'. No generic phrases. No advice to seek professional help. IMPORTANT: your response has two sections separated by the line ---. First section (intro): exactly 2 short sentences in the format: \"{Name}, you came into this world as [archetype]. Today is the time for: [3 key themes, comma-separated].\" Second section (portrait): 6-8 sentences of a living numerological portrait. Write exclusively in English — no hieroglyphs, no characters from other scripts or alphabets.",
-};
-
 // ── Active-cycle pickers — find which pinnacle/challenge is active for current age
 function activeCycle<T extends { startAge: number; endAge: number | null }>(arr: T[] | undefined, age: number): T | null {
   if (!arr) return null;
   return arr.find(c => age >= c.startAge && (c.endAge === null || age <= c.endAge)) ?? null;
 }
 
-function buildPrompt(d: SynthesisRequest): string {
-  const { language: l, name, birthYear, age } = d;
+/**
+ * Build the {{numbersBlock}} and {{extrasBlock}} variables passed into the
+ * editable template. These strings are already localized — admin only edits
+ * the surrounding instructions, never the data shape.
+ */
+function buildPromptVars(d: SynthesisRequest): { numbersBlock: string; extrasBlock: string } {
+  const { language: l, age } = d;
   const karmicArr = d.karmicLessons;
 
   const karmic = karmicArr.length > 0
@@ -114,15 +115,13 @@ function buildPrompt(d: SynthesisRequest): string {
     const state = l === "ru" ? stateRu : l === "en" ? stateEn : stateUk;
     ext.push(`- ${lbl} ${mp.masterNumber}/${mp.baseNumber} — ${state}`);
   }
-  const extBlock = ext.length > 0
+  const extrasBlock = ext.length > 0
     ? (l === "ru" ? "\n\nДополнительные числа:\n" : l === "en" ? "\n\nAdditional numbers:\n" : "\n\nДодаткові числа:\n") + ext.join("\n")
     : "";
 
-  if (l === "ru") {
-    return `Проанализируй нумерологический портрет человека по имени ${name} (год рождения: ${birthYear}, возраст: ${age} лет).
-
-Числа:
-- Жизненный путь: ${d.lifePath} (${d.lifePathKeyword})
+  // Build the {{numbersBlock}} (already localized) for the editable template.
+  const numbersBlock = l === "ru"
+    ? `- Жизненный путь: ${d.lifePath} (${d.lifePathKeyword})
 - Судьба: ${d.destiny} (${d.destinyKeyword})
 - Число Души: ${d.soul} (${d.soulKeyword})
 - Личность: ${d.personality} (${d.personalityKeyword})
@@ -131,19 +130,9 @@ function buildPrompt(d: SynthesisRequest): string {
 - Число Зрелости: ${d.maturity} (${d.maturityKeyword}) — раскрывается после 35
 - Число Баланса: ${d.balance} (${d.balanceKeyword}) — стратегия в кризисе
 - Кармические уроки: ${karmic}
-- Дар Стихии (Hidden Passion): ${d.hiddenPassion} (${d.hiddenPassionKeyword}) — самая частая цифра в имени, врождённый талант${extBlock}
-
-Структура ответа (СТРОГО):
-intro: 2 предложения в формате "${name}, ты пришла/пришёл в этот мир как [архетип]. Сегодня актуально: [3 тезиса через запятую]."
----
-portrait: 6-8 предложений живого портрета. Учитывай возраст (${age}), активную Вершину и Вызов, мастер-числа. Обращайся на 'ты'. Пиши исключительно на русском — никаких иероглифов или других алфавитов.`;
-  }
-
-  if (l === "en") {
-    return `Analyse the numerological portrait of ${name} (birth year: ${birthYear}, age: ${age}).
-
-Numbers:
-- Life Path: ${d.lifePath} (${d.lifePathKeyword})
+- Дар Стихии (Hidden Passion): ${d.hiddenPassion} (${d.hiddenPassionKeyword}) — самая частая цифра в имени, врождённый талант`
+    : l === "en"
+    ? `- Life Path: ${d.lifePath} (${d.lifePathKeyword})
 - Destiny: ${d.destiny} (${d.destinyKeyword})
 - Soul: ${d.soul} (${d.soulKeyword})
 - Personality: ${d.personality} (${d.personalityKeyword})
@@ -152,18 +141,8 @@ Numbers:
 - Maturity Number: ${d.maturity} (${d.maturityKeyword}) — awakens after 35
 - Balance Number: ${d.balance} (${d.balanceKeyword}) — stress strategy
 - Karmic Lessons: ${karmic}
-- Gift of the Element (Hidden Passion): ${d.hiddenPassion} (${d.hiddenPassionKeyword}) — most frequent digit in the name, innate talent${extBlock}
-
-Response structure (STRICT):
-intro: 2 sentences in the format "${name}, you came into this world as [archetype]. Today is the time for: [3 themes, comma-separated]."
----
-portrait: 6-8 sentences of a living portrait. Honour the age (${age}), the active Pinnacle and Challenge, master numbers. Address as 'you'. Write exclusively in English — no hieroglyphs or other scripts.`;
-  }
-
-  return `Проаналізуй нумерологічний портрет людини на ім'я ${name} (рік народження: ${birthYear}, вік: ${age} років).
-
-Числа:
-- Шлях: ${d.lifePath} (${d.lifePathKeyword})
+- Gift of the Element (Hidden Passion): ${d.hiddenPassion} (${d.hiddenPassionKeyword}) — most frequent digit in the name, innate talent`
+    : `- Шлях: ${d.lifePath} (${d.lifePathKeyword})
 - Доля: ${d.destiny} (${d.destinyKeyword})
 - Душа: ${d.soul} (${d.soulKeyword})
 - Особистість: ${d.personality} (${d.personalityKeyword})
@@ -172,12 +151,9 @@ portrait: 6-8 sentences of a living portrait. Honour the age (${age}), the activ
 - Число Зрілості: ${d.maturity} (${d.maturityKeyword}) — розкривається після 35
 - Число Балансу: ${d.balance} (${d.balanceKeyword}) — стратегія у кризі
 - Карматичні уроки: ${karmic}
-- Дар Стихії (Hidden Passion): ${d.hiddenPassion} (${d.hiddenPassionKeyword}) — найчастіша цифра в імені, вроджений талант${extBlock}
+- Дар Стихії (Hidden Passion): ${d.hiddenPassion} (${d.hiddenPassionKeyword}) — найчастіша цифра в імені, вроджений талант`;
 
-Структура відповіді (СТРОГО):
-intro: 2 речення у форматі "${name}, ти прийшла/прийшов у цей світ як [архетип]. Сьогодні актуально: [3 тези через кому]."
----
-portrait: 6-8 речень живого портрета. Враховуй вік (${age}), активну Вершину та Виклик, майстер-числа. Звертайся на 'ти'. Пиши виключно українською — жодних ієрогліфів або символів інших алфавітів.`;
+  return { numbersBlock, extrasBlock };
 }
 
 // ── Split AI response into intro + portrait sections ───────────────────────
@@ -218,6 +194,18 @@ export async function POST(req: NextRequest) {
   try {
     const data = (await req.json()) as SynthesisRequest;
 
+    const { numbersBlock, extrasBlock } = buildPromptVars(data);
+    const overrides = (await loadPromptOverrides()) as PromptOverrides | null;
+    const tpl = resolvePrompt("numerology-synthesis", overrides);
+    const vars = {
+      language_name: getLanguageName(data.language),
+      name: data.name,
+      birthYear: data.birthYear,
+      age: data.age,
+      numbersBlock,
+      extrasBlock,
+    };
+
     const res = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
@@ -227,8 +215,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: SYSTEM[data.language] ?? SYSTEM.uk },
-          { role: "user",   content: buildPrompt(data) },
+          { role: "system", content: renderTemplate(tpl.system, vars) },
+          { role: "user",   content: renderTemplate(tpl.user, vars) },
         ],
         max_tokens: 1200,
         temperature: 0.8,

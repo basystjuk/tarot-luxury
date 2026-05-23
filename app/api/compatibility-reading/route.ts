@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
+import { loadPromptOverrides } from "@/lib/server-content";
 
 export const maxDuration = 30;
 
@@ -38,13 +40,11 @@ interface CompatibilityRequest {
   loShuPair?: string;
 }
 
-const SYSTEM: Record<string, string> = {
-  uk: "Ти — астролог і нумеролог високого класу. Аналізуєш сумісність двох людей у комплексі: західна астрологія (синастрія, композит), піфагорійська нумерологія, китайська Ло Шу, аспекти душ. Стиль: конкретно, проникливо, без кліше. Адаптуй глибину та тон до типу зв'язку. Пиши виключно українською мовою — жодних ієрогліфів, латиниці або символів інших алфавітів.",
-  ru: "Ты — астролог и нумеролог высокого класса. Анализируешь совместимость двух людей в комплексе: западная астрология (синастрия, композит), пифагорейская нумерология, китайская Ло Шу, аспекты душ. Стиль: конкретно, проницательно, без клише. Адаптируй глубину и тон к типу связи. Пиши исключительно на русском языке — никаких иероглифов, латиницы или символов других алфавитов.",
-  en: "You are a high-level astrologer and numerologist. You analyse the compatibility of two people holistically: western astrology (synastry, composite), Pythagorean numerology, Chinese Lo Shu square, soul aspects. Style: specific, insightful, no clichés. Adapt depth and tone to the type of connection. Write exclusively in English — no hieroglyphs, no characters from other scripts or alphabets.",
-};
-
-function buildPrompt(d: CompatibilityRequest): string {
+/**
+ * Build localized `dataBlock` + `relDirective` for the editable template.
+ * Admin tweaks the surrounding instructions; the data structure stays here.
+ */
+function buildPromptVars(d: CompatibilityRequest): { dataBlock: string; relDirective: string } {
   const { language: l } = d;
   const relTypeRu = d.relType === "romantic" ? "романтическая пара" : d.relType === "business" ? "деловые партнёры" : "друзья";
   const relTypeUk = d.relType === "romantic" ? "романтична пара" : d.relType === "business" ? "ділові партнери" : "друзі";
@@ -107,10 +107,8 @@ function buildPrompt(d: CompatibilityRequest): string {
     ? "MUST name which of them is the leader and which is the executor — based on modalities (Cardinal = initiative, Fixed = stability/execution, Mutable = adaptation/coordination)."
     : "Emphasise what unites them at the level of values and how they enrich each other.";
 
-  if (l === "ru") {
-    return `Проанализируй совместимость двух людей.
-
-${d.name1} (д.р. ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Жизненный путь ${d.lifePath1} (${d.lpKeyword1}), Душа ${d.soul1} (${d.soulKeyword1})
+  const dataBlock = l === "ru"
+    ? `${d.name1} (д.р. ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Жизненный путь ${d.lifePath1} (${d.lpKeyword1}), Душа ${d.soul1} (${d.soulKeyword1})
 ${d.name2} (д.р. ${d.birthDate2}): ${d.sign2} (${d.element2}, ${d.modality2}), Жизненный путь ${d.lifePath2} (${d.lpKeyword2}), Душа ${d.soul2} (${d.soulKeyword2})
 
 ${destCompareRu}${moonBlockRu}${venusBlockRu}${marsBlockRu}${compositeBlockRu}${soulMateBlockRu}${karmicBlockRu}${loShuBlockRu}
@@ -118,17 +116,9 @@ ${destCompareRu}${moonBlockRu}${venusBlockRu}${marsBlockRu}${compositeBlockRu}${
 Астрологический аспект Солнц: ${d.zodiacAspect} (оценка ${d.zodiacScore}/5)
 Взаимодействие стихий: ${d.elemInteraction}
 Модальности: ${d.modalityInteraction}
-Тип связи: ${relTypeRu}
-
-${relDirectiveRu}
-
-Напиши анализ совместимости (6–7 предложений). Покажи как их стихии, модальности, числа и (если есть) Луны/Венеры/Марсы взаимодействуют. Что усиливает притяжение, что создаёт напряжение, в чём сила как пары. Обращайся к ним напрямую. Дай единый портрет — не перечисляй данные. Пиши исключительно на русском языке — никаких иероглифов или других алфавитов.`;
-  }
-
-  if (l === "en") {
-    return `Analyse the compatibility of two people.
-
-${d.name1} (born ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Life Path ${d.lifePath1} (${d.lpKeyword1}), Soul ${d.soul1} (${d.soulKeyword1})
+Тип связи: ${relTypeRu}`
+    : l === "en"
+    ? `${d.name1} (born ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Life Path ${d.lifePath1} (${d.lpKeyword1}), Soul ${d.soul1} (${d.soulKeyword1})
 ${d.name2} (born ${d.birthDate2}): ${d.sign2} (${d.element2}, ${d.modality2}), Life Path ${d.lifePath2} (${d.lpKeyword2}), Soul ${d.soul2} (${d.soulKeyword2})
 
 ${destCompareEn}${moonBlockEn}${venusBlockEn}${marsBlockEn}${compositeBlockEn}${soulMateBlockEn}${karmicBlockEn}${loShuBlockEn}
@@ -136,16 +126,8 @@ ${destCompareEn}${moonBlockEn}${venusBlockEn}${marsBlockEn}${compositeBlockEn}${
 Sun aspect: ${d.zodiacAspect} (score ${d.zodiacScore}/5)
 Elemental interaction: ${d.elemInteraction}
 Modalities: ${d.modalityInteraction}
-Type of connection: ${relTypeEn}
-
-${relDirectiveEn}
-
-Write a compatibility analysis (6–7 sentences). Show how their elements, modalities, numbers and (if present) Moons/Venuses/Marses interact. What strengthens the attraction, what creates tension, what is their strength as a pair. Address them directly. Give a unified portrait — do not list data. Write exclusively in English — no hieroglyphs or other scripts.`;
-  }
-
-  return `Проаналізуй сумісність двох людей.
-
-${d.name1} (н.д. ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Шлях ${d.lifePath1} (${d.lpKeyword1}), Душа ${d.soul1} (${d.soulKeyword1})
+Type of connection: ${relTypeEn}`
+    : `${d.name1} (н.д. ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Шлях ${d.lifePath1} (${d.lpKeyword1}), Душа ${d.soul1} (${d.soulKeyword1})
 ${d.name2} (н.д. ${d.birthDate2}): ${d.sign2} (${d.element2}, ${d.modality2}), Шлях ${d.lifePath2} (${d.lpKeyword2}), Душа ${d.soul2} (${d.soulKeyword2})
 
 ${destCompareUk}${moonBlockUk}${venusBlockUk}${marsBlockUk}${compositeBlockUk}${soulMateBlockUk}${karmicBlockUk}${loShuBlockUk}
@@ -153,16 +135,27 @@ ${destCompareUk}${moonBlockUk}${venusBlockUk}${marsBlockUk}${compositeBlockUk}${
 Астрологічний аспект Сонць: ${d.zodiacAspect} (оцінка ${d.zodiacScore}/5)
 Взаємодія стихій: ${d.elemInteraction}
 Модальності: ${d.modalityInteraction}
-Тип зв'язку: ${relTypeUk}
+Тип зв'язку: ${relTypeUk}`;
 
-${relDirectiveUk}
-
-Напиши аналіз сумісності (6–7 речень). Покажи як їхні стихії, модальності, числа та (якщо є) Місяці/Венери/Марси взаємодіють між собою. Що підсилює притяжіння, що створює напругу, в чому сила як пари. Звертайся до них напряму. Дай єдиний портрет — не перераховуй дані. Пиши виключно українською мовою — жодних ієрогліфів або інших алфавітів.`;
+  const relDirective = l === "ru" ? relDirectiveRu : l === "en" ? relDirectiveEn : relDirectiveUk;
+  return { dataBlock, relDirective };
 }
 
 export async function POST(req: NextRequest) {
   try {
     const data = (await req.json()) as CompatibilityRequest;
+
+    const { dataBlock, relDirective } = buildPromptVars(data);
+    const overrides = (await loadPromptOverrides()) as PromptOverrides | null;
+    const tpl = resolvePrompt("compatibility-reading", overrides);
+    const vars = {
+      language_name: getLanguageName(data.language),
+      name1: data.name1,
+      name2: data.name2,
+      relType: data.relType,
+      dataBlock,
+      relDirective,
+    };
 
     const res = await fetch(GROQ_URL, {
       method: "POST",
@@ -173,8 +166,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: SYSTEM[data.language] ?? SYSTEM.uk },
-          { role: "user",   content: buildPrompt(data) },
+          { role: "system", content: renderTemplate(tpl.system, vars) },
+          { role: "user",   content: renderTemplate(tpl.user, vars) },
         ],
         max_tokens: 800,
         temperature: 0.85,

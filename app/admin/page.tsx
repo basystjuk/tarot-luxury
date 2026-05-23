@@ -18,6 +18,13 @@ import {
   TOOL_LABELS,
   type ToolId,
 } from "@/lib/tools-config";
+import {
+  ALL_PROMPT_TOOL_IDS,
+  DEFAULT_PROMPTS,
+  validatePromptOverride,
+  type PromptToolId,
+  type PromptOverrides,
+} from "@/lib/ai-prompts";
 
 const ADMIN_PASSWORD = "ellensoul2025";
 const STORAGE_KEY = "ellen_admin_testimonials";
@@ -327,7 +334,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "prompts">("testimonials");
 
   // Gallery state
   interface GalleryItem { url: string; pathname: string; position?: "top" | "center" | "bottom"; }
@@ -457,6 +464,15 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [previewSaving, setPreviewSaving] = useState(false);
   const [accessSaved, setAccessSaved] = useState(false);
 
+  // ── AI prompt overrides (per-tool system+user editing) ─────────────────
+  // Stored in the same site-content.json blob under `ai_prompts`. Empty
+  // strings mean "use default". Refs mirror state so saveAllContent reads
+  // freshest values.
+  const [aiPrompts, setAiPrompts] = useState<PromptOverrides>({});
+  const aiPromptsRef = useRef<PromptOverrides>({});
+  const [activePromptTool, setActivePromptTool] = useState<PromptToolId>(ALL_PROMPT_TOOL_IDS[0]);
+  const [promptsSaved, setPromptsSaved] = useState(false);
+
   // Global save indicator
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
   // Refs to always have latest values for publishContent
@@ -543,6 +559,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           setToolsEnabled(merged);
           toolsEnabledRef.current = merged;
         }
+        if (d.ai_prompts && typeof d.ai_prompts === "object") {
+          setAiPrompts(d.ai_prompts);
+          aiPromptsRef.current = d.ai_prompts;
+        }
         setPreviewOn(Boolean(d.preview));
       })
       .catch(() => {});
@@ -587,6 +607,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           about: aboutRef.current,
           studio_tools: studioRef.current,
           tools_enabled: toolsEnabledRef.current,
+          ai_prompts: aiPromptsRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -637,6 +658,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           about: aboutRef.current,
           studio_tools: studioRef.current,
           tools_enabled: toolsEnabledRef.current,
+          ai_prompts: aiPromptsRef.current,
         }),
       });
       setSaving(res.ok ? "saved" : "error");
@@ -787,7 +809,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access"] as const).map((tab) => (
+          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "prompts"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -807,7 +829,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : tab === "home" ? "🏠 Головна"
                 : tab === "about" ? "👤 Про мене"
                 : tab === "studio" ? "🔮 Студія"
-                : "🎛 Доступ"}
+                : tab === "access" ? "🎛 Доступ"
+                : "🧠 Промти"}
             </button>
           ))}
         </div>
@@ -1757,6 +1780,136 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </button>
           </div>
         )}
+
+        {/* ── Prompts Tab — edit AI System+User per tool ──────────────── */}
+        {activeTab === "prompts" && (() => {
+          const def = DEFAULT_PROMPTS[activePromptTool];
+          const ov = aiPrompts[activePromptTool] ?? {};
+          const sysVal = ov.system ?? "";
+          const userVal = ov.user ?? "";
+          const effectiveSys = sysVal.trim() || def.defaultSystem;
+          const effectiveUser = userVal.trim() || def.defaultUser;
+          const validation = validatePromptOverride(activePromptTool, {
+            system: effectiveSys,
+            user: effectiveUser,
+          });
+          const updatePrompt = (patch: Partial<{ system: string; user: string }>) => {
+            const next = { ...aiPromptsRef.current, [activePromptTool]: { ...ov, ...patch } };
+            aiPromptsRef.current = next;
+            setAiPrompts(next);
+          };
+          return (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>AI-промти</h2>
+                <p className="text-white/40 text-sm">
+                  Редагуй System і User промти для кожного інструмента. Порожнє поле = використовується дефолт з коду.
+                  Мова відповіді контролюється через <code className="text-[#C4A97A]">{`{{language_name}}`}</code>.
+                </p>
+              </div>
+
+              {/* Tool picker pills */}
+              <div className="flex flex-wrap gap-2">
+                {ALL_PROMPT_TOOL_IDS.map((id) => (
+                  <button
+                    key={id}
+                    onClick={() => setActivePromptTool(id)}
+                    className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                      activePromptTool === id
+                        ? "bg-[#D4A853] text-white"
+                        : "bg-white/5 hover:bg-white/10 text-white/70"
+                    }`}
+                  >
+                    {DEFAULT_PROMPTS[id].label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Description */}
+              <p className="text-white/60 text-sm">{def.description}</p>
+
+              {/* Variables legend */}
+              <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-4 space-y-2">
+                <p className="text-[#C4A97A] text-xs uppercase tracking-widest">Доступні змінні</p>
+                <ul className="space-y-1.5">
+                  {def.variables.map((v) => (
+                    <li key={v.name} className="text-xs">
+                      <code className="text-[#D4A853]">{`{{${v.name}}}`}</code>
+                      {v.required && <span className="ml-2 text-red-300/80 text-[10px]">обов&apos;язкова</span>}
+                      <span className="text-white/50 ml-2">— {v.description}</span>
+                    </li>
+                  ))}
+                </ul>
+                {!validation.ok && (
+                  <p className="text-red-300/90 text-xs mt-3 border-t border-red-300/20 pt-2">
+                    ⚠ Бракує обов&apos;язкових змінних у промтах: {validation.missing.map((m) => `{{${m}}}`).join(", ")}.
+                    Додай їх або збережи — AI може повернути неякісну відповідь.
+                  </p>
+                )}
+              </div>
+
+              {/* System */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/60 uppercase tracking-widest">System prompt</label>
+                  <button
+                    onClick={() => updatePrompt({ system: "" })}
+                    className="text-[10px] text-white/40 hover:text-[#C4A97A] uppercase tracking-widest"
+                  >
+                    Скинути до дефолту
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  className="admin-input w-full resize-y font-mono text-[12px]"
+                  placeholder={def.defaultSystem}
+                  value={sysVal}
+                  onChange={(e) => updatePrompt({ system: e.target.value })}
+                />
+                {!sysVal.trim() && (
+                  <p className="text-white/40 text-[10px] mt-1">Зараз використовується дефолт (показано як placeholder).</p>
+                )}
+              </div>
+
+              {/* User */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/60 uppercase tracking-widest">User prompt</label>
+                  <button
+                    onClick={() => updatePrompt({ user: "" })}
+                    className="text-[10px] text-white/40 hover:text-[#C4A97A] uppercase tracking-widest"
+                  >
+                    Скинути до дефолту
+                  </button>
+                </div>
+                <textarea
+                  rows={14}
+                  className="admin-input w-full resize-y font-mono text-[12px]"
+                  placeholder={def.defaultUser}
+                  value={userVal}
+                  onChange={(e) => updatePrompt({ user: e.target.value })}
+                />
+                {!userVal.trim() && (
+                  <p className="text-white/40 text-[10px] mt-1">Зараз використовується дефолт (показано як placeholder).</p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={async () => {
+                    await saveAllContent();
+                    setPromptsSaved(true);
+                    setTimeout(() => setPromptsSaved(false), 2000);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> {promptsSaved ? "Збережено ✓" : "Зберегти промт"}
+                </button>
+                <p className="text-white/40 text-xs">Зміна підхопиться новими запитами за ≤30 секунд.</p>
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </div>

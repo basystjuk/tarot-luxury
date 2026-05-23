@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
+import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
+import { loadPromptOverrides } from "@/lib/server-content";
 
 export const maxDuration = 30;
 
@@ -102,46 +104,27 @@ export async function POST(req: NextRequest) {
     lilithSign ? `Black Moon Lilith in ${lilithSign} — the shadow, the taboo, the wildness asking to be acknowledged.` : "",
   ].filter(Boolean).join(" ");
 
-  const SYSTEM_PROMPT =
-    language === "en"
-      ? "You are an expert lunar astrologer — perceptive, poetic, feminine, mystical. You know lunar astrology at a professional depth: phases, signs, degrees, void of course, nodes, Lilith, dark moon. Your readings are never generic: search for nuance, avoid clichés, name the unexpected angle. Write exclusively in English — not a single word, hieroglyph or character from any other language or script."
-      : language === "ru"
-      ? "Ты — эксперт лунной астрологии: проницательный, поэтичный, женственный, мистический. Знаешь лунную астрологию на профессиональной глубине: фазы, знаки, градусы, void of course, узлы, Лилит, тёмная луна. Прочтения никогда не банальны: ищи нюансы, избегай клише, называй неожиданный угол. Пиши исключительно на русском языке — ни единого иероглифа, латинского слова или символа другого алфавита."
-      : "Ти — експерт лунної астрології: проникливий, поетичний, жіночний, містичний. Знаєш лунну астрологію на професійній глибині: фази, знаки, градуси, void of course, вузли, Ліліт, темний місяць. Прочитання ніколи не банальні: шукай нюанси, уникай кліше, називай несподіваний кут. Пиши виключно українською мовою — жодного ієрогліфа, латинського слова або символу іншого алфавіту.";
+  // Pick localized blocks for the template variables (admin only sees finals).
+  const sunBlock = language === "en" ? sunBlockEn : language === "ru" ? sunBlockRu : sunBlockUk;
+  const extraBlockRaw = language === "en" ? extraBlockEn : language === "ru" ? extraBlockRu : extraBlockUk;
+  const extraBlock = extraBlockRaw ? "\n" + extraBlockRaw : "";
+  const contextDirective = language === "en" ? contextDirectiveEn : language === "ru" ? contextDirectiveRu : contextDirectiveUk;
+  const moonSignResolved = language === "en" ? (moonSignEn ?? moonSign) : moonSign;
 
-  const prompt =
-    language === "en"
-      ? `The Moon is at ${moonDegree}° ${moonSignEn} in the ${phaseName} phase (${illumination}% illumination). Context: ${usageContext}.${sunBlockEn}${extraBlockEn ? "\n" + extraBlockEn : ""}
-
-${contextDirectiveEn}
-
-Write the message in 3 paragraphs (no headers, no bullet points, no greeting):
-1) Energy (2 sentences — the precise quality of ${moonDegree}° ${moonSignEn} in this phase: name the specific archetype, tension or gift active right now; go deeper than "this is a time for...")
-2) Concrete advice (1–2 sentences — name ONE specific ritual or action appropriate exactly for this phase in this sign; AVOID banalities like "meditate", "journal", "breathe deeply")
-3) Affirmation (ONE short, powerful sentence starting with "I", NO MORE THAN 15 WORDS, directly tied to ${moonDegree}° ${moonSignEn})
-
-Write exclusively in English — absolutely no other language, script or hieroglyphs.`
-      : language === "ru"
-      ? `Луна на ${moonDegree}° ${moonSign} в фазе ${phaseName} (${illumination}% освещения). Контекст: ${usageContext}.${sunBlockRu}${extraBlockRu ? "\n" + extraBlockRu : ""}
-
-${contextDirectiveRu}
-
-Напиши послание в 3 абзаца (без заголовков, без маркеров, без приветствия):
-1) Энергия (2 предложения — точное качество ${moonDegree}° ${moonSign} в этой фазе: назови специфический архетип, напряжение или дар, активный прямо сейчас; иди глубже, чем «это время для...»)
-2) Конкретный совет (1–2 предложения — назови ОДИН конкретный ритуал или действие, уместный именно для этой фазы в этом знаке; ИЗБЕГАЙ банальностей вроде «медитируйте», «ведите дневник», «дышите глубоко»)
-3) Аффирмация (ОДНО короткое мощное предложение, начинается со слова «Я», НЕ БОЛЕЕ 15 СЛОВ, прямо связано с энергией ${moonDegree}° ${moonSign})
-
-Пиши исключительно на русском языке — абсолютно никаких иероглифов, других языков или алфавитов.`
-      : `Місяць на ${moonDegree}° ${moonSign} у фазі ${phaseName} (${illumination}% освітлення). Контекст: ${usageContext}.${sunBlockUk}${extraBlockUk ? "\n" + extraBlockUk : ""}
-
-${contextDirectiveUk}
-
-Напиши послання у 3 абзаци (без заголовків, без маркерів, без вітання):
-1) Енергія (2 речення — точна якість ${moonDegree}° ${moonSign} у цій фазі: назви специфічний архетип, напругу або дар, активний прямо зараз; іди глибше, ніж «це час для...»)
-2) Конкретна порада (1–2 речення — назви ОДИН конкретний ритуал або дію, доречний саме для цієї фази в цьому знаку; УНИКАЙ банальностей на кшталт «медитуйте», «ведіть щоденник», «дихайте глибоко»)
-3) Аффірмація (ОДНЕ коротке потужне речення, починається зі слова «Я», НЕ БІЛЬШЕ 15 СЛІВ, прямо пов'язане з енергією ${moonDegree}° ${moonSign})
-
-Пиши виключно українською мовою — абсолютно жодних ієрогліфів, інших мов або алфавітів.`;
+  const overrides = (await loadPromptOverrides()) as PromptOverrides | null;
+  const tpl = resolvePrompt("moon-reading", overrides);
+  const vars = {
+    language_name: getLanguageName(language),
+    moonDegree,
+    moonSign: moonSignResolved,
+    phaseName,
+    illumination,
+    contextDirective,
+    sunBlock,
+    extraBlock,
+  };
+  const SYSTEM_PROMPT = renderTemplate(tpl.system, vars);
+  const prompt = renderTemplate(tpl.user, vars);
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
