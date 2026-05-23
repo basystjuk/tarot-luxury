@@ -221,6 +221,59 @@ export type MasterPhase =
       currentlyActive: boolean;
     };
 
+// ─── Personal Day ───────────────────────────────────────────────────────────
+// Personal Day = Personal Year + month + day, reduced. Each day of the year
+// carries its own micro-vibration on top of the Personal Year. Used for
+// picking favourable days for action (1), travel (5), completion (9), etc.
+
+export interface PersonalDay {
+  /** day of the month (1–31) */
+  day: number;
+  /** the personal-day number (1–9) — master numbers collapse here for clarity */
+  number: number;
+  /** day-of-week, 0=Sun..6=Sat — for calendar grid layout */
+  weekday: number;
+}
+
+export function calcPersonalYear(day: number, month: number, year: number): number {
+  // Standard Decoz: reduce(birthDay) + reduce(birthMonth) + reduce(calendarYear)
+  const d = reduceNum(day);
+  const m = reduceNum(month);
+  const y = reduceNum(digitSum(year));
+  return reduceNum(d + m + y);
+}
+
+export function calcPersonalMonth(personalYear: number, calendarMonth: number): number {
+  return reduceNum(personalYear + reduceNum(calendarMonth));
+}
+
+/**
+ * Generate all Personal Days for a given calendar month.
+ *
+ * @param birthDay   birthday day-of-month (1–31)
+ * @param birthMonth birthday month (1–12)
+ * @param year       calendar year for which to compute the days
+ * @param month      calendar month (1–12) for which to compute the days
+ */
+export function calcPersonalDays(
+  birthDay: number,
+  birthMonth: number,
+  year: number,
+  month: number,
+): PersonalDay[] {
+  const personalYear  = calcPersonalYear(birthDay, birthMonth, year);
+  const personalMonth = calcPersonalMonth(personalYear, month);
+  const daysInMonth = new Date(year, month, 0).getDate(); // month is 1-indexed; passing 0 gives last day of prev = correct here
+
+  const out: PersonalDay[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const pd = reduceToDigit(personalMonth + reduceToDigit(d));
+    const weekday = new Date(year, month - 1, d).getDay();
+    out.push({ day: d, number: pd, weekday });
+  }
+  return out;
+}
+
 export function calcMasterPhase(num: number, age: number): MasterPhase {
   if (num === 11) {
     return { isMaster: true, masterNumber: 11, baseNumber: 2, activationAge: 30, currentlyActive: age >= 30 };

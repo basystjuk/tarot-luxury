@@ -9,6 +9,7 @@ import {
   AiIntroPanel,
   ExtendedRow,
   PlaneBars,
+  PersonalDaysCalendar,
 } from "./_components";
 import { t as ts, hint as tHint, letterMeaning, planeDominantNote } from "./_strings";
 import AnimatedSection from "@/components/ui/AnimatedSection";
@@ -22,6 +23,7 @@ import {
   calcFirstVowel,
   calcPlaneOfExpression,
   calcMasterPhase,
+  calcPersonalDays,
   type Pinnacle,
   type Challenge,
   type LetterReading,
@@ -669,6 +671,10 @@ interface ResultViewProps {
     masterPhase: MasterPhase;
     age: number;
   } | null;
+  /** raw birth day-of-month (1-31), needed for Personal Days */
+  birthDay: number;
+  /** raw birth month (1-12), needed for Personal Days */
+  birthMonth: number;
   data: NumberData;
   language: "uk" | "ru" | "en";
   isRu: boolean;
@@ -686,7 +692,7 @@ interface ResultViewProps {
 }
 
 function NumerologyResultView({
-  result, extended, data, language, isRu, isEn, t, labels,
+  result, extended, birthDay, birthMonth, data, language, isRu, isEn, t, labels,
   synthIntro, synthPortrait, loadingSynth, synthError, onRetrySynth,
   expanded, onExpand, onCollapse,
 }: ResultViewProps) {
@@ -895,6 +901,48 @@ function NumerologyResultView({
               </>
             )}
           </CollapseSection>
+
+          {/* Personal Days calendar — best dates for action this month */}
+          {birthDay > 0 && birthMonth > 0 && (
+            <CollapseSection
+              defaultOpen
+              title={t("Найкращі дати цього місяця", "Лучшие даты этого месяца", "Best Dates This Month")}
+            >
+              {(() => {
+                const now = new Date();
+                const year = now.getFullYear();
+                const monthIdx = now.getMonth(); // 0-11
+                const month = monthIdx + 1;
+                const days = calcPersonalDays(birthDay, birthMonth, year, month);
+                const localeMap: Record<string, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
+                const monthName = now.toLocaleString(localeMap[language] ?? "uk-UA", { month: "long" });
+                const weekdayShort: [string, string, string, string, string, string, string] =
+                  language === "ru" ? ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
+                  : language === "en" ? ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+                  : ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
+                return (
+                  <>
+                    <p className="text-xs text-[#7A6A58] mb-4 leading-relaxed">
+                      {t(
+                        "Виділені дні (1 · 5 · 9) — найкращі для важливих рішень: 1 — початки, 5 — рух і подорожі, 9 — завершення.",
+                        "Выделенные дни (1 · 5 · 9) — лучшие для важных решений: 1 — начала, 5 — движение и путешествия, 9 — завершения.",
+                        "Highlighted days (1 · 5 · 9) are best for important decisions: 1 = beginnings, 5 = motion & travel, 9 = completion.",
+                      )}
+                    </p>
+                    <PersonalDaysCalendar
+                      days={days}
+                      year={year}
+                      month={month}
+                      language={language}
+                      monthName={monthName}
+                      weekdayShort={weekdayShort}
+                      todayDay={now.getDate()}
+                    />
+                  </>
+                );
+              })()}
+            </CollapseSection>
+          )}
 
           {/* Portrait (long AI text) */}
           {synthPortrait && (
@@ -1247,6 +1295,8 @@ export default function NumerologyPage() {
               <NumerologyResultView
                 result={result}
                 extended={extended}
+                birthDay={parseInt(form.day) || 0}
+                birthMonth={parseInt(form.month) || 0}
                 data={data}
                 language={language}
                 isRu={isRu}

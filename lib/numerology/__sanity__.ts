@@ -14,6 +14,9 @@ import {
   calcFirstVowel,
   calcPlaneOfExpression,
   calcMasterPhase,
+  calcPersonalYear,
+  calcPersonalMonth,
+  calcPersonalDays,
 } from "./calculators";
 
 function eq(label: string, actual: unknown, expected: unknown) {
@@ -90,6 +93,28 @@ function eq(label: string, actual: unknown, expected: unknown) {
   eq("Master 22 at age 30", calcMasterPhase(22, 30),
     { isMaster: true, masterNumber: 22, baseNumber: 4, activationAge: 36, currentlyActive: false });
   eq("Non-master 7", calcMasterPhase(7, 50), { isMaster: false });
+}
+
+// ─── Personal Year / Month / Days ───────────────────────────────────────────
+// Born 12 May 1985, calendar year 2024:
+//   reduce(12)=3, reduce(5)=5, reduce(2024)=2+0+2+4=8 → personalYear = 3+5+8=16→7
+{
+  const py = calcPersonalYear(12, 5, 2024);
+  eq("PersonalYear 1985-05-12 in 2024", py, 7);
+  // PersonalMonth for May 2024 = py(7) + reduce(5)=5 → 12 → 3
+  const pm = calcPersonalMonth(py, 5);
+  eq("PersonalMonth May 2024", pm, 3);
+  // PersonalDay = pm(3) + reduce(day); day 1 → 3+1=4
+  const days = calcPersonalDays(12, 5, 2024, 5);
+  eq("PersonalDays length May 2024", days.length, 31);
+  eq("PersonalDay May 1 2024", days[0].number, 4);
+  // Day 12 → 3 + (1+2)=3 → 6
+  eq("PersonalDay May 12 2024", days[11].number, 6);
+  // Day 9 → 3 + 9 = 12 → 3
+  eq("PersonalDay May 9 2024", days[8].number, 3);
+  // February in a leap year = 29 days
+  eq("PersonalDays length Feb 2024 (leap)", calcPersonalDays(12, 5, 2024, 2).length, 29);
+  eq("PersonalDays length Feb 2023 (non-leap)", calcPersonalDays(12, 5, 2023, 2).length, 28);
 }
 
 console.log("\nsanity checks done");

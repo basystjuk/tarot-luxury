@@ -10,6 +10,7 @@
 
 import { useState, useId } from "react";
 import { Info, ChevronDown } from "lucide-react";
+import type { PersonalDay } from "@/lib/numerology/calculators";
 
 // ─── TermHint — tooltip on tap (mobile) / hover (desktop) ──────────────────
 export function TermHint({ children, hint }: { children: React.ReactNode; hint: string }) {
@@ -218,3 +219,125 @@ export function PlaneBars({
     </div>
   );
 }
+
+// ─── Personal Days Calendar ─────────────────────────────────────────────────
+// Highlights the favourable days of the current month based on Personal Day
+// vibration. 1 = beginnings, 5 = motion/travel, 9 = completion — the three
+// most actionable for everyday decisions.
+
+const FAVOURABLE = new Set([1, 5, 9]);
+
+const PD_LABEL: Record<number, [string, string, string]> = {
+  1: ["початки, нові проєкти", "начала, новые проекты", "beginnings, new projects"],
+  2: ["партнерство, переговори", "партнёрство, переговоры", "partnership, negotiations"],
+  3: ["творчість, спілкування", "творчество, общение", "creativity, communication"],
+  4: ["робота, структура", "работа, структура", "work, structure"],
+  5: ["рух, подорожі, зміни", "движение, путешествия, перемены", "motion, travel, change"],
+  6: ["дім, сім'я, турбота", "дом, семья, забота", "home, family, care"],
+  7: ["рефлексія, навчання", "рефлексия, обучение", "reflection, study"],
+  8: ["великі рішення, гроші", "большие решения, деньги", "big decisions, money"],
+  9: ["завершення, відпускання", "завершение, отпускание", "completion, letting go"],
+};
+
+function getPdLabel(n: number, language: "uk" | "ru" | "en"): string {
+  const row = PD_LABEL[n];
+  if (!row) return "";
+  return language === "ru" ? row[1] : language === "en" ? row[2] : row[0];
+}
+
+export function PersonalDaysCalendar({
+  days,
+  year,
+  month,
+  language,
+  monthName,
+  weekdayShort,
+  todayDay,
+}: {
+  days: PersonalDay[];
+  year: number;
+  month: number;
+  language: "uk" | "ru" | "en";
+  monthName: string;
+  /** 7 short weekday labels starting Monday */
+  weekdayShort: [string, string, string, string, string, string, string];
+  /** today's day-of-month if viewing current month; else undefined */
+  todayDay?: number;
+}) {
+  // Build grid starting Monday (ISO week)
+  const firstWeekday = (new Date(year, month - 1, 1).getDay() + 6) % 7; // 0=Mon
+  const cells: (PersonalDay | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  days.forEach(d => cells.push(d));
+
+  // Group favourable days for the "best dates" summary
+  const best: Record<number, number[]> = { 1: [], 5: [], 9: [] };
+  days.forEach(d => {
+    if (FAVOURABLE.has(d.number)) best[d.number].push(d.day);
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="text-center">
+        <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">
+          {language === "ru" ? "Календарь личных дней" : language === "en" ? "Personal Days Calendar" : "Календар особистих днів"}
+        </p>
+        <p className="text-xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+          {monthName} {year}
+        </p>
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center">
+        {weekdayShort.map((w, i) => (
+          <div key={i} className="text-[10px] text-[#C4A97A] tracking-wider uppercase py-1.5">
+            {w}
+          </div>
+        ))}
+        {cells.map((cell, i) => {
+          if (!cell) return <div key={i} aria-hidden="true" />;
+          const isFav = FAVOURABLE.has(cell.number);
+          const isToday = todayDay === cell.day;
+          return (
+            <div
+              key={i}
+              title={`${cell.day}: ${getPdLabel(cell.number, language)}`}
+              className={[
+                "aspect-square rounded-lg flex flex-col items-center justify-center transition-all",
+                isFav
+                  ? "bg-gradient-to-br from-[#D4A853] to-[#9A6E28] text-white shadow-[0_3px_10px_rgba(180,140,60,0.3)]"
+                  : "bg-[rgba(255,253,248,0.5)] border border-[rgba(196,169,122,0.15)] text-[#7A6A58]",
+                isToday ? "ring-2 ring-[#1C1512] ring-offset-1" : "",
+              ].join(" ")}
+            >
+              <span className={`text-[10px] sm:text-xs ${isFav ? "opacity-90" : "opacity-60"}`}>
+                {cell.day}
+              </span>
+              <span className={`text-sm sm:text-base ${isFav ? "font-medium" : ""}`} style={{ fontFamily: "var(--font-cormorant)" }}>
+                {cell.number}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Best dates summary */}
+      <div className="space-y-2.5 pt-2">
+        {([1, 5, 9] as const).map(n => (
+          best[n].length > 0 && (
+            <div key={n} className="flex items-baseline gap-3 text-sm">
+              <span className="w-7 h-7 rounded-full bg-gradient-to-br from-[#D4A853] to-[#9A6E28] text-white flex items-center justify-center flex-shrink-0" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                {n}
+              </span>
+              <span className="text-[#5C4530] flex-1">
+                <span className="font-medium text-[#1C1512]">{best[n].join(", ")}</span>
+                <span className="text-[#7A6A58]"> · {getPdLabel(n, language)}</span>
+              </span>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
+  );
+}
+
