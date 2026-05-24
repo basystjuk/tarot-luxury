@@ -26,7 +26,9 @@ export type HintKey =
   | "triplicity"
   | "sect"
   | "calendar"
-  | "recommendations";
+  | "recommendations"
+  | "eclipseSolar"
+  | "eclipseLunar";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -110,6 +112,16 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Місячний календар — фаза, знак і градус Місяця на кожен день місяця. Повний Місяць позначено теплим, новий — приглушеним тоном. Натисни на будь-яку дату — форма перейде в режим «Інша дата» і покаже послання саме цього дня.",
     ru: "Лунный календарь — фаза, знак и градус Луны на каждый день месяца. Полнолуние выделено тёплым, новолуние — приглушённым тоном. Нажми на любую дату — форма переключится в режим «Другая дата» и покажет послание именно этого дня.",
     en: "Lunar calendar — Moon phase, sign and degree for every day of the month. Full moons are tinted warm, new moons cool. Tap any date — the form switches to 'Other date' mode and shows the message for that day.",
+  },
+  eclipseSolar: {
+    uk: "Сонячне затемнення — Місяць на новомісяці знаходиться між Землею і Сонцем, перекриваючи його диск. Енергія перевернутих сценаріїв і доленосних поворотів: 6 місяців по обидва боки від затемнення на лінії вузлів формується новий розділ життя. Не варто стартувати важливе самé у день затемнення — спостерігай, відпускай старе.",
+    ru: "Солнечное затмение — Луна на новолуние оказывается между Землёй и Солнцем, перекрывая его диск. Энергия перевёрнутых сценариев и судьбоносных поворотов: 6 месяцев по обе стороны от затмения на оси узлов формируется новая глава жизни. Не стоит стартовать важное в сам день затмения — наблюдай, отпускай старое.",
+    en: "Solar eclipse — at the new moon the Moon stands between Earth and Sun, blocking the disc. An energy of upended scripts and fated turns: a six-month window around an eclipse on the nodal axis reshapes a chapter of life. Don't launch anything important on the eclipse day itself — observe, release the old.",
+  },
+  eclipseLunar: {
+    uk: "Місячне затемнення — на повному Місяці Земля кидає тінь на Місяць. Найпотужніший повний Місяць циклу: те, що довго було приховане, виходить на світло. Відчуття пришвидшеного завершення розділу; емоції яскраві, інтуїція гостра. Не починай нового; дозволь циклу закритися.",
+    ru: "Лунное затмение — на полнолуние Земля бросает тень на Луну. Самое мощное полнолуние цикла: то, что долго было скрыто, выходит на свет. Ощущение ускоренного завершения главы; эмоции ярки, интуиция остра. Не начинай нового; дай циклу закрыться.",
+    en: "Lunar eclipse — at the full moon Earth's shadow falls on the Moon. The most potent full moon of its cycle: what's been hidden surfaces. A sense of an accelerated ending; emotions vivid, intuition sharp. Don't start anything new — let the cycle close.",
   },
   recommendations: {
     uk: "Кристали, олії та трав'яні чаї, що резонують зі знаком, у якому зараз Місяць. AI підбирає по три позиції в кожній категорії з коротким поясненням «чому саме воно». Окремий ліміт — 1 запит на добу; повторні відкриття цього самого знака беруться з кешу й не витрачають квоту.",

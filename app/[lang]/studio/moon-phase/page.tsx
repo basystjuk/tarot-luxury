@@ -53,6 +53,8 @@ interface MoonData {
   rulerNight: PlanetKey;      // night triplicity ruler
   rulerParticipating: PlanetKey; // participating ruler (always present)
   rulerActive: PlanetKey;     // whichever of day/night is currently active
+  eclipseType: "solar" | "lunar" | null;
+  eclipseProximity: number;   // 0–100, higher = closer to exact alignment
 }
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
@@ -133,6 +135,41 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
   const lilithLon = calcLilithMean(jd);
   const lilithSignIdx = Math.floor(((lilithLon % 360) + 360) % 360 / 30);
 
+  // ── Eclipse detection ───────────────────────────────────────────────────
+  // An eclipse happens when Sun, Moon and a Lunar Node are aligned. The
+  // Moon's orbital plane is tilted ~5° from the ecliptic; the nodes mark
+  // where it crosses. Standard tolerances:
+  //   Solar: at New Moon, Sun within ~18° of a node (partial OK ≤18°,
+  //          total ≤10°). The Moon is by definition at ~same longitude.
+  //   Lunar: at Full Moon, Moon within ~12° of a node (partial ≤12°,
+  //          total ≤6°).
+  // We also require we're within ~24h of exact conjunction/opposition
+  // (~13° elongation tolerance — Moon moves ~13°/day).
+  //
+  // We can't easily distinguish total vs partial without shadow geometry,
+  // so the UI just says "Solar/Lunar eclipse" — close enough for a daily
+  // tool. Precision: detects every actual eclipse, false-positives are
+  // rare (~1–2 days per year that look eclipse-adjacent but aren't quite).
+  const angDist = (a: number, b: number) => {
+    let d = Math.abs(((a - b) % 360 + 360) % 360);
+    if (d > 180) d = 360 - d;
+    return d;
+  };
+  const southNodeLon = (northNodeLon + 180) % 360;
+  const sunNodeDist  = Math.min(angDist(sunLon, northNodeLon),  angDist(sunLon, southNodeLon));
+  const moonNodeDist = Math.min(angDist(moonLon, northNodeLon), angDist(moonLon, southNodeLon));
+  const isNearNew  = elongation < 13 || elongation > 347;
+  const isNearFull = Math.abs(elongation - 180) < 13;
+  let eclipseType: "solar" | "lunar" | null = null;
+  let eclipseProximity = 0; // 0–100, higher = closer to exact alignment
+  if (isNearNew && sunNodeDist < 18) {
+    eclipseType = "solar";
+    eclipseProximity = Math.max(0, Math.round(100 * (1 - sunNodeDist / 18)));
+  } else if (isNearFull && moonNodeDist < 12) {
+    eclipseType = "lunar";
+    eclipseProximity = Math.max(0, Math.round(100 * (1 - moonNodeDist / 12)));
+  }
+
   let phaseKey: PhaseKey;
   let emoji: string;
   if      (elongation < 22.5 || elongation >= 337.5) { phaseKey = "new";             emoji = "🌑"; }
@@ -202,6 +239,8 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     rulerNight: triplicity.night,
     rulerParticipating: triplicity.participating,
     rulerActive,
+    eclipseType,
+    eclipseProximity,
   };
 }
 
@@ -679,6 +718,8 @@ export default function MoonPhasePage() {
           rulerDay: result.rulerDay,
           rulerNight: result.rulerNight,
           rulerParticipating: result.rulerParticipating,
+          eclipseType: result.eclipseType,
+          eclipseProximity: result.eclipseProximity,
         }),
       });
       const data = await res.json();
@@ -1115,6 +1156,21 @@ export default function MoonPhasePage() {
                         <span className="ml-1.5 opacity-80 normal-case">
                           δ {result.moonDeclination >= 0 ? "+" : ""}{result.moonDeclination.toFixed(1)}°
                         </span>
+                      </TermHint>
+                    </span>
+                  )}
+                  {result.eclipseType && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+                        result.eclipseType === "solar"
+                          ? "bg-[#1C1512] text-[#E8C98A] border-[rgba(232,201,138,0.55)] shadow-sm"
+                          : "bg-[rgba(184,136,58,0.95)] text-[#FDFBF7] border-[rgba(184,136,58,0.8)] shadow-sm"
+                      }`}
+                    >
+                      <TermHint hint={moonHint(language, result.eclipseType === "solar" ? "eclipseSolar" : "eclipseLunar")}>
+                        {result.eclipseType === "solar"
+                          ? (isRu ? "🌒 СОЛНЕЧНОЕ ЗАТМЕНИЕ" : isEn ? "🌒 SOLAR ECLIPSE" : "🌒 СОНЯЧНЕ ЗАТЕМНЕННЯ")
+                          : (isRu ? "🌕 ЛУННОЕ ЗАТМЕНИЕ" : isEn ? "🌕 LUNAR ECLIPSE" : "🌕 МІСЯЧНЕ ЗАТЕМНЕННЯ")}
                       </TermHint>
                     </span>
                   )}

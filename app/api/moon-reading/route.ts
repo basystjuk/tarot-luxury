@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
     rulerDay,
     rulerNight,
     rulerParticipating,
+    eclipseType,
+    eclipseProximity,
   } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -149,7 +151,28 @@ export async function POST(req: NextRequest) {
     ? `Triplicity of ${ELEMENT_LOCAL[element]?.en}: active ruler is ${PLANET_LOCAL[rulerActive]?.en} (${isDayChart ? "diurnal" : "nocturnal"} sect). Day ruler: ${PLANET_LOCAL[rulerDay]?.en}, night ruler: ${PLANET_LOCAL[rulerNight]?.en}, participating: ${PLANET_LOCAL[rulerParticipating]?.en}. This is the whisper of the planet through which the element 'speaks' right now.`
     : "";
 
+  // Eclipse — strongest single signal we can flag. Days near an eclipse
+  // carry a "fated chapter turn" weight that's worth naming explicitly.
+  const eclipseProxNote = typeof eclipseProximity === "number" && eclipseProximity > 0
+    ? ` (${eclipseProximity}% alignment)` : "";
+  const eclipseBlockUk = eclipseType === "solar"
+    ? `Сьогодні СОНЯЧНЕ ЗАТЕМНЕННЯ${eclipseProxNote} — момент переписаних сценаріїв на осі вузлів. Не запускай нічого нового; спостерігай, відпускай, бачи що стає видимим.`
+    : eclipseType === "lunar"
+    ? `Сьогодні МІСЯЧНЕ ЗАТЕМНЕННЯ${eclipseProxNote} — пришвидшене завершення розділу. Те, що було приховане, виходить на світло. Не починай нового; дай циклу закритися.`
+    : "";
+  const eclipseBlockRu = eclipseType === "solar"
+    ? `Сегодня СОЛНЕЧНОЕ ЗАТМЕНИЕ${eclipseProxNote} — момент переписанных сценариев на оси узлов. Не запускай ничего нового; наблюдай, отпускай, замечай что становится видимым.`
+    : eclipseType === "lunar"
+    ? `Сегодня ЛУННОЕ ЗАТМЕНИЕ${eclipseProxNote} — ускоренное завершение главы. То, что было скрыто, выходит на свет. Не начинай нового; дай циклу закрыться.`
+    : "";
+  const eclipseBlockEn = eclipseType === "solar"
+    ? `Today is a SOLAR ECLIPSE${eclipseProxNote} — a moment of scripts rewritten on the nodal axis. Don't launch anything new; observe, release, notice what becomes visible.`
+    : eclipseType === "lunar"
+    ? `Today is a LUNAR ECLIPSE${eclipseProxNote} — an accelerated chapter ending. What was hidden surfaces. Don't start anything new; let the cycle close.`
+    : "";
+
   const extraBlockUk = [
+    eclipseBlockUk,
     isDarkMoon ? "Зараз ТЕМНИЙ МІСЯЦЬ (передноволуння) — енергія повного спокою, інтроверсія, ритуали відпускання, не починай нічого нового." : "",
     voidOfCourse ? "Місяць ПУСТИЙ (Void of Course) — рішення цього періоду рідко реалізуються; добре для рутини, відпочинку, медитації; не підписуй контрактів." : "",
     speedBlockUk,
@@ -160,6 +183,7 @@ export async function POST(req: NextRequest) {
     lilithSign ? `Чорна Луна Ліліт у ${lilithSign} — тінь, табу, дикість, що просить визнання.` : "",
   ].filter(Boolean).join(" ");
   const extraBlockRu = [
+    eclipseBlockRu,
     isDarkMoon ? "Сейчас ТЁМНАЯ ЛУНА (предноволуние) — энергия полного покоя, интроверсия, ритуалы отпускания, не начинай ничего нового." : "",
     voidOfCourse ? "Луна ПУСТАЯ (Void of Course) — решения этого периода редко реализуются; хорошо для рутины, отдыха, медитации; не подписывай контрактов." : "",
     speedBlockRu,
@@ -170,6 +194,7 @@ export async function POST(req: NextRequest) {
     lilithSign ? `Чёрная Луна Лилит в ${lilithSign} — тень, табу, дикость, просящая признания.` : "",
   ].filter(Boolean).join(" ");
   const extraBlockEn = [
+    eclipseBlockEn,
     isDarkMoon ? "It is currently the DARK MOON (pre-new) — energy of complete rest, introversion, release rituals; do not start anything new." : "",
     voidOfCourse ? "The Moon is VOID OF COURSE — decisions made in this window rarely manifest; good for routine, rest, meditation; do not sign contracts." : "",
     speedBlockEn,
