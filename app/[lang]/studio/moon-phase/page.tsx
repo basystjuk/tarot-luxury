@@ -6,6 +6,8 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { dateToJD, calcPlanetDeg, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
+import { TermHint } from "@/components/ui/TermHint";
+import { moonHint } from "./_hints";
 
 type PhaseKey =
   | "new"
@@ -763,7 +765,9 @@ export default function MoonPhasePage() {
                   className="text-3xl text-[#1C1512] mb-2"
                   style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
                 >
-                  {phaseContent[result.phaseKey].name}
+                  <TermHint hint={moonHint(language, "phase")}>
+                    {phaseContent[result.phaseKey].name}
+                  </TermHint>
                 </h2>
 
                 {/* Moon sign + degree badge */}
@@ -771,8 +775,12 @@ export default function MoonPhasePage() {
                   <span className="text-[#C4A97A] text-lg">{SIGN_GLYPHS[result.moonSignIdx]}</span>
                   <span className="text-sm text-[#7A6A58]">
                     {isRu ? "Луна в" : isEn ? "Moon in" : "Місяць у"}{" "}
-                    <strong className="text-[#5C4530]">{signNames[result.moonSignIdx]}</strong>
-                    <span className="text-[#C4A97A] ml-1">{result.moonDegree}°</span>
+                    <TermHint hint={moonHint(language, "moonSign")}>
+                      <strong className="text-[#5C4530]">{signNames[result.moonSignIdx]}</strong>
+                    </TermHint>
+                    <TermHint hint={moonHint(language, "moonDegree")}>
+                      <span className="text-[#C4A97A] ml-1">{result.moonDegree}°</span>
+                    </TermHint>
                   </span>
                 </div>
 
@@ -788,7 +796,9 @@ export default function MoonPhasePage() {
                 <div className="grid grid-cols-2 gap-3 mt-6">
                   <div className="p-4 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.12)]">
                     <p className="text-xs text-[#7A6A58] mb-1 tracking-wide uppercase">
-                      {isRu ? "Знак Луны" : isEn ? "Moon Sign" : "Знак Місяця"}
+                      <TermHint hint={moonHint(language, "moonSign")}>
+                        {isRu ? "Знак Луны" : isEn ? "Moon Sign" : "Знак Місяця"}
+                      </TermHint>
                     </p>
                     <p className="text-[#B8883A] font-medium" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.25rem" }}>
                       {SIGN_GLYPHS[result.moonSignIdx]} {signNames[result.moonSignIdx]}
@@ -803,7 +813,9 @@ export default function MoonPhasePage() {
                       {moonSignContent[result.moonSignIdx].keyword}
                     </p>
                     <p className="text-xs text-[#7A6A58] mt-1">
-                      {isRu ? `${result.illumination}% освещения` : isEn ? `${result.illumination}% illuminated` : `${result.illumination}% освітлення`}
+                      <TermHint hint={moonHint(language, "illumination")}>
+                        {isRu ? `${result.illumination}% освещения` : isEn ? `${result.illumination}% illuminated` : `${result.illumination}% освітлення`}
+                      </TermHint>
                     </p>
                   </div>
                 </div>
@@ -820,12 +832,16 @@ export default function MoonPhasePage() {
                   <div className="flex flex-wrap justify-center gap-2 mt-5">
                     {result.isDarkMoon && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#1C1512] text-[#C4A97A] border border-[rgba(196,169,122,0.3)]">
-                        🌑 {isRu ? "Тёмная Луна" : isEn ? "Dark Moon" : "Темний Місяць"}
+                        <TermHint hint={moonHint(language, "darkMoon")}>
+                          🌑 {isRu ? "Тёмная Луна" : isEn ? "Dark Moon" : "Темний Місяць"}
+                        </TermHint>
                       </span>
                     )}
                     {result.voidOfCourse && (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(196,169,122,0.12)] text-[#7A6A58] border border-[rgba(196,169,122,0.3)]">
-                        ⊘ {isRu ? "Пустая Луна (VoC)" : isEn ? "Void of Course" : "Пустий Місяць (VoC)"}
+                        <TermHint hint={moonHint(language, "voc")}>
+                          ⊘ {isRu ? "Пустая Луна (VoC)" : isEn ? "Void of Course" : "Пустий Місяць (VoC)"}
+                        </TermHint>
                       </span>
                     )}
                   </div>
@@ -835,7 +851,9 @@ export default function MoonPhasePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 text-left">
                   <div className="p-3 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.12)]">
                     <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">
-                      ☊ {isRu ? "Северный узел · Раху" : isEn ? "North Node · Rahu" : "Північний вузол · Раху"}
+                      <TermHint hint={moonHint(language, "northNode")}>
+                        ☊ {isRu ? "Северный узел · Раху" : isEn ? "North Node · Rahu" : "Північний вузол · Раху"}
+                      </TermHint>
                     </p>
                     <p className="text-sm text-[#5C4530]" style={{fontFamily:"var(--font-cormorant)", fontWeight:500}}>
                       {SIGN_GLYPHS[result.northNodeSignIdx]} {signNames[result.northNodeSignIdx]}
@@ -844,7 +862,9 @@ export default function MoonPhasePage() {
                   </div>
                   <div className="p-3 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.12)]">
                     <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">
-                      ☋ {isRu ? "Южный узел · Кету" : isEn ? "South Node · Ketu" : "Південний вузол · Кету"}
+                      <TermHint hint={moonHint(language, "southNode")}>
+                        ☋ {isRu ? "Южный узел · Кету" : isEn ? "South Node · Ketu" : "Південний вузол · Кету"}
+                      </TermHint>
                     </p>
                     <p className="text-sm text-[#5C4530]" style={{fontFamily:"var(--font-cormorant)", fontWeight:500}}>
                       {SIGN_GLYPHS[result.southNodeSignIdx]} {signNames[result.southNodeSignIdx]}
@@ -853,7 +873,9 @@ export default function MoonPhasePage() {
                   </div>
                   <div className="p-3 rounded-xl bg-[rgba(28,21,18,0.06)] border border-[rgba(28,21,18,0.18)]">
                     <p className="text-[10px] text-[#7A6A58] tracking-widest uppercase mb-1">
-                      ⚸ {isRu ? "Чёрная Луна · Лилит" : isEn ? "Black Moon · Lilith" : "Чорна Луна · Ліліт"}
+                      <TermHint hint={moonHint(language, "lilith")}>
+                        ⚸ {isRu ? "Чёрная Луна · Лилит" : isEn ? "Black Moon · Lilith" : "Чорна Луна · Ліліт"}
+                      </TermHint>
                     </p>
                     <p className="text-sm text-[#1C1512]" style={{fontFamily:"var(--font-cormorant)", fontWeight:500}}>
                       {SIGN_GLYPHS[result.lilithSignIdx]} {signNames[result.lilithSignIdx]}
@@ -866,7 +888,9 @@ export default function MoonPhasePage() {
                 <div className="grid grid-cols-2 gap-4 mt-6">
                   <div className="text-center p-4 rounded-xl bg-[rgba(196,169,122,0.06)]">
                     <p className="text-xs text-[#7A6A58] mb-1 tracking-wide uppercase">
-                      {isRu ? "Полнолуние" : isEn ? "Full Moon" : "Повний місяць"}
+                      <TermHint hint={moonHint(language, "nextFull")}>
+                        {isRu ? "Полнолуние" : isEn ? "Full Moon" : "Повний місяць"}
+                      </TermHint>
                     </p>
                     <p className="text-[#B8883A] font-medium" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.2rem" }}>
                       {fmtDate(result.nextFull, language)}
@@ -874,7 +898,9 @@ export default function MoonPhasePage() {
                   </div>
                   <div className="text-center p-4 rounded-xl bg-[rgba(196,169,122,0.06)]">
                     <p className="text-xs text-[#7A6A58] mb-1 tracking-wide uppercase">
-                      {isRu ? "Новолуние" : isEn ? "New Moon" : "Новомісяць"}
+                      <TermHint hint={moonHint(language, "nextNew")}>
+                        {isRu ? "Новолуние" : isEn ? "New Moon" : "Новомісяць"}
+                      </TermHint>
                     </p>
                     <p className="text-[#B8883A] font-medium" style={{ fontFamily: "var(--font-cormorant)", fontSize: "1.2rem" }}>
                       {fmtDate(result.nextNew, language)}
