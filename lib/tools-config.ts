@@ -29,13 +29,12 @@ export const ALL_TOOL_IDS: ToolId[] = [
  *
  * Currently OFF (in active polish — owner can re-enable from admin once
  * admin save is verified working):
- *   - daily-card
  *   - compatibility
  *   - moon-phase
  *   - natal-chart  (no AI integration yet)
  */
 export const DEFAULT_TOOLS_ENABLED: Record<ToolId, boolean> = {
-  "daily-card": false,
+  "daily-card": true,
   numerology: true,
   compatibility: false,
   "moon-phase": false,
