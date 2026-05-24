@@ -434,3 +434,53 @@ export function calcNatalChart(
     houses,
   };
 }
+
+// ── Moon speed & declination (used by the Moon Guide tool) ────────────────
+//
+// The Moon's speed varies between ~11.6°/day (apogee) and ~15.4°/day
+// (perigee). The astrological convention is that ≥13°/day reads as
+// "fast" (events unfold quickly, decisions stick fast) and ≤12°/day as
+// "slow" (delays, drag). This drift also affects how long a Void of
+// Course window lasts.
+//
+// We use a 24-hour central difference around jd to dampen short-period
+// libration noise — that's accurate to better than 0.1°/day, plenty for
+// classifying a day as fast/normal/slow.
+
+/** Moon's apparent ecliptic longitude motion in degrees per day at jd. */
+export function calcMoonSpeed(jd: number): number {
+  const lon1 = moonLongitudeFull(jd - 0.5);
+  const lon2 = moonLongitudeFull(jd + 0.5);
+  let diff = lon2 - lon1;
+  if (diff < -180) diff += 360;
+  if (diff > 180)  diff -= 360;
+  return diff;
+}
+
+// Moon declination — approximate but good to ~0.5°, which is more than
+// enough to detect Out of Bounds (|δ| > 23.4365°, the obliquity of the
+// ecliptic). We approximate the Moon's ecliptic latitude β ≈ 5.128° ·
+// sin(F), where F is the argument of latitude. Then convert ecliptic
+// (λ, β) to equatorial declination via the standard rotation.
+//
+// A full Meeus solution would use the 60-term β series; the simplified
+// form is within the precision needed for OOB classification (we only
+// care about a binary "is |δ| > 23.4365°" decision).
+
+/** Moon's equatorial declination in degrees at jd. */
+export function calcMoonDeclination(jd: number): number {
+  const T = (jd - 2451545.0) / 36525.0;
+  const F = 93.2720950 + 483202.0175233 * T; // argument of latitude (degrees)
+  const beta   = 5.128 * Math.sin(rad(F));   // approximate ecliptic latitude (degrees)
+  const lambda = moonLongitudeFull(jd);      // ecliptic longitude (degrees)
+  const e = calcObliquity(jd);               // obliquity of ecliptic (degrees)
+  const sinDec =
+    Math.sin(rad(beta)) * Math.cos(rad(e)) +
+    Math.cos(rad(beta)) * Math.sin(rad(e)) * Math.sin(rad(lambda));
+  const clamped = Math.max(-1, Math.min(1, sinDec));
+  return (Math.asin(clamped) * 180) / Math.PI;
+}
+
+/** Obliquity of the ecliptic — the threshold for the Moon being Out of Bounds. */
+export const OBLIQUITY_DEG = 23.4365;
+

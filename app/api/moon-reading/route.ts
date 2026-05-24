@@ -50,6 +50,10 @@ export async function POST(req: NextRequest) {
     northNodeSign,
     southNodeSign,
     lilithSign,
+    moonSpeedDegPerDay,
+    moonSpeedClass,
+    moonDeclination,
+    isOutOfBounds,
   } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -86,9 +90,36 @@ export async function POST(req: NextRequest) {
   const sunBlockEn = sunSign ? `\nSun sign: ${sunSignEn ?? sunSign} — consider the Moon–Sun dialogue.` : "";
 
   // Extra astrological context blocks
+  // Moon speed / OOB phrasing — only included when the AI should care.
+  // "normal" speed is the default and not worth mentioning; fast/slow
+  // changes how a window unfolds. OOB is rare (~25% of months) but
+  // always carries weight when present.
+  const speedNum = typeof moonSpeedDegPerDay === "number" ? moonSpeedDegPerDay.toFixed(1) : null;
+  const declNum  = typeof moonDeclination === "number" ? moonDeclination.toFixed(1) : null;
+  const speedBlockUk = moonSpeedClass === "fast"
+    ? `Місяць ШВИДКИЙ (${speedNum}°/добу) — події розгортаються стрімко, рішення «приклеюються» швидко, вікно VoC коротке.`
+    : moonSpeedClass === "slow"
+    ? `Місяць ПОВІЛЬНИЙ (${speedNum}°/добу) — темп уповільнений, можливі затягування, VoC триває довше; ситуації потребують терпіння.`
+    : "";
+  const speedBlockRu = moonSpeedClass === "fast"
+    ? `Луна БЫСТРАЯ (${speedNum}°/сутки) — события разворачиваются стремительно, решения «приклеиваются» быстро, окно VoC короткое.`
+    : moonSpeedClass === "slow"
+    ? `Луна МЕДЛЕННАЯ (${speedNum}°/сутки) — темп замедлен, возможны затягивания, VoC длится дольше; ситуации требуют терпения.`
+    : "";
+  const speedBlockEn = moonSpeedClass === "fast"
+    ? `The Moon is FAST (${speedNum}°/day) — events unfold quickly, decisions stick fast, the VoC window is short.`
+    : moonSpeedClass === "slow"
+    ? `The Moon is SLOW (${speedNum}°/day) — slower tempo, possible delays, longer VoC; situations require patience.`
+    : "";
+  const oobUk = isOutOfBounds ? `Місяць OUT OF BOUNDS (декліннація ${declNum}°) — енергія дика, неприборкана; можливі несподівані рішення, ірраціональні пориви, креативні прориви.` : "";
+  const oobRu = isOutOfBounds ? `Луна OUT OF BOUNDS (склонение ${declNum}°) — энергия дикая, неприручённая; возможны неожиданные решения, иррациональные порывы, креативные прорывы.` : "";
+  const oobEn = isOutOfBounds ? `The Moon is OUT OF BOUNDS (declination ${declNum}°) — wild, unrestrained energy; expect unexpected decisions, irrational impulses, creative breakthroughs.` : "";
+
   const extraBlockUk = [
     isDarkMoon ? "Зараз ТЕМНИЙ МІСЯЦЬ (передноволуння) — енергія повного спокою, інтроверсія, ритуали відпускання, не починай нічого нового." : "",
     voidOfCourse ? "Місяць ПУСТИЙ (Void of Course) — рішення цього періоду рідко реалізуються; добре для рутини, відпочинку, медитації; не підписуй контрактів." : "",
+    speedBlockUk,
+    oobUk,
     northNodeSign ? `Північний вузол (Раху): ${northNodeSign} — карматичне зростання тут.` : "",
     southNodeSign ? `Південний вузол (Кету): ${southNodeSign} — звички з минулих циклів.` : "",
     lilithSign ? `Чорна Луна Ліліт у ${lilithSign} — тінь, табу, дикість, що просить визнання.` : "",
@@ -96,6 +127,8 @@ export async function POST(req: NextRequest) {
   const extraBlockRu = [
     isDarkMoon ? "Сейчас ТЁМНАЯ ЛУНА (предноволуние) — энергия полного покоя, интроверсия, ритуалы отпускания, не начинай ничего нового." : "",
     voidOfCourse ? "Луна ПУСТАЯ (Void of Course) — решения этого периода редко реализуются; хорошо для рутины, отдыха, медитации; не подписывай контрактов." : "",
+    speedBlockRu,
+    oobRu,
     northNodeSign ? `Северный узел (Раху): ${northNodeSign} — кармическое развитие здесь.` : "",
     southNodeSign ? `Южный узел (Кету): ${southNodeSign} — привычки из прошлых циклов.` : "",
     lilithSign ? `Чёрная Луна Лилит в ${lilithSign} — тень, табу, дикость, просящая признания.` : "",
@@ -103,6 +136,8 @@ export async function POST(req: NextRequest) {
   const extraBlockEn = [
     isDarkMoon ? "It is currently the DARK MOON (pre-new) — energy of complete rest, introversion, release rituals; do not start anything new." : "",
     voidOfCourse ? "The Moon is VOID OF COURSE — decisions made in this window rarely manifest; good for routine, rest, meditation; do not sign contracts." : "",
+    speedBlockEn,
+    oobEn,
     northNodeSign ? `North Node (Rahu): ${northNodeSign} — karmic growth lies here.` : "",
     southNodeSign ? `South Node (Ketu): ${southNodeSign} — habits from previous cycles.` : "",
     lilithSign ? `Black Moon Lilith in ${lilithSign} — the shadow, the taboo, the wildness asking to be acknowledged.` : "",

@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles, ChevronDown, Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
-import { dateToJD, calcPlanetDeg, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
+import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, OBLIQUITY_DEG, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
@@ -42,6 +42,10 @@ interface MoonData {
   lilithSignIdx: number;    // Black Moon Lilith sign
   sunSignIdx: number;       // 0–11, computed from the same JD
   sunDegree: number;        // 0–29° within sign
+  moonSpeedDegPerDay: number; // signed; ~11.6–15.4°/day for Moon
+  moonSpeedClass: "fast" | "normal" | "slow"; // ≥13 fast, 12–13 normal, <12 slow
+  moonDeclination: number;    // signed degrees; |δ| > 23.4365° → OOB
+  isOutOfBounds: boolean;     // true when |moonDeclination| > 23.4365°
 }
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
@@ -157,6 +161,18 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
   const sunSignIdx = Math.floor(((sunLon % 360) + 360) % 360 / 30);
   const sunDegree  = Math.floor(((sunLon % 30) + 30) % 30);
 
+  // Moon speed (°/day) and Out of Bounds. Speed buckets follow the
+  // astrological convention: ≥13 fast (events unfold quickly, VoC windows
+  // are short), 12–13 normal, <12 slow (drag, longer VoC). OOB happens
+  // when the Moon's declination exceeds the ecliptic's obliquity —
+  // historically tied to "wild card" days and major standstill epochs.
+  const moonSpeedDegPerDay = calcMoonSpeed(jd);
+  const moonSpeedAbs = Math.abs(moonSpeedDegPerDay);
+  const moonSpeedClass: "fast" | "normal" | "slow" =
+    moonSpeedAbs >= 13 ? "fast" : moonSpeedAbs >= 12 ? "normal" : "slow";
+  const moonDeclination = calcMoonDeclination(jd);
+  const isOutOfBounds = Math.abs(moonDeclination) > OBLIQUITY_DEG;
+
   return {
     phaseKey, phaseAngle: elongation, illumination, emoji,
     nextFull: fullDate, nextNew: newDate,
@@ -165,6 +181,8 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     northNodeSignIdx, southNodeSignIdx,
     lilithSignIdx,
     sunSignIdx, sunDegree,
+    moonSpeedDegPerDay, moonSpeedClass,
+    moonDeclination, isOutOfBounds,
   };
 }
 
@@ -589,6 +607,10 @@ export default function MoonPhasePage() {
           northNodeSign: signNames[result.northNodeSignIdx],
           southNodeSign: signNames[result.southNodeSignIdx],
           lilithSign: signNames[result.lilithSignIdx],
+          moonSpeedDegPerDay: result.moonSpeedDegPerDay,
+          moonSpeedClass: result.moonSpeedClass,
+          moonDeclination: result.moonDeclination,
+          isOutOfBounds: result.isOutOfBounds,
         }),
       });
       const data = await res.json();
@@ -905,25 +927,55 @@ export default function MoonPhasePage() {
                   </p>
                 </div>
 
-                {/* Astrological flags */}
-                {(result.isDarkMoon || result.voidOfCourse) && (
-                  <div className="flex flex-wrap justify-center gap-2 mt-5">
-                    {result.isDarkMoon && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#1C1512] text-[#C4A97A] border border-[rgba(196,169,122,0.3)]">
-                        <TermHint hint={moonHint(language, "darkMoon")}>
-                          🌑 {isRu ? "Тёмная Луна" : isEn ? "Dark Moon" : "Темний Місяць"}
-                        </TermHint>
+                {/* Astrological flags — always shows Moon speed; Dark Moon / VoC / OOB only when active */}
+                <div className="flex flex-wrap justify-center gap-2 mt-5">
+                  {/* Moon speed — always visible, colour-coded */}
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border ${
+                      result.moonSpeedClass === "fast"
+                        ? "bg-[rgba(212,168,83,0.15)] text-[#B8883A] border-[rgba(212,168,83,0.4)]"
+                        : result.moonSpeedClass === "slow"
+                        ? "bg-[rgba(122,106,88,0.12)] text-[#5C4530] border-[rgba(122,106,88,0.3)]"
+                        : "bg-[rgba(196,169,122,0.08)] text-[#7A6A58] border-[rgba(196,169,122,0.25)]"
+                    }`}
+                  >
+                    <TermHint hint={moonHint(language, "moonSpeed")}>
+                      {result.moonSpeedClass === "fast"
+                        ? (isRu ? "⚡ Быстрая Луна" : isEn ? "⚡ Fast Moon" : "⚡ Швидкий Місяць")
+                        : result.moonSpeedClass === "slow"
+                        ? (isRu ? "🐌 Медленная Луна" : isEn ? "🐌 Slow Moon" : "🐌 Повільний Місяць")
+                        : (isRu ? "Луна в норме" : isEn ? "Normal speed" : "Звичайна швидкість")}
+                      <span className="ml-1.5 opacity-70 normal-case">
+                        {Math.abs(result.moonSpeedDegPerDay).toFixed(1)}°/{isRu || !isEn ? "доба" : "day"}
                       </span>
-                    )}
-                    {result.voidOfCourse && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(196,169,122,0.12)] text-[#7A6A58] border border-[rgba(196,169,122,0.3)]">
-                        <TermHint hint={moonHint(language, "voc")}>
-                          ⊘ {isRu ? "Пустая Луна (VoC)" : isEn ? "Void of Course" : "Пустий Місяць (VoC)"}
-                        </TermHint>
-                      </span>
-                    )}
-                  </div>
-                )}
+                    </TermHint>
+                  </span>
+
+                  {result.isDarkMoon && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#1C1512] text-[#C4A97A] border border-[rgba(196,169,122,0.3)]">
+                      <TermHint hint={moonHint(language, "darkMoon")}>
+                        🌑 {isRu ? "Тёмная Луна" : isEn ? "Dark Moon" : "Темний Місяць"}
+                      </TermHint>
+                    </span>
+                  )}
+                  {result.voidOfCourse && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(196,169,122,0.12)] text-[#7A6A58] border border-[rgba(196,169,122,0.3)]">
+                      <TermHint hint={moonHint(language, "voc")}>
+                        ⊘ {isRu ? "Пустая Луна (VoC)" : isEn ? "Void of Course" : "Пустий Місяць (VoC)"}
+                      </TermHint>
+                    </span>
+                  )}
+                  {result.isOutOfBounds && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(28,21,18,0.85)] text-[#E8C98A] border border-[rgba(232,201,138,0.5)]">
+                      <TermHint hint={moonHint(language, "outOfBounds")}>
+                        🌠 {isRu ? "Out of Bounds" : isEn ? "Out of Bounds" : "Out of Bounds"}
+                        <span className="ml-1.5 opacity-80 normal-case">
+                          δ {result.moonDeclination >= 0 ? "+" : ""}{result.moonDeclination.toFixed(1)}°
+                        </span>
+                      </TermHint>
+                    </span>
+                  )}
+                </div>
 
                 {/* Lunar nodes + Lilith */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 text-left">

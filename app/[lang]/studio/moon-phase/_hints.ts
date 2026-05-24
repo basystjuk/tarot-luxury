@@ -20,7 +20,9 @@ export type HintKey =
   | "southNode"
   | "lilith"
   | "nextFull"
-  | "nextNew";
+  | "nextNew"
+  | "moonSpeed"
+  | "outOfBounds";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -79,6 +81,16 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Дата найближчого новомісяця — точка перезапуску циклу. Найкращий момент для нових намірів, обіцянок собі та посівання задумів на наступні ~28 діб.",
     ru: "Дата ближайшего новолуния — точка перезапуска цикла. Лучший момент для новых намерений, обещаний себе и посева замыслов на следующие ~28 дней.",
     en: "Date of the next new Moon — the cycle's restart point. The best moment for new intentions, promises to yourself, and planting seeds for the next ~28 days.",
+  },
+  moonSpeed: {
+    uk: "Швидкість Місяця (°/добу) — між 11,6° (повільний, біля апогею) та 15,4° (швидкий, біля перигею). ≥13°/добу: події розгортаються стрімко, рішення «приклеюються» швидко, вікно Void of Course коротке. <12°/добу: повільніший темп, можливі затримки, VoC триває довше.",
+    ru: "Скорость Луны (°/сутки) — между 11,6° (медленная, у апогея) и 15,4° (быстрая, у перигея). ≥13°/сутки: события разворачиваются стремительно, решения «приклеиваются» быстро, окно Void of Course короткое. <12°/сутки: более медленный темп, возможны задержки, VoC длится дольше.",
+    en: "Moon speed (°/day) — between 11.6° (slow, near apogee) and 15.4° (fast, near perigee). ≥13°/day: events unfold quickly, decisions 'stick' fast, the Void of Course window is short. <12°/day: slower tempo, possible delays, longer VoC.",
+  },
+  outOfBounds: {
+    uk: "Out of Bounds — Місяць виходить за межі звичного коридору декліннації (більше за нахил екліптики, ≈23.44°). Енергія «дика» й неприборкана: можуть зʼявлятись несподівані рішення, ірраціональні пориви, креативні прориви. Для частини астрологів — магічний, для інших — нестабільний день.",
+    ru: "Out of Bounds — Луна выходит за пределы обычного коридора склонения (больше наклона эклиптики, ≈23.44°). Энергия «дикая» и неприручённая: возможны неожиданные решения, иррациональные порывы, креативные прорывы. Для одних астрологов — магический, для других — нестабильный день.",
+    en: "Out of Bounds — the Moon's declination exceeds the ecliptic's obliquity (≈23.44°). The energy is 'wild', unrestrained: unexpected decisions, irrational impulses, creative breakthroughs. To some astrologers it's magical, to others it's an unstable day.",
   },
 };
 
