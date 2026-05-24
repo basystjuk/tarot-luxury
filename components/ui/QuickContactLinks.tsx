@@ -39,9 +39,9 @@ export default function QuickContactLinks() {
   const isEn = language === 'en';
 
   const [contacts, setContacts] = useState({
-    telegram_handle: '@ellen_soul_taro',
-    telegram_url: 'https://t.me/ellen_soul_taro',
-    whatsapp_url: 'https://wa.me/380000000000',
+    telegram_handle: '@ellen_rouge',
+    telegram_url: 'https://t.me/ellen_rouge',
+    whatsapp_url: 'https://wa.me/380502318988',
     instagram_handle: '@ellen_soul_taro',
     instagram_url: 'https://instagram.com/ellen_soul_taro',
   });
