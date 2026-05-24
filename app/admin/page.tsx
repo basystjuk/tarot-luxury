@@ -462,7 +462,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     desc_uk: string; desc_ru: string; desc_en: string;
   };
   const DEFAULT_STUDIO_TOOLS: StudioTool[] = [
-    { id: "moon-phase", title_uk: "Місячний гороскоп", title_ru: "Лунный гороскоп", title_en: "Moon Horoscope", desc_uk: "Дізнайтесь поточну фазу Місяця...", desc_ru: "Узнайте текущую фазу Луны...", desc_en: "Find the current Moon phase..." },
+    { id: "moon-phase", title_uk: "Місячний провідник", title_ru: "Лунный проводник", title_en: "Moon Guide", desc_uk: "Точна фаза, знак і градус Місяця на будь-яку дату. Темний Місяць, Void of Course, вузли, Ліліт — особисте місячне послання.", desc_ru: "Точная фаза, знак и градус Луны на любую дату. Тёмная Луна, Void of Course, узлы, Лилит — личное лунное послание.", desc_en: "The precise Moon phase, sign and degree for any date. Dark Moon, Void of Course, nodes, Lilith — a personal lunar message." },
     { id: "compatibility", title_uk: "Сумісність знаків", title_ru: "Совместимость знаков", title_en: "Sign Compatibility", desc_uk: "Перевірте астрологічну сумісність...", desc_ru: "Проверьте астрологическую совместимость...", desc_en: "Check the astrological compatibility..." },
     { id: "daily-card", title_uk: "Карта дня", title_ru: "Карта дня", title_en: "Card of the Day", desc_uk: "Щоденна карта Старшого Аркану...", desc_ru: "Ежедневная карта Старшего Аркана...", desc_en: "Daily Major Arcana card..." },
     { id: "numerology", title_uk: "Нумерологія", title_ru: "Нумерология", title_en: "Numerology", desc_uk: "Ваше число Долі...", desc_ru: "Ваше число Судьбы...", desc_en: "Your Destiny number..." },

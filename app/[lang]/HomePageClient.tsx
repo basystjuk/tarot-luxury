@@ -81,9 +81,9 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       href: `/${language}/studio/moon-phase`,
       glyph: "🌙",
       accent: "from-[#C4A97A] to-[#9A6E28]",
-      title: "Місячний провідник",
+      title: "Лунный проводник",
       subtitle: "Луна · Астрология",
-      desc: "Точная фаза и знак Луны на любую дату. Личное лунное послание от Ellen Soul.",
+      desc: "Точная фаза, знак и градус Луны на любую дату. Тёмная Луна, Void of Course, узлы, Лилит — личное лунное послание.",
     },
   ] : isEn ? [
     {
@@ -116,7 +116,7 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       accent: "from-[#C4A97A] to-[#9A6E28]",
       title: "Moon Guide",
       subtitle: "Moon · Astrology",
-      desc: "The precise Moon phase and sign for any date. A personal lunar message from Ellen Soul.",
+      desc: "The precise Moon phase, sign and degree for any date. Dark Moon, Void of Course, nodes, Lilith — a personal lunar message.",
     },
   ] : [
     {
@@ -149,7 +149,7 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       accent: "from-[#C4A97A] to-[#9A6E28]",
       title: "Місячний провідник",
       subtitle: "Місяць · Астрологія",
-      desc: "Точна фаза і знак Місяця на будь-яку дату. Особисте місячне послання від Ellen Soul.",
+      desc: "Точна фаза, знак і градус Місяця на будь-яку дату. Темний Місяць, Void of Course, вузли, Ліліт — особисте місячне послання.",
     },
   ];
 
