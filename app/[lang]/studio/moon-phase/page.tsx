@@ -8,6 +8,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { dateToJD, calcPlanetDeg, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
+import { moonAdvice, type AdviceKey } from "./_advice";
 
 type PhaseKey =
   | "new"
@@ -389,6 +390,83 @@ function CustomDropdown({
         </ul>
       )}
     </div>
+  );
+}
+
+// ── Expand block ("Що це для тебе?") ───────────────────────────────────────
+// Native <details> styled to match the brand. Used below Dark Moon / VoC
+// badges to give first-time visitors concrete do/don't lists and a small
+// ritual without burning another AI call. The personal AI message at the
+// bottom of the page still carries the day's specific nuance.
+function AdviceExpand({
+  language,
+  adviceKey,
+  badge,
+  question,
+}: {
+  language: string;
+  adviceKey: AdviceKey;
+  badge: React.ReactNode; // e.g. "🌑 Темний Місяць"
+  question: string;       // localised "Що це для тебе зараз?"
+}) {
+  const advice = moonAdvice(language, adviceKey);
+  return (
+    <details className="group rounded-2xl border border-[rgba(196,169,122,0.25)] bg-[rgba(255,253,248,0.7)] transition-colors hover:border-[rgba(196,169,122,0.45)] text-left">
+      <summary
+        className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer list-none select-none"
+        style={{ fontFamily: "var(--font-cormorant)" }}
+      >
+        <span className="text-[#1C1512] text-base sm:text-lg font-medium flex-1">
+          {badge}
+          <span className="block text-xs sm:text-sm text-[#7A6A58] italic mt-0.5">{question}</span>
+        </span>
+        <ChevronDown
+          size={18}
+          className="text-[#C4A97A] transition-transform duration-300 group-open:rotate-180 flex-shrink-0"
+        />
+      </summary>
+      <div className="px-5 pb-5 pt-1 space-y-4">
+        <p className="text-sm text-[#5C4530] leading-relaxed">{advice.intro}</p>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] text-[#B8883A] tracking-widest uppercase mb-2 font-medium">
+              ✓ {advice.doTitle}
+            </p>
+            <ul className="space-y-1.5 text-sm text-[#5C4530]">
+              {advice.doList.map((item, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-[#C4A97A] mt-0.5">·</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="text-[10px] text-[#9A8A78] tracking-widest uppercase mb-2 font-medium">
+              ✕ {advice.avoidTitle}
+            </p>
+            <ul className="space-y-1.5 text-sm text-[#7A6A58]">
+              {advice.avoidList.map((item, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-[#C4A97A]/60 mt-0.5">·</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)]">
+          <p className="text-[10px] text-[#B8883A] tracking-widest uppercase mb-1 font-medium">
+            ✦ {advice.ritualTitle}
+          </p>
+          <p className="text-sm text-[#5C4530] italic leading-relaxed" style={{ fontFamily: "var(--font-cormorant)" }}>
+            {advice.ritual}
+          </p>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -908,6 +986,28 @@ export default function MoonPhasePage() {
                   </div>
                 </div>
               </div>
+
+              {/* ── "Що це для тебе?" expand blocks for Dark Moon / VoC ── */}
+              {(result.isDarkMoon || result.voidOfCourse) && (
+                <div className="space-y-3 mb-6">
+                  {result.isDarkMoon && (
+                    <AdviceExpand
+                      language={language}
+                      adviceKey="darkMoon"
+                      badge={<>🌑 {isRu ? "Тёмная Луна" : isEn ? "Dark Moon" : "Темний Місяць"}</>}
+                      question={isRu ? "Что это для тебя сейчас?" : isEn ? "What does this mean for you right now?" : "Що це для тебе зараз?"}
+                    />
+                  )}
+                  {result.voidOfCourse && (
+                    <AdviceExpand
+                      language={language}
+                      adviceKey="voc"
+                      badge={<>⊘ {isRu ? "Пустая Луна (Void of Course)" : isEn ? "Void of Course" : "Пустий Місяць (Void of Course)"}</>}
+                      question={isRu ? "Что это для тебя сейчас?" : isEn ? "What does this mean for you right now?" : "Що це для тебе зараз?"}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* ── AI personal message ── */}
               {!aiResult && (
