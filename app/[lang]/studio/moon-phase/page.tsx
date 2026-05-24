@@ -10,6 +10,7 @@ import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
 import { MoonCalendar } from "./_calendar";
+import { findMoonStarConjunction, type FixedStar } from "./_fixed-stars";
 
 type PhaseKey =
   | "new"
@@ -55,6 +56,8 @@ interface MoonData {
   rulerActive: PlanetKey;     // whichever of day/night is currently active
   eclipseType: "solar" | "lunar" | null;
   eclipseProximity: number;   // 0–100, higher = closer to exact alignment
+  fixedStar: FixedStar | null; // closest fixed star within 1° orb, if any
+  fixedStarOrb: number;        // arc-minutes from exact when fixedStar set
 }
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
@@ -170,6 +173,12 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     eclipseProximity = Math.max(0, Math.round(100 * (1 - moonNodeDist / 12)));
   }
 
+  // Fixed star conjunction — only the closest star within 1°. The Moon
+  // moves ~13°/day so this is a ~2-hour window when it does happen.
+  const starHit = findMoonStarConjunction(moonLon);
+  const fixedStar = starHit?.star ?? null;
+  const fixedStarOrb = starHit ? Math.round(starHit.orb * 60) : 0; // arc-minutes
+
   let phaseKey: PhaseKey;
   let emoji: string;
   if      (elongation < 22.5 || elongation >= 337.5) { phaseKey = "new";             emoji = "🌑"; }
@@ -241,6 +250,8 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     rulerActive,
     eclipseType,
     eclipseProximity,
+    fixedStar,
+    fixedStarOrb,
   };
 }
 
@@ -720,6 +731,13 @@ export default function MoonPhasePage() {
           rulerParticipating: result.rulerParticipating,
           eclipseType: result.eclipseType,
           eclipseProximity: result.eclipseProximity,
+          fixedStarName: result.fixedStar
+            ? result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].name
+            : null,
+          fixedStarMeaning: result.fixedStar
+            ? result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].meaning
+            : null,
+          fixedStarOrb: result.fixedStarOrb,
         }),
       });
       const data = await res.json();
@@ -1171,6 +1189,16 @@ export default function MoonPhasePage() {
                         {result.eclipseType === "solar"
                           ? (isRu ? "🌒 СОЛНЕЧНОЕ ЗАТМЕНИЕ" : isEn ? "🌒 SOLAR ECLIPSE" : "🌒 СОНЯЧНЕ ЗАТЕМНЕННЯ")
                           : (isRu ? "🌕 ЛУННОЕ ЗАТМЕНИЕ" : isEn ? "🌕 LUNAR ECLIPSE" : "🌕 МІСЯЧНЕ ЗАТЕМНЕННЯ")}
+                      </TermHint>
+                    </span>
+                  )}
+                  {result.fixedStar && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(212,168,83,0.18)] text-[#5C4530] border border-[rgba(212,168,83,0.45)]">
+                      <TermHint
+                        hint={`${result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].name} — ${result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].meaning}`}
+                      >
+                        ✦ {result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].name}
+                        <span className="ml-1.5 opacity-70 normal-case">±{result.fixedStarOrb}′</span>
                       </TermHint>
                     </span>
                   )}

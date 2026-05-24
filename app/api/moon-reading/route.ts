@@ -62,6 +62,9 @@ export async function POST(req: NextRequest) {
     rulerParticipating,
     eclipseType,
     eclipseProximity,
+    fixedStarName,
+    fixedStarMeaning,
+    fixedStarOrb,
   } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -171,8 +174,25 @@ export async function POST(req: NextRequest) {
     ? `Today is a LUNAR ECLIPSE${eclipseProxNote} — an accelerated chapter ending. What was hidden surfaces. Don't start anything new; let the cycle close.`
     : "";
 
+  // Fixed star conjunction — short ~2h window that tints the day with the
+  // star's distinct character. Pass the localised name+meaning so the AI
+  // can lean into the specific archetype.
+  const starOrbNote = typeof fixedStarOrb === "number" && fixedStarOrb > 0 ? ` (орб ±${fixedStarOrb}′)` : "";
+  const starOrbNoteRu = typeof fixedStarOrb === "number" && fixedStarOrb > 0 ? ` (орб ±${fixedStarOrb}′)` : "";
+  const starOrbNoteEn = typeof fixedStarOrb === "number" && fixedStarOrb > 0 ? ` (orb ±${fixedStarOrb}′)` : "";
+  const starBlockUk = fixedStarName
+    ? `Місяць у зʼєднанні з нерухомою зіркою ${fixedStarName}${starOrbNote} — ${fixedStarMeaning}`
+    : "";
+  const starBlockRu = fixedStarName
+    ? `Луна в соединении с неподвижной звездой ${fixedStarName}${starOrbNoteRu} — ${fixedStarMeaning}`
+    : "";
+  const starBlockEn = fixedStarName
+    ? `The Moon is conjunct the fixed star ${fixedStarName}${starOrbNoteEn} — ${fixedStarMeaning}`
+    : "";
+
   const extraBlockUk = [
     eclipseBlockUk,
+    starBlockUk,
     isDarkMoon ? "Зараз ТЕМНИЙ МІСЯЦЬ (передноволуння) — енергія повного спокою, інтроверсія, ритуали відпускання, не починай нічого нового." : "",
     voidOfCourse ? "Місяць ПУСТИЙ (Void of Course) — рішення цього періоду рідко реалізуються; добре для рутини, відпочинку, медитації; не підписуй контрактів." : "",
     speedBlockUk,
@@ -184,6 +204,7 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join(" ");
   const extraBlockRu = [
     eclipseBlockRu,
+    starBlockRu,
     isDarkMoon ? "Сейчас ТЁМНАЯ ЛУНА (предноволуние) — энергия полного покоя, интроверсия, ритуалы отпускания, не начинай ничего нового." : "",
     voidOfCourse ? "Луна ПУСТАЯ (Void of Course) — решения этого периода редко реализуются; хорошо для рутины, отдыха, медитации; не подписывай контрактов." : "",
     speedBlockRu,
@@ -195,6 +216,7 @@ export async function POST(req: NextRequest) {
   ].filter(Boolean).join(" ");
   const extraBlockEn = [
     eclipseBlockEn,
+    starBlockEn,
     isDarkMoon ? "It is currently the DARK MOON (pre-new) — energy of complete rest, introversion, release rituals; do not start anything new." : "",
     voidOfCourse ? "The Moon is VOID OF COURSE — decisions made in this window rarely manifest; good for routine, rest, meditation; do not sign contracts." : "",
     speedBlockEn,

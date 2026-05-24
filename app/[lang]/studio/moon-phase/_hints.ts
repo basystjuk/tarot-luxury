@@ -28,7 +28,8 @@ export type HintKey =
   | "calendar"
   | "recommendations"
   | "eclipseSolar"
-  | "eclipseLunar";
+  | "eclipseLunar"
+  | "fixedStar";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -122,6 +123,11 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Місячне затемнення — на повному Місяці Земля кидає тінь на Місяць. Найпотужніший повний Місяць циклу: те, що довго було приховане, виходить на світло. Відчуття пришвидшеного завершення розділу; емоції яскраві, інтуїція гостра. Не починай нового; дозволь циклу закритися.",
     ru: "Лунное затмение — на полнолуние Земля бросает тень на Луну. Самое мощное полнолуние цикла: то, что долго было скрыто, выходит на свет. Ощущение ускоренного завершения главы; эмоции ярки, интуиция остра. Не начинай нового; дай циклу закрыться.",
     en: "Lunar eclipse — at the full moon Earth's shadow falls on the Moon. The most potent full moon of its cycle: what's been hidden surfaces. A sense of an accelerated ending; emotions vivid, intuition sharp. Don't start anything new — let the cycle close.",
+  },
+  fixedStar: {
+    uk: "Сполучення з нерухомою зіркою — Місяць перебуває в орбі ≤1° від однієї з відомих стародавніх зірок (Альдебаран, Антарес, Регул, Алголь і т.д.). Це коротке (~2 години) вікно, коли день набуває яскраво вираженого характеру цієї зірки. Кожна зірка несе свою тему — детальніше в підказці біля назви.",
+    ru: "Соединение с неподвижной звездой — Луна находится в орбе ≤1° от одной из известных древних звёзд (Альдебаран, Антарес, Регул, Алголь и т.д.). Это короткое (~2 часа) окно, когда день приобретает ярко выраженный характер этой звезды. У каждой звезды своя тема — подробнее в подсказке у названия.",
+    en: "Fixed star conjunction — the Moon is within a ≤1° orb of one of the famous classical stars (Aldebaran, Antares, Regulus, Algol, etc.). A short (~2h) window when the day takes on that star's distinct character. Each star carries its own theme — see the tooltip on the star's name.",
   },
   recommendations: {
     uk: "Кристали, олії та трав'яні чаї, що резонують зі знаком, у якому зараз Місяць. AI підбирає по три позиції в кожній категорії з коротким поясненням «чому саме воно». Окремий ліміт — 1 запит на добу; повторні відкриття цього самого знака беруться з кешу й не витрачають квоту.",
