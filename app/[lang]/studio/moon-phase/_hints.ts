@@ -25,7 +25,8 @@ export type HintKey =
   | "outOfBounds"
   | "triplicity"
   | "sect"
-  | "calendar";
+  | "calendar"
+  | "recommendations";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -109,6 +110,11 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Місячний календар — фаза, знак і градус Місяця на кожен день місяця. Повний Місяць позначено теплим, новий — приглушеним тоном. Натисни на будь-яку дату — форма перейде в режим «Інша дата» і покаже послання саме цього дня.",
     ru: "Лунный календарь — фаза, знак и градус Луны на каждый день месяца. Полнолуние выделено тёплым, новолуние — приглушённым тоном. Нажми на любую дату — форма переключится в режим «Другая дата» и покажет послание именно этого дня.",
     en: "Lunar calendar — Moon phase, sign and degree for every day of the month. Full moons are tinted warm, new moons cool. Tap any date — the form switches to 'Other date' mode and shows the message for that day.",
+  },
+  recommendations: {
+    uk: "Кристали, олії та трав'яні чаї, що резонують зі знаком, у якому зараз Місяць. AI підбирає по три позиції в кожній категорії з коротким поясненням «чому саме воно». Окремий ліміт — 1 запит на добу; повторні відкриття цього самого знака беруться з кешу й не витрачають квоту.",
+    ru: "Кристаллы, масла и травяные чаи, резонирующие со знаком, в котором сейчас Луна. AI подбирает по три позиции в каждой категории с коротким объяснением «почему именно оно». Отдельный лимит — 1 запрос в сутки; повторные открытия того же знака берутся из кэша и не тратят квоту.",
+    en: "Crystals, essential oils and herbal teas resonating with the Moon's current sign. The AI curates three picks per category with a short 'why' line. Separate daily quota — 1 request per day; re-opening the same sign uses cache and doesn't burn quota.",
   },
 };
 

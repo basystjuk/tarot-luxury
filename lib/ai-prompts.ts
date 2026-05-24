@@ -21,12 +21,14 @@ export type PromptToolId =
   | "tarot-reading"
   | "numerology-synthesis"
   | "moon-reading"
+  | "moon-recommendations"
   | "compatibility-reading";
 
 export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "tarot-reading",
   "numerology-synthesis",
   "moon-reading",
+  "moon-recommendations",
   "compatibility-reading",
 ];
 
@@ -205,6 +207,31 @@ Write the message in {{language_name}}, in 3 paragraphs (no headers, no bullet p
 1) ENERGY (2 sentences — the precise quality of {{moonDegree}}° {{moonSign}} in this phase: name the specific archetype, tension or gift active right now; go deeper than "this is a time for…").
 2) CONCRETE ADVICE (1–2 sentences — name ONE specific ritual or action appropriate exactly for this phase in this sign; AVOID banalities like "meditate", "journal", "breathe deeply").
 3) AFFIRMATION (ONE short sentence, ≤15 words, starts with the first-person pronoun of the response language — "I" / "Я" — directly tied to {{moonDegree}}° {{moonSign}}).`,
+  },
+
+  "moon-recommendations": {
+    label: "Місяць — кристали, олії, чаї",
+    description: "AI-добірка кристалів, олій та чаїв під поточний знак Місяця (стихію). Окрема кнопка в інструменті Місячний провідник, окремий денний ліміт.",
+    variables: [
+      { name: "language_name", description: "Мова відповіді.", required: true },
+      { name: "moonSign", description: "Знак Місяця у мові відповіді.", required: true },
+      { name: "element", description: "Стихія знака у мові відповіді (Вогонь / Земля / Повітря / Вода).", required: true },
+    ],
+    defaultSystem: `You are a holistic lunar practitioner — equal parts gemstone therapist, aromatherapist and herbalist. Your audience is a curious, feminine reader who wants concrete, safe, easily-sourced recommendations she can act on tonight.
+
+${COMMON_LANG}
+
+OUTPUT FORMAT — return STRICTLY a single JSON object, no prose around it, no markdown fences. Shape exactly:
+{
+  "crystals": [{"name": "...", "why": "..."}, {"name": "...", "why": "..."}, {"name": "...", "why": "..."}],
+  "oils":     [{"name": "...", "why": "..."}, {"name": "...", "why": "..."}, {"name": "...", "why": "..."}],
+  "teas":     [{"name": "...", "why": "..."}, {"name": "...", "why": "..."}, {"name": "...", "why": "..."}]
+}
+
+Each "name" is the common name of the stone / essential oil / herb (1–3 words). Each "why" is ONE short sentence (≤18 words) explaining how it resonates with the Moon's current sign and element — no clichés, no generic "promotes balance", be specific. Avoid anything dangerous in pregnancy, toxic, or hard to source.`,
+    defaultUser: `The Moon is currently in {{moonSign}} ({{element}}).
+
+Return exactly three crystals, three essential oils, and three herbal teas that resonate with this Moon-sign and element combination right now. Write all "name" and "why" values in {{language_name}}. Return ONLY the JSON object — no preamble, no closing remarks, no code fences.`,
   },
 
   "compatibility-reading": {

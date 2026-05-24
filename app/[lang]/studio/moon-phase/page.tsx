@@ -538,6 +538,15 @@ export default function MoonPhasePage() {
   const [aiError, setAiError]         = useState<string | null>(null);
   const [aiRateLimited, setAiRateLimited] = useState(false);
 
+  // Phase #14 — crystal / oil / tea recommendations. Separate endpoint
+  // and separate daily quota from the main AI message.
+  type RecItem = { name: string; why: string };
+  type RecResult = { crystals: RecItem[]; oils: RecItem[]; teas: RecItem[] };
+  const [recResult, setRecResult] = useState<RecResult | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
+  const [recError, setRecError] = useState<string | null>(null);
+  const [recRateLimited, setRecRateLimited] = useState(false);
+
   const phaseContent    = isRu ? PHASE_CONTENT.ru    : isEn ? PHASE_CONTENT.en    : PHASE_CONTENT.uk;
   const moonSignContent = isRu ? MOON_SIGN_CONTENT.ru : isEn ? MOON_SIGN_CONTENT.en : MOON_SIGN_CONTENT.uk;
   const signNames       = isRu ? SIGNS_RU : isEn ? SIGNS_EN : SIGNS_UA;
@@ -698,6 +707,81 @@ export default function MoonPhasePage() {
       );
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  // Reset cached UI recs whenever the underlying sign changes so the user
+  // sees fresh content when they pick another date / today rolls over.
+  useEffect(() => {
+    setRecResult(null);
+    setRecError(null);
+    setRecRateLimited(false);
+  }, [result?.moonSignIdx, language]);
+
+  const recCacheKey = (lang: string, signIdx: number) => `moonRec:${lang}:${signIdx}`;
+
+  const handleRecommendations = async () => {
+    if (!result) return;
+
+    // Client-side cache by (language × moon sign) — recommendations don't
+    // change with the day, only with the sign, so the same sign hits the
+    // cache forever. Saves both the user's daily quota and Groq tokens.
+    const key = recCacheKey(language, result.moonSignIdx);
+    try {
+      const cached = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+      if (cached) {
+        const parsed = JSON.parse(cached) as RecResult;
+        if (parsed?.crystals && parsed?.oils && parsed?.teas) {
+          setRecResult(parsed);
+          return;
+        }
+      }
+    } catch { /* corrupt cache — fall through and refetch */ }
+
+    setRecLoading(true);
+    setRecError(null);
+    setRecRateLimited(false);
+    try {
+      const res = await fetch("/api/moon-recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language,
+          moonSign: signNames[result.moonSignIdx],
+          moonSignEn: SIGNS_EN[result.moonSignIdx],
+          element: result.element,
+        }),
+      });
+      const data = await res.json();
+      if (data.error === "rate_limit") {
+        setRecRateLimited(true);
+        setRecError(
+          isRu ? "Лимит 1 запрос рекомендаций в сутки. Возвращайтесь завтра 🌿"
+          : isEn ? "1 recommendations request per day limit reached. Come back tomorrow 🌿"
+          : "Ліміт 1 запит рекомендацій на добу. Повертайтесь завтра 🌿"
+        );
+      } else if (data.error) {
+        setRecError(
+          isRu ? "Что-то пошло не так. Попробуйте позже."
+          : isEn ? "Something went wrong. Please try again later."
+          : "Щось пішло не так. Спробуйте пізніше."
+        );
+      } else {
+        setRecResult(data as RecResult);
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(key, JSON.stringify(data));
+          }
+        } catch { /* quota full or private mode — non-fatal */ }
+      }
+    } catch {
+      setRecError(
+        isRu ? "Ошибка соединения. Попробуйте позже."
+        : isEn ? "Connection error. Please try again."
+        : "Помилка з'єднання. Спробуйте пізніше."
+      );
+    } finally {
+      setRecLoading(false);
     }
   };
 
@@ -1254,6 +1338,80 @@ export default function MoonPhasePage() {
                   </div>
                 </div>
               )}
+
+              {/* ── Recommendations (Phase #14) — separate AI call, separate daily quota.
+                  Cached client-side per (language × moon sign): the same sign never
+                  re-fetches. Only the very first click for a fresh sign burns quota. */}
+              <div className="card-luxury mt-6">
+                <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-1">
+                      <TermHint hint={moonHint(language, "recommendations")}>
+                        {isRu ? "Кристаллы · масла · чаи" : isEn ? "Crystals · oils · teas" : "Кристали · олії · чаї"}
+                      </TermHint>
+                    </p>
+                    <h3 className="text-xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                      {isRu ? "Поддержка для Луны в" : isEn ? "Support for the Moon in" : "Підтримка для Місяця у"}{" "}
+                      <span className="text-[#B8883A]">{SIGN_GLYPHS[result.moonSignIdx]} {signNames[result.moonSignIdx]}</span>
+                    </h3>
+                  </div>
+                </div>
+
+                {!recResult && !recRateLimited && (
+                  <button
+                    type="button"
+                    onClick={handleRecommendations}
+                    disabled={recLoading}
+                    className="btn-primary w-full min-h-[48px] flex items-center justify-center gap-2"
+                  >
+                    {recLoading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        {isRu ? "Подбираем…" : isEn ? "Curating…" : "Підбираємо…"}
+                      </span>
+                    ) : (
+                      <>✦ {isRu ? "Получить рекомендации" : isEn ? "Get recommendations" : "Отримати рекомендації"}</>
+                    )}
+                  </button>
+                )}
+
+                {recError && (
+                  <p className={`text-sm text-center ${recRateLimited ? "text-[#7A6A58] italic" : "text-[#9A6E28]"}`}>
+                    {recError}
+                  </p>
+                )}
+
+                {recResult && (
+                  <div className="grid sm:grid-cols-3 gap-3 mt-4">
+                    {([
+                      { key: "crystals" as const, glyph: "✦",
+                        title: isRu ? "Кристаллы" : isEn ? "Crystals" : "Кристали" },
+                      { key: "oils" as const, glyph: "💧",
+                        title: isRu ? "Эфирные масла" : isEn ? "Essential oils" : "Ефірні олії" },
+                      { key: "teas" as const, glyph: "🍵",
+                        title: isRu ? "Травяные чаи" : isEn ? "Herbal teas" : "Травʼяні чаї" },
+                    ]).map(group => (
+                      <div key={group.key} className="p-4 rounded-2xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.18)]">
+                        <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-3 text-center">
+                          {group.glyph} {group.title}
+                        </p>
+                        <ul className="space-y-3">
+                          {recResult[group.key].map((item, i) => (
+                            <li key={i}>
+                              <p className="text-sm text-[#5C4530] font-medium" style={{ fontFamily: "var(--font-cormorant)" }}>
+                                {item.name}
+                              </p>
+                              <p className="text-xs text-[#7A6A58] mt-0.5 leading-relaxed">
+                                {item.why}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </AnimatedSection>
           )}
 
