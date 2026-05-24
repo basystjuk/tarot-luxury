@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles, ChevronDown, Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
-import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, OBLIQUITY_DEG, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
+import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
@@ -46,6 +46,12 @@ interface MoonData {
   moonSpeedClass: "fast" | "normal" | "slow"; // ≥13 fast, 12–13 normal, <12 slow
   moonDeclination: number;    // signed degrees; |δ| > 23.4365° → OOB
   isOutOfBounds: boolean;     // true when |moonDeclination| > 23.4365°
+  element: ElementKey;        // element of the Moon's sign (fire/earth/air/water)
+  isDayChart: boolean;        // approximated from hour: 6–18 = day
+  rulerDay: PlanetKey;        // day triplicity ruler for the element
+  rulerNight: PlanetKey;      // night triplicity ruler
+  rulerParticipating: PlanetKey; // participating ruler (always present)
+  rulerActive: PlanetKey;     // whichever of day/night is currently active
 }
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
@@ -173,6 +179,13 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
   const moonDeclination = calcMoonDeclination(jd);
   const isOutOfBounds = Math.abs(moonDeclination) > OBLIQUITY_DEG;
 
+  // Triplicity rulers for the Moon's sign element. Sect (day/night) is
+  // approximated by local hour until natal-mode brings true sunrise data.
+  const element = (["fire", "earth", "air", "water"] as const)[SIGN_TO_ELEMENT[moonSignIdx]];
+  const triplicity = TRIPLICITY[element];
+  const isDayChart = isDayChartByHour(hour);
+  const rulerActive = isDayChart ? triplicity.day : triplicity.night;
+
   return {
     phaseKey, phaseAngle: elongation, illumination, emoji,
     nextFull: fullDate, nextNew: newDate,
@@ -183,6 +196,11 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     sunSignIdx, sunDegree,
     moonSpeedDegPerDay, moonSpeedClass,
     moonDeclination, isOutOfBounds,
+    element, isDayChart,
+    rulerDay: triplicity.day,
+    rulerNight: triplicity.night,
+    rulerParticipating: triplicity.participating,
+    rulerActive,
   };
 }
 
@@ -523,6 +541,23 @@ export default function MoonPhasePage() {
   const moonSignContent = isRu ? MOON_SIGN_CONTENT.ru : isEn ? MOON_SIGN_CONTENT.en : MOON_SIGN_CONTENT.uk;
   const signNames       = isRu ? SIGNS_RU : isEn ? SIGNS_EN : SIGNS_UA;
 
+  // Localised element + planet labels for the Triplicity card.
+  const elementLabel: Record<ElementKey, { name: string; glyph: string }> = {
+    fire:  { name: isRu ? "Огонь"   : isEn ? "Fire"  : "Вогонь", glyph: "🔥" },
+    earth: { name: isRu ? "Земля"   : isEn ? "Earth" : "Земля",  glyph: "🌿" },
+    air:   { name: isRu ? "Воздух"  : isEn ? "Air"   : "Повітря", glyph: "🌬" },
+    water: { name: isRu ? "Вода"    : isEn ? "Water" : "Вода",    glyph: "💧" },
+  };
+  const planetLabel: Record<PlanetKey, { name: string; glyph: string }> = {
+    sun:     { name: isRu ? "Солнце"   : isEn ? "Sun"     : "Сонце",   glyph: "☉" },
+    moon:    { name: isRu ? "Луна"     : isEn ? "Moon"    : "Місяць",  glyph: "☽" },
+    mercury: { name: isRu ? "Меркурий" : isEn ? "Mercury" : "Меркурій", glyph: "☿" },
+    venus:   { name: isRu ? "Венера"   : isEn ? "Venus"   : "Венера",  glyph: "♀" },
+    mars:    { name: isRu ? "Марс"     : isEn ? "Mars"    : "Марс",    glyph: "♂" },
+    jupiter: { name: isRu ? "Юпитер"   : isEn ? "Jupiter" : "Юпітер",  glyph: "♃" },
+    saturn:  { name: isRu ? "Сатурн"   : isEn ? "Saturn"  : "Сатурн",  glyph: "♄" },
+  };
+
   // Auto-calculate today on first render — use current hour/minute for live data
   const [initialized, setInitialized] = useState(false);
   if (!initialized) {
@@ -611,6 +646,12 @@ export default function MoonPhasePage() {
           moonSpeedClass: result.moonSpeedClass,
           moonDeclination: result.moonDeclination,
           isOutOfBounds: result.isOutOfBounds,
+          element: result.element,
+          isDayChart: result.isDayChart,
+          rulerActive: result.rulerActive,
+          rulerDay: result.rulerDay,
+          rulerNight: result.rulerNight,
+          rulerParticipating: result.rulerParticipating,
         }),
       });
       const data = await res.json();
@@ -1011,6 +1052,64 @@ export default function MoonPhasePage() {
                       {SIGN_GLYPHS[result.lilithSignIdx]} {signNames[result.lilithSignIdx]}
                     </p>
                     <p className="text-[10px] text-[#9A8A78] mt-0.5 italic">{isRu ? "тень и сила" : isEn ? "shadow & power" : "тінь і сила"}</p>
+                  </div>
+                </div>
+
+                {/* Triplicity rulers — the day/night/participating helpers of the
+                    Moon's sign element. The currently-active ruler (per local hour)
+                    is highlighted. Day/night is approximated by hour 06–18 until
+                    natal-mode brings true sunrise data. */}
+                <div className="mt-5 p-4 rounded-2xl bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.18)] text-left">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase">
+                      <TermHint hint={moonHint(language, "triplicity")}>
+                        {isRu ? "Управители стихии" : isEn ? "Triplicity rulers" : "Управителі стихії"}
+                      </TermHint>
+                      <span className="ml-2 text-[#7A6A58] normal-case tracking-normal">
+                        · {elementLabel[result.element].glyph} {elementLabel[result.element].name}
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-[#9A8A78] italic">
+                      <TermHint hint={moonHint(language, "sect")}>
+                        {result.isDayChart
+                          ? (isRu ? "☀ Дневная секта" : isEn ? "☀ Day chart" : "☀ Денна секта")
+                          : (isRu ? "🌙 Ночная секта" : isEn ? "🌙 Night chart" : "🌙 Нічна секта")}
+                      </TermHint>
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["day", "night", "participating"] as const).map(slot => {
+                      const planet =
+                        slot === "day" ? result.rulerDay
+                        : slot === "night" ? result.rulerNight
+                        : result.rulerParticipating;
+                      const isActive = slot !== "participating" && planet === result.rulerActive;
+                      const slotLabel =
+                        slot === "day" ? (isRu ? "День" : isEn ? "Day" : "День")
+                        : slot === "night" ? (isRu ? "Ночь" : isEn ? "Night" : "Ніч")
+                        : (isRu ? "Помощник" : isEn ? "Helper" : "Помічник");
+                      const slotGlyph = slot === "day" ? "☀" : slot === "night" ? "🌙" : "⚹";
+                      return (
+                        <div
+                          key={slot}
+                          className={`p-2.5 rounded-xl border text-center transition-colors ${
+                            isActive
+                              ? "bg-[rgba(212,168,83,0.18)] border-[rgba(212,168,83,0.45)]"
+                              : "bg-white/40 border-[rgba(196,169,122,0.18)]"
+                          }`}
+                        >
+                          <p className="text-[9px] text-[#9A8A78] tracking-widest uppercase">
+                            {slotGlyph} {slotLabel}
+                          </p>
+                          <p
+                            className={`text-sm mt-1 ${isActive ? "text-[#B8883A] font-medium" : "text-[#5C4530]"}`}
+                            style={{ fontFamily: "var(--font-cormorant)" }}
+                          >
+                            {planetLabel[planet].glyph} {planetLabel[planet].name}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

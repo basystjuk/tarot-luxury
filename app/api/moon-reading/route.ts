@@ -54,6 +54,12 @@ export async function POST(req: NextRequest) {
     moonSpeedClass,
     moonDeclination,
     isOutOfBounds,
+    element,
+    isDayChart,
+    rulerActive,
+    rulerDay,
+    rulerNight,
+    rulerParticipating,
   } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -115,11 +121,40 @@ export async function POST(req: NextRequest) {
   const oobRu = isOutOfBounds ? `Луна OUT OF BOUNDS (склонение ${declNum}°) — энергия дикая, неприручённая; возможны неожиданные решения, иррациональные порывы, креативные прорывы.` : "";
   const oobEn = isOutOfBounds ? `The Moon is OUT OF BOUNDS (declination ${declNum}°) — wild, unrestrained energy; expect unexpected decisions, irrational impulses, creative breakthroughs.` : "";
 
+  // Triplicity rulers — name the active ruler so the AI can call out
+  // through-which-planet the day's energy lands. We send English planet
+  // tokens; the prompt is locale-aware, so we translate inline here.
+  const PLANET_LOCAL: Record<string, { uk: string; ru: string; en: string }> = {
+    sun:     { uk: "Сонце",   ru: "Солнце",   en: "Sun"     },
+    moon:    { uk: "Місяць",  ru: "Луна",     en: "Moon"    },
+    mercury: { uk: "Меркурій", ru: "Меркурий", en: "Mercury" },
+    venus:   { uk: "Венера",  ru: "Венера",   en: "Venus"   },
+    mars:    { uk: "Марс",    ru: "Марс",     en: "Mars"    },
+    jupiter: { uk: "Юпітер",  ru: "Юпитер",   en: "Jupiter" },
+    saturn:  { uk: "Сатурн",  ru: "Сатурн",   en: "Saturn"  },
+  };
+  const ELEMENT_LOCAL: Record<string, { uk: string; ru: string; en: string }> = {
+    fire:  { uk: "Вогню", ru: "Огня",    en: "Fire"  },
+    earth: { uk: "Землі", ru: "Земли",   en: "Earth" },
+    air:   { uk: "Повітря", ru: "Воздуха", en: "Air"   },
+    water: { uk: "Води",  ru: "Воды",    en: "Water" },
+  };
+  const tripBlockUk = (element && rulerActive)
+    ? `Триплицитет стихії ${ELEMENT_LOCAL[element]?.uk}: активний управитель — ${PLANET_LOCAL[rulerActive]?.uk} (${isDayChart ? "денна" : "нічна"} секта). Денний: ${PLANET_LOCAL[rulerDay]?.uk}, нічний: ${PLANET_LOCAL[rulerNight]?.uk}, помічник: ${PLANET_LOCAL[rulerParticipating]?.uk}. Це шепіт планети, через яку «звучить» стихія саме зараз.`
+    : "";
+  const tripBlockRu = (element && rulerActive)
+    ? `Триплицитет стихии ${ELEMENT_LOCAL[element]?.ru}: активный управитель — ${PLANET_LOCAL[rulerActive]?.ru} (${isDayChart ? "дневная" : "ночная"} секта). Дневной: ${PLANET_LOCAL[rulerDay]?.ru}, ночной: ${PLANET_LOCAL[rulerNight]?.ru}, помощник: ${PLANET_LOCAL[rulerParticipating]?.ru}. Это шёпот планеты, через которую «звучит» стихия именно сейчас.`
+    : "";
+  const tripBlockEn = (element && rulerActive)
+    ? `Triplicity of ${ELEMENT_LOCAL[element]?.en}: active ruler is ${PLANET_LOCAL[rulerActive]?.en} (${isDayChart ? "diurnal" : "nocturnal"} sect). Day ruler: ${PLANET_LOCAL[rulerDay]?.en}, night ruler: ${PLANET_LOCAL[rulerNight]?.en}, participating: ${PLANET_LOCAL[rulerParticipating]?.en}. This is the whisper of the planet through which the element 'speaks' right now.`
+    : "";
+
   const extraBlockUk = [
     isDarkMoon ? "Зараз ТЕМНИЙ МІСЯЦЬ (передноволуння) — енергія повного спокою, інтроверсія, ритуали відпускання, не починай нічого нового." : "",
     voidOfCourse ? "Місяць ПУСТИЙ (Void of Course) — рішення цього періоду рідко реалізуються; добре для рутини, відпочинку, медитації; не підписуй контрактів." : "",
     speedBlockUk,
     oobUk,
+    tripBlockUk,
     northNodeSign ? `Північний вузол (Раху): ${northNodeSign} — карматичне зростання тут.` : "",
     southNodeSign ? `Південний вузол (Кету): ${southNodeSign} — звички з минулих циклів.` : "",
     lilithSign ? `Чорна Луна Ліліт у ${lilithSign} — тінь, табу, дикість, що просить визнання.` : "",
@@ -129,6 +164,7 @@ export async function POST(req: NextRequest) {
     voidOfCourse ? "Луна ПУСТАЯ (Void of Course) — решения этого периода редко реализуются; хорошо для рутины, отдыха, медитации; не подписывай контрактов." : "",
     speedBlockRu,
     oobRu,
+    tripBlockRu,
     northNodeSign ? `Северный узел (Раху): ${northNodeSign} — кармическое развитие здесь.` : "",
     southNodeSign ? `Южный узел (Кету): ${southNodeSign} — привычки из прошлых циклов.` : "",
     lilithSign ? `Чёрная Луна Лилит в ${lilithSign} — тень, табу, дикость, просящая признания.` : "",
@@ -138,6 +174,7 @@ export async function POST(req: NextRequest) {
     voidOfCourse ? "The Moon is VOID OF COURSE — decisions made in this window rarely manifest; good for routine, rest, meditation; do not sign contracts." : "",
     speedBlockEn,
     oobEn,
+    tripBlockEn,
     northNodeSign ? `North Node (Rahu): ${northNodeSign} — karmic growth lies here.` : "",
     southNodeSign ? `South Node (Ketu): ${southNodeSign} — habits from previous cycles.` : "",
     lilithSign ? `Black Moon Lilith in ${lilithSign} — the shadow, the taboo, the wildness asking to be acknowledged.` : "",

@@ -484,3 +484,48 @@ export function calcMoonDeclination(jd: number): number {
 /** Obliquity of the ecliptic — the threshold for the Moon being Out of Bounds. */
 export const OBLIQUITY_DEG = 23.4365;
 
+// ── Triplicity rulers (Hellenistic / Dorothean tradition) ─────────────────
+//
+// In the Dorothean tradition each element has three rulers — a day ruler,
+// a night ruler, and a participating (helper) ruler. Which one is "active"
+// depends on the sect of the chart: day charts (Sun above the horizon)
+// emphasise the day ruler; night charts (Sun below the horizon) emphasise
+// the night ruler. The participating ruler is always present but secondary.
+//
+// We don't have a horizon (no birth location yet — that's the natal-mode
+// work). For now we approximate sect by local hour: 06:00–17:59 = day,
+// 18:00–05:59 = night. Good enough until natal-mode adds true sunrise.
+
+/** 0 = Fire, 1 = Earth, 2 = Air, 3 = Water — index = signIdx % 4
+ *  (♈ Aries→Fire, ♉ Taurus→Earth, ♊ Gemini→Air, ♋ Cancer→Water, …). */
+export const SIGN_TO_ELEMENT: readonly number[] = [
+  0, 1, 2, 3, // Aries, Taurus, Gemini, Cancer
+  0, 1, 2, 3, // Leo, Virgo, Libra, Scorpio
+  0, 1, 2, 3, // Sagittarius, Capricorn, Aquarius, Pisces
+];
+
+export type ElementKey = "fire" | "earth" | "air" | "water";
+export const ELEMENT_KEYS: readonly ElementKey[] = ["fire", "earth", "air", "water"];
+
+export type PlanetKey = "sun" | "moon" | "mercury" | "venus" | "mars" | "jupiter" | "saturn";
+
+export interface TriplicityRulers {
+  element: ElementKey;
+  day: PlanetKey;
+  night: PlanetKey;
+  participating: PlanetKey;
+}
+
+/** Dorothean triplicity rulers. Keyed by ElementKey. */
+export const TRIPLICITY: Record<ElementKey, TriplicityRulers> = {
+  fire:  { element: "fire",  day: "sun",    night: "jupiter", participating: "saturn"  },
+  earth: { element: "earth", day: "venus",  night: "moon",    participating: "mars"    },
+  air:   { element: "air",   day: "saturn", night: "mercury", participating: "jupiter" },
+  water: { element: "water", day: "venus",  night: "mars",    participating: "moon"    },
+};
+
+/** Approximate "is it a day chart?" by local hour. 06:00 ≤ h < 18:00 = day. */
+export function isDayChartByHour(hour: number): boolean {
+  return hour >= 6 && hour < 18;
+}
+

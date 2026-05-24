@@ -22,7 +22,9 @@ export type HintKey =
   | "nextFull"
   | "nextNew"
   | "moonSpeed"
-  | "outOfBounds";
+  | "outOfBounds"
+  | "triplicity"
+  | "sect";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -91,6 +93,16 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Out of Bounds — Місяць виходить за межі звичного коридору декліннації (більше за нахил екліптики, ≈23.44°). Енергія «дика» й неприборкана: можуть зʼявлятись несподівані рішення, ірраціональні пориви, креативні прориви. Для частини астрологів — магічний, для інших — нестабільний день.",
     ru: "Out of Bounds — Луна выходит за пределы обычного коридора склонения (больше наклона эклиптики, ≈23.44°). Энергия «дикая» и неприручённая: возможны неожиданные решения, иррациональные порывы, креативные прорывы. Для одних астрологов — магический, для других — нестабильный день.",
     en: "Out of Bounds — the Moon's declination exceeds the ecliptic's obliquity (≈23.44°). The energy is 'wild', unrestrained: unexpected decisions, irrational impulses, creative breakthroughs. To some astrologers it's magical, to others it's an unstable day.",
+  },
+  triplicity: {
+    uk: "Управителі стихії (триплицитет) — у Дорофейській традиції кожна стихія (Вогонь / Земля / Повітря / Вода) має три «господарів»: денного, нічного й помічника. Активний управитель показує, через яку планету найкраще «звучить» енергія знака саме зараз.",
+    ru: "Управители стихии (триплицитет) — в Дорофейской традиции у каждой стихии (Огонь / Земля / Воздух / Вода) три «хозяина»: дневной, ночной и помощник. Активный управитель показывает, через какую планету лучше всего «звучит» энергия знака именно сейчас.",
+    en: "Triplicity rulers — in the Dorothean tradition each element (Fire / Earth / Air / Water) has three 'lords': day, night, and a helper. The active ruler shows which planet best channels the sign's energy right now.",
+  },
+  sect: {
+    uk: "Секта (день / ніч) — у Геленістичній традиції чарти діляться на денні (Сонце над горизонтом) і нічні (Сонце під горизонтом). Це впливає на те, який саме управитель стихії «активний». Поки локацію не введено, секту визначаємо за годинником: 06:00–18:00 = день.",
+    ru: "Секта (день / ночь) — в эллинистической традиции карты делятся на дневные (Солнце над горизонтом) и ночные (Солнце под горизонтом). Это влияет на то, какой именно управитель стихии «активен». Пока локация не введена, секту определяем по часам: 06:00–18:00 = день.",
+    en: "Sect (day / night) — in Hellenistic tradition charts are classified as diurnal (Sun above the horizon) or nocturnal (Sun below). This shapes which triplicity ruler is 'active'. Until location is provided, we approximate sect by the clock: 06:00–18:00 = day.",
   },
 };
 
