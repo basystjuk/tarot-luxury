@@ -57,24 +57,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
   }
 
-  // Context labels — explicitly direct AI behaviour per context
+  // Context labels — explicitly direct AI behaviour per context.
+  // "today"  — current sky right now (live energy).
+  // "event"  — any other date (past or future): qualitative window of that day.
+  // "natal"  — kept for the upcoming natal-mode work; not currently sent from UI.
+  // "future" — legacy alias of "event"; kept for backward compatibility.
   const contextDirectiveUk =
     usageContext === "natal"
       ? "Це натальний Місяць — людина народилась з цією конфігурацією. НЕ описуй зовнішні події цього дня. Опиши їхню внутрішню емоційну природу, реакції на стрес, що дає відчуття безпеки, материнські патерни, спосіб насичувати душу."
-      : usageContext === "future"
-      ? "Це планування майбутнього — користувач дивиться вперед. Опиши якісне вікно для запланованої події/наміру саме в цей день: для чого цей день добрий, що краще НЕ робити, який тип дії резонує з цією місячною енергією."
+      : (usageContext === "event" || usageContext === "future")
+      ? "Це конкретна дата — користувач дивиться на якісне вікно саме цього дня (минулого чи майбутнього). Опиши для чого цей день добрий, що краще НЕ робити, який тип дії резонує з цією місячною енергією. Якщо дата у минулому — допоможи побачити, чому той день міг відчуватися саме так."
       : "Це поточний момент — місячна енергія прямо зараз. Опиши що відбувається в полі емоцій і інтуїції людей сьогодні.";
   const contextDirectiveRu =
     usageContext === "natal"
       ? "Это натальная Луна — человек родился с этой конфигурацией. НЕ описывай внешние события этого дня. Опиши их внутреннюю эмоциональную природу, реакции на стресс, что даёт чувство безопасности, материнские паттерны, способ напитывать душу."
-      : usageContext === "future"
-      ? "Это планирование будущего — пользователь смотрит вперёд. Опиши качественное окно для запланированного события/намерения именно в этот день: для чего этот день хорош, что лучше НЕ делать, какой тип действия резонирует с этой лунной энергией."
+      : (usageContext === "event" || usageContext === "future")
+      ? "Это конкретная дата — пользователь смотрит на качественное окно именно этого дня (прошлого или будущего). Опиши для чего этот день хорош, что лучше НЕ делать, какой тип действия резонирует с этой лунной энергией. Если дата в прошлом — помоги увидеть, почему тот день мог ощущаться именно так."
       : "Это текущий момент — лунная энергия прямо сейчас. Опиши что происходит в поле эмоций и интуиции людей сегодня.";
   const contextDirectiveEn =
     usageContext === "natal"
       ? "This is a natal Moon — the person was born with this configuration. DO NOT describe external events of this day. Describe their inner emotional nature, stress responses, what gives them safety, mother patterns, how they nourish their soul."
-      : usageContext === "future"
-      ? "This is future planning — the user is looking ahead. Describe the qualitative window for a planned event/intention on this exact day: what this day is good for, what to AVOID, what type of action resonates with this lunar energy."
+      : (usageContext === "event" || usageContext === "future")
+      ? "This is a specific date — the user is looking at the qualitative window of this exact day (past or future). Describe what this day is good for, what to AVOID, what type of action resonates with this lunar energy. If the date is in the past, help the user see why that day may have felt the way it did."
       : "This is the current moment — lunar energy right now. Describe what is happening in the emotional and intuitive field today.";
 
   const sunBlockUk = sunSign ? `\nЗнак Сонця: ${sunSign} — врахуй діалог Місяця і Сонця.` : "";

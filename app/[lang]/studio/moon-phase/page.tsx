@@ -37,6 +37,8 @@ interface MoonData {
   northNodeSignIdx: number; // Rahu sign
   southNodeSignIdx: number; // Ketu sign
   lilithSignIdx: number;    // Black Moon Lilith sign
+  sunSignIdx: number;       // 0–11, computed from the same JD
+  sunDegree: number;        // 0–29° within sign
 }
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
@@ -147,6 +149,11 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
   const newDate = new Date(year, month - 1, day);
   newDate.setDate(newDate.getDate() + Math.round(daysToNew));
 
+  // Sun sign (tropical) derived from the same JD — used by the AI route
+  // to compute the Sun–Moon dialogue without a manual dropdown.
+  const sunSignIdx = Math.floor(((sunLon % 360) + 360) % 360 / 30);
+  const sunDegree  = Math.floor(((sunLon % 30) + 30) % 30);
+
   return {
     phaseKey, phaseAngle: elongation, illumination, emoji,
     nextFull: fullDate, nextNew: newDate,
@@ -154,6 +161,7 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     isDarkMoon, voidOfCourse,
     northNodeSignIdx, southNodeSignIdx,
     lilithSignIdx,
+    sunSignIdx, sunDegree,
   };
 }
 
@@ -310,6 +318,9 @@ function MoonVisual({
 }
 
 // ── Custom branded dropdown (replaces native <select>) ──────────────────────
+// TODO(natal-mode): re-used tomorrow for the natal-mode timezone / city
+// selector. Kept here to avoid a churn cycle.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CustomDropdown({
   value, options, onChange, placeholder, ariaLabel,
 }: {
@@ -390,6 +401,12 @@ export default function MoonPhasePage() {
   // Browser timezone offset in hours (Date.getTimezoneOffset returns minutes WEST of UTC)
   const tzHours = -today.getTimezoneOffset() / 60;
 
+  // Tool mode — Phase #2 ships only "today" and "event".
+  // "natal" is intentionally hidden until the natal-mode phase lands
+  // (see TODO(natal-mode) markers below).
+  type Mode = "today" | "event";
+  const [mode, setMode] = useState<Mode>("today");
+
   const [form, setForm] = useState({
     year:   today.getFullYear().toString(),
     month:  (today.getMonth() + 1).toString(),
@@ -403,7 +420,6 @@ export default function MoonPhasePage() {
   const [aiLoading, setAiLoading]     = useState(false);
   const [aiError, setAiError]         = useState<string | null>(null);
   const [aiRateLimited, setAiRateLimited] = useState(false);
-  const [sunSignIdx, setSunSignIdx]   = useState<number | null>(null);
 
   const phaseContent    = isRu ? PHASE_CONTENT.ru    : isEn ? PHASE_CONTENT.en    : PHASE_CONTENT.uk;
   const moonSignContent = isRu ? MOON_SIGN_CONTENT.ru : isEn ? MOON_SIGN_CONTENT.en : MOON_SIGN_CONTENT.uk;
@@ -416,8 +432,22 @@ export default function MoonPhasePage() {
     setResult(calcMoonPhase(today.getFullYear(), today.getMonth() + 1, today.getDate(), today.getHours(), today.getMinutes(), tzHours));
   }
 
-  // Live preview computed on every form change
+  // Keep "today" mode live: recompute whenever the mode flips back to today,
+  // and refresh once a minute so the badge stays current on long-open tabs.
+  useEffect(() => {
+    if (mode !== "today") return;
+    const refresh = () => {
+      const now = new Date();
+      setResult(calcMoonPhase(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tzHours));
+    };
+    refresh();
+    const id = setInterval(refresh, 60_000);
+    return () => clearInterval(id);
+  }, [mode, tzHours]);
+
+  // Live preview computed on every form change (only meaningful in "event" mode).
   const previewResult = (() => {
+    if (mode !== "event") return null;
     const y = parseInt(form.year), m = parseInt(form.month), d = parseInt(form.day);
     if (!y || !m || !d || y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
     const h = useExactTime ? parseInt(form.hour || "12") : 12;
@@ -430,9 +460,14 @@ export default function MoonPhasePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const h = useExactTime ? parseInt(form.hour || "12") : 12;
-    const min = useExactTime ? parseInt(form.minute || "0") : 0;
-    setResult(calcMoonPhase(parseInt(form.year), parseInt(form.month), parseInt(form.day), h, min, useExactTime ? tzHours : 0));
+    if (mode === "today") {
+      const now = new Date();
+      setResult(calcMoonPhase(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tzHours));
+    } else {
+      const h = useExactTime ? parseInt(form.hour || "12") : 12;
+      const min = useExactTime ? parseInt(form.minute || "0") : 0;
+      setResult(calcMoonPhase(parseInt(form.year), parseInt(form.month), parseInt(form.day), h, min, useExactTime ? tzHours : 0));
+    }
     setAiResult(null);
     setAiError(null);
     setAiRateLimited(false);
@@ -447,16 +482,14 @@ export default function MoonPhasePage() {
       const moonSignEn = SIGNS_EN[result.moonSignIdx];
       const phaseName  = phaseContent[result.phaseKey].name;
 
-      // Detect usage context from selected date
-      const selectedDate = new Date(parseInt(form.year), parseInt(form.month) - 1, parseInt(form.day));
-      const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const usageContext =
-        selectedDate.getTime() === todayMidnight.getTime() ? "today"
-        : selectedDate < todayMidnight ? "natal"
-        : "future";
+      // Mode → AI context. Phase #2 ships only two modes; the API still
+      // accepts "natal" for tomorrow's natal-mode work — TODO(natal-mode).
+      const usageContext = mode === "today" ? "today" : "event";
 
-      const sunSign   = sunSignIdx !== null ? signNames[sunSignIdx] : null;
-      const sunSignEn = sunSignIdx !== null ? SIGNS_EN[sunSignIdx]  : null;
+      // Sun sign is now derived from the same JD as the Moon — no manual
+      // dropdown. Always present.
+      const sunSign   = signNames[result.sunSignIdx];
+      const sunSignEn = SIGNS_EN[result.sunSignIdx];
 
       const res = await fetch("/api/moon-reading", {
         method: "POST",
@@ -539,135 +572,182 @@ export default function MoonPhasePage() {
       <section className="section-padding bg-[#FDFBF7]">
         <div className="max-w-2xl mx-auto px-6">
 
-          {/* ── Date form ── */}
+          {/* ── Mode tabs + date form ──
+              Phase #2 of the Moon Guide overhaul: two explicit modes.
+              "today" — live current sky, no inputs needed.
+              "event" — pick any date (past or future) for an event reading.
+              TODO(natal-mode): a third "natal" tab lands tomorrow once we
+              decide how to capture place of birth / timezone. Until then,
+              the natal branch in the API directive stays dormant. */}
           <AnimatedSection>
             <div className="card-luxury mb-8">
+              {/* Mode segmented control */}
+              <div
+                role="tablist"
+                aria-label={isRu ? "Режим" : isEn ? "Mode" : "Режим"}
+                className="flex p-1 rounded-2xl bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)] mb-5"
+              >
+                {([
+                  { id: "today" as Mode, glyph: "🌙",
+                    label: isRu ? "Сегодня" : isEn ? "Today" : "Сьогодні" },
+                  { id: "event" as Mode, glyph: "📅",
+                    label: isRu ? "Другая дата" : isEn ? "Other date" : "Інша дата" },
+                ]).map(t => {
+                  const active = mode === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setMode(t.id)}
+                      className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                        active
+                          ? "bg-white text-[#1C1512] shadow-sm"
+                          : "text-[#7A6A58] hover:text-[#5C4530]"
+                      }`}
+                    >
+                      <span className="mr-1.5">{t.glyph}</span>
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <h2
                 className="text-2xl text-[#1C1512] mb-2"
                 style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
               >
-                {isRu ? "Выберите дату" : isEn ? "Select a date" : "Оберіть дату"}
+                {mode === "today"
+                  ? (isRu ? "Сейчас в небе" : isEn ? "The sky right now" : "Зараз у небі")
+                  : (isRu ? "Дата события" : isEn ? "Event date" : "Дата події")}
               </h2>
               <p className="text-sm text-[#7A6A58] mb-6 leading-relaxed">
-                {isRu
-                  ? "Сегодня, дата рождения или любое важное событие — Луна расскажет своим языком."
-                  : isEn
-                  ? "Today, your birth date, or any meaningful event — the Moon speaks its own language."
-                  : "Сьогодні, дата народження або будь-яка важлива подія — Місяць розкаже своєю мовою."}
+                {mode === "today"
+                  ? (isRu
+                      ? "Фаза, знак и градус Луны прямо сейчас — личное послание на текущий момент."
+                      : isEn
+                      ? "The Moon's phase, sign and degree right now — a personal message for this very moment."
+                      : "Фаза, знак і градус Місяця прямо зараз — особисте послання на поточний момент.")
+                  : (isRu
+                      ? "Любая важная дата — день рождения, свадьба, переезд, запуск проекта. Луна расскажет о качестве этого окна."
+                      : isEn
+                      ? "Any meaningful date — a birthday, wedding, move, project launch. The Moon will tell you about the quality of that window."
+                      : "Будь-яка важлива дата — день народження, весілля, переїзд, старт проєкту. Місяць розкаже про якість цього вікна.")}
               </p>
+
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-3 gap-4 items-start">
-                  {[
-                    { key:"day",   label: isRu ? "День"  : isEn ? "Day"   : "День",   ph: today.getDate().toString(),             maxLen: 2 },
-                    { key:"month", label: isRu ? "Месяц" : isEn ? "Month" : "Місяць", ph: (today.getMonth()+1).toString(),         maxLen: 2 },
-                    { key:"year",  label: isRu ? "Год"   : isEn ? "Year"  : "Рік",    ph: today.getFullYear().toString(),          maxLen: 4 },
-                  ].map(f => (
-                    <div key={f.key} className="flex flex-col">
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">{f.label}</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={f.maxLen}
-                        placeholder={f.ph}
-                        value={form[f.key as keyof typeof form]}
-                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value.replace(/[^0-9]/g, "") })}
-                        className="input-luxury"
-                      />
+                {mode === "event" && (
+                  <>
+                    <div className="grid grid-cols-3 gap-4 items-start">
+                      {[
+                        { key:"day",   label: isRu ? "День"  : isEn ? "Day"   : "День",   ph: today.getDate().toString(),             maxLen: 2 },
+                        { key:"month", label: isRu ? "Месяц" : isEn ? "Month" : "Місяць", ph: (today.getMonth()+1).toString(),         maxLen: 2 },
+                        { key:"year",  label: isRu ? "Год"   : isEn ? "Year"  : "Рік",    ph: today.getFullYear().toString(),          maxLen: 4 },
+                      ].map(f => (
+                        <div key={f.key} className="flex flex-col">
+                          <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">{f.label}</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={f.maxLen}
+                            placeholder={f.ph}
+                            value={form[f.key as keyof typeof form]}
+                            onChange={(e) => setForm({ ...form, [f.key]: e.target.value.replace(/[^0-9]/g, "") })}
+                            className="input-luxury"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                {/* Optional exact time toggle */}
-                <div className="flex items-center justify-between gap-3 py-1">
-                  <label htmlFor="useExactTime" className="text-xs text-[#7A6A58] tracking-wide cursor-pointer">
-                    {isRu ? "Указать точное время (точнее знак Луны)"
-                      : isEn ? "Specify exact time (more accurate Moon sign)"
-                      : "Вказати точний час (точніший знак Місяця)"}
-                  </label>
-                  <button
-                    type="button"
-                    id="useExactTime"
-                    onClick={() => setUseExactTime(v => !v)}
-                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${useExactTime ? "bg-[#B8883A]" : "bg-[rgba(196,169,122,0.3)]"}`}
-                    aria-pressed={useExactTime}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${useExactTime ? "translate-x-5" : ""}`} />
-                  </button>
-                </div>
+                    {/* Optional exact time — only meaningful for a specific event. */}
+                    <div className="flex items-center justify-between gap-3 py-1">
+                      <label htmlFor="useExactTime" className="text-xs text-[#7A6A58] tracking-wide cursor-pointer">
+                        {isRu ? "Указать точное время события (точнее знак Луны)"
+                          : isEn ? "Specify the event's exact time (more accurate Moon sign)"
+                          : "Вказати точний час події (точніший знак Місяця)"}
+                      </label>
+                      <button
+                        type="button"
+                        id="useExactTime"
+                        onClick={() => setUseExactTime(v => !v)}
+                        className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${useExactTime ? "bg-[#B8883A]" : "bg-[rgba(196,169,122,0.3)]"}`}
+                        aria-pressed={useExactTime}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${useExactTime ? "translate-x-5" : ""}`} />
+                      </button>
+                    </div>
 
-                {useExactTime && (
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
-                    <div className="flex flex-col">
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                        {isRu ? "Часы" : isEn ? "Hour" : "Година"}
-                      </label>
-                      <input
-                        type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
-                        placeholder="14"
-                        value={form.hour}
-                        onChange={(e) => setForm({ ...form, hour: e.target.value.replace(/[^0-9]/g, "") })}
-                        className="input-luxury"
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                        {isRu ? "Минуты" : isEn ? "Minutes" : "Хвилини"}
-                      </label>
-                      <input
-                        type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
-                        placeholder="30"
-                        value={form.minute}
-                        onChange={(e) => setForm({ ...form, minute: e.target.value.replace(/[^0-9]/g, "") })}
-                        className="input-luxury"
-                      />
-                    </div>
-                    <p className="col-span-2 text-[10px] text-[#C4A97A] -mt-1 italic">
-                      {isRu ? `Часовой пояс: UTC${tzHours >= 0 ? "+" : ""}${tzHours} (определён автоматически)`
-                        : isEn ? `Timezone: UTC${tzHours >= 0 ? "+" : ""}${tzHours} (detected automatically)`
-                        : `Часовий пояс: UTC${tzHours >= 0 ? "+" : ""}${tzHours} (визначено автоматично)`}
-                    </p>
-                  </div>
+                    {useExactTime && (
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
+                        <div className="flex flex-col">
+                          <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
+                            {isRu ? "Часы" : isEn ? "Hour" : "Година"}
+                          </label>
+                          <input
+                            type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
+                            placeholder="14"
+                            value={form.hour}
+                            onChange={(e) => setForm({ ...form, hour: e.target.value.replace(/[^0-9]/g, "") })}
+                            className="input-luxury"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
+                            {isRu ? "Минуты" : isEn ? "Minutes" : "Хвилини"}
+                          </label>
+                          <input
+                            type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2}
+                            placeholder="30"
+                            value={form.minute}
+                            onChange={(e) => setForm({ ...form, minute: e.target.value.replace(/[^0-9]/g, "") })}
+                            className="input-luxury"
+                          />
+                        </div>
+                        <p className="col-span-2 text-[10px] text-[#C4A97A] -mt-1 italic">
+                          {isRu ? `Часовой пояс: UTC${tzHours >= 0 ? "+" : ""}${tzHours} (определён автоматически)`
+                            : isEn ? `Timezone: UTC${tzHours >= 0 ? "+" : ""}${tzHours} (detected automatically)`
+                            : `Часовий пояс: UTC${tzHours >= 0 ? "+" : ""}${tzHours} (визначено автоматично)`}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Live preview for event mode */}
+                    {previewResult && (
+                      <div className="p-3 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.15)] text-center">
+                        <p className="text-sm text-[#5C4530]">
+                          🌙 {isRu ? "Луна" : isEn ? "Moon" : "Місяць"}{" "}
+                          <span className="text-[#9A8A78]">
+                            {isRu ? "в" : isEn ? "in" : "у"}
+                          </span>{" "}
+                          <strong className="text-[#B8883A]">{SIGN_GLYPHS[previewResult.moonSignIdx]} {signNames[previewResult.moonSignIdx]}</strong>{" "}
+                          <span className="text-[#C4A97A]">{previewResult.moonDegree}°</span>
+                          <span className="mx-1 text-[#C4A97A]/50">·</span>
+                          <span className="text-[#7A6A58]">{phaseContent[previewResult.phaseKey].name}</span>
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {/* Optional Sun sign — custom branded dropdown */}
-                <div>
-                  <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                    {isRu ? "Ваш знак Солнца (необязательно)" : isEn ? "Your Sun sign (optional)" : "Ваш знак Сонця (необов'язково)"}
-                  </label>
-                  <CustomDropdown
-                    value={sunSignIdx}
-                    options={signNames.map((s, i) => ({ idx: i, label: s, glyph: SIGN_GLYPHS[i] }))}
-                    onChange={setSunSignIdx}
-                    placeholder={isRu ? "— не указывать —" : isEn ? "— not specified —" : "— не вказувати —"}
-                    ariaLabel={isRu ? "Знак Солнца" : isEn ? "Sun sign" : "Знак Сонця"}
-                  />
-                  <p className="text-[10px] text-[#C4A97A] mt-1 italic">
-                    {isRu ? "Знак Солнца уточняет взаимодействие лунной и солнечной энергий в послании"
-                      : isEn ? "Your Sun sign adds Sun–Moon interaction nuance to the reading"
-                      : "Знак Сонця додає нюанс взаємодії місячної та сонячної енергій у посланні"}
-                  </p>
-                </div>
-
-                {/* Live preview */}
-                {previewResult && (
-                  <div className="p-3 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.15)] text-center">
+                {mode === "today" && result && (
+                  <div className="p-4 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.15)] text-center">
                     <p className="text-sm text-[#5C4530]">
-                      🌙 {isRu ? "Луна" : isEn ? "Moon" : "Місяць"}{" "}
-                      <span className="text-[#9A8A78]">
-                        {isRu ? "в" : isEn ? "in" : "у"}
-                      </span>{" "}
-                      <strong className="text-[#B8883A]">{SIGN_GLYPHS[previewResult.moonSignIdx]} {signNames[previewResult.moonSignIdx]}</strong>{" "}
-                      <span className="text-[#C4A97A]">{previewResult.moonDegree}°</span>
+                      🌙 {isRu ? "Сейчас" : isEn ? "Right now" : "Зараз"}:{" "}
+                      <strong className="text-[#B8883A]">{SIGN_GLYPHS[result.moonSignIdx]} {signNames[result.moonSignIdx]}</strong>{" "}
+                      <span className="text-[#C4A97A]">{result.moonDegree}°</span>
                       <span className="mx-1 text-[#C4A97A]/50">·</span>
-                      <span className="text-[#7A6A58]">{phaseContent[previewResult.phaseKey].name}</span>
+                      <span className="text-[#7A6A58]">{phaseContent[result.phaseKey].name}</span>
                     </p>
                   </div>
                 )}
 
                 <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 min-h-[48px]">
                   <ArrowRight size={16} />
-                  {isRu ? "Рассчитать" : isEn ? "Calculate" : "Розрахувати"}
+                  {mode === "today"
+                    ? (isRu ? "Открыть послание" : isEn ? "Open the message" : "Відкрити послання")
+                    : (isRu ? "Рассчитать" : isEn ? "Calculate" : "Розрахувати")}
                 </button>
               </form>
             </div>
