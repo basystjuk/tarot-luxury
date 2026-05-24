@@ -9,6 +9,7 @@ import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, OBLIQUITY_
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
+import { MoonCalendar } from "./_calendar";
 
 type PhaseKey =
   | "new"
@@ -606,6 +607,23 @@ export default function MoonPhasePage() {
     setAiRateLimited(false);
   };
 
+  // Wired from the monthly calendar grid. Switches the form to "event"
+  // mode, fills the date, recomputes the result, clears stale AI output,
+  // and scrolls the user back up so they see the reading.
+  const formRef = useRef<HTMLDivElement>(null);
+  const handleCalendarSelect = (y: number, m: number, d: number) => {
+    setMode("event");
+    setForm(f => ({ ...f, year: String(y), month: String(m), day: String(d) }));
+    setResult(calcMoonPhase(y, m, d, 12, 0, 0));
+    setAiResult(null);
+    setAiError(null);
+    setAiRateLimited(false);
+    // Smooth scroll on the next frame so React paints first.
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   const handleAi = async () => {
     if (!result) return;
     setAiLoading(true);
@@ -723,7 +741,7 @@ export default function MoonPhasePage() {
               decide how to capture place of birth / timezone. Until then,
               the natal branch in the API directive stays dormant. */}
           <AnimatedSection>
-            <div className="card-luxury mb-8">
+            <div ref={formRef} className="card-luxury mb-8">
               {/* Mode segmented control */}
               <div
                 role="tablist"
@@ -1238,6 +1256,29 @@ export default function MoonPhasePage() {
               )}
             </AnimatedSection>
           )}
+
+          {/* ── Monthly lunar calendar (Phase #12) ──
+              Always-visible grid below the result. Gives daily-returning
+              users a reason to come back and a quick visual of the whole
+              cycle. Click any day → form jumps to event mode + that date. */}
+          <AnimatedSection delay={0.15}>
+            <div className="mt-10">
+              <MoonCalendar
+                language={language}
+                calc={(y, m, d, h, min, tz) => {
+                  const r = calcMoonPhase(y, m, d, h, min, tz);
+                  return {
+                    emoji: r.emoji,
+                    moonSignIdx: r.moonSignIdx,
+                    phaseKey: r.phaseKey,
+                    illumination: r.illumination,
+                  };
+                }}
+                phaseNameOf={(key) => phaseContent[key as keyof typeof phaseContent]?.name ?? key}
+                onSelectDate={handleCalendarSelect}
+              />
+            </div>
+          </AnimatedSection>
         </div>
       </section>
     </>

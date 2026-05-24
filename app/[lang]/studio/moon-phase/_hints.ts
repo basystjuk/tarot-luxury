@@ -24,7 +24,8 @@ export type HintKey =
   | "moonSpeed"
   | "outOfBounds"
   | "triplicity"
-  | "sect";
+  | "sect"
+  | "calendar";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -103,6 +104,11 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Секта (день / ніч) — у Геленістичній традиції чарти діляться на денні (Сонце над горизонтом) і нічні (Сонце під горизонтом). Це впливає на те, який саме управитель стихії «активний». Поки локацію не введено, секту визначаємо за годинником: 06:00–18:00 = день.",
     ru: "Секта (день / ночь) — в эллинистической традиции карты делятся на дневные (Солнце над горизонтом) и ночные (Солнце под горизонтом). Это влияет на то, какой именно управитель стихии «активен». Пока локация не введена, секту определяем по часам: 06:00–18:00 = день.",
     en: "Sect (day / night) — in Hellenistic tradition charts are classified as diurnal (Sun above the horizon) or nocturnal (Sun below). This shapes which triplicity ruler is 'active'. Until location is provided, we approximate sect by the clock: 06:00–18:00 = day.",
+  },
+  calendar: {
+    uk: "Місячний календар — фаза, знак і градус Місяця на кожен день місяця. Повний Місяць позначено теплим, новий — приглушеним тоном. Натисни на будь-яку дату — форма перейде в режим «Інша дата» і покаже послання саме цього дня.",
+    ru: "Лунный календарь — фаза, знак и градус Луны на каждый день месяца. Полнолуние выделено тёплым, новолуние — приглушённым тоном. Нажми на любую дату — форма переключится в режим «Другая дата» и покажет послание именно этого дня.",
+    en: "Lunar calendar — Moon phase, sign and degree for every day of the month. Full moons are tinted warm, new moons cool. Tap any date — the form switches to 'Other date' mode and shows the message for that day.",
   },
 };
 
