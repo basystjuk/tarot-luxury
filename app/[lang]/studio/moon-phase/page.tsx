@@ -644,6 +644,32 @@ export default function MoonPhasePage() {
     jupiter: { name: isRu ? "Юпитер"   : isEn ? "Jupiter" : "Юпітер",  glyph: "♃" },
     saturn:  { name: isRu ? "Сатурн"   : isEn ? "Saturn"  : "Сатурн",  glyph: "♄" },
   };
+  // What the active triplicity ruler asks of you today — one short, concrete
+  // line per planet. Newcomers see "Venus is active" and need to know what
+  // to actually do; this is that one-liner.
+  const planetAdvice: Record<PlanetKey, string> = {
+    sun:     isRu ? "Действуй через сердце, достоинство и желание сиять и вести."
+                  : isEn ? "Act through the heart, dignity, and the wish to shine and lead."
+                  : "Дій через серце, гідність і бажання сяяти і вести.",
+    moon:    isRu ? "Действуй через ощущения, заботу, интуицию тела — мягко и волной."
+                  : isEn ? "Act through feeling, care and the body's intuition — softly, like a wave."
+                  : "Дій через відчуття, турботу, інтуїцію тіла — мʼяко і хвилею.",
+    mercury: isRu ? "Действуй через слова, обмен информацией, лёгкие быстрые контакты."
+                  : isEn ? "Act through words, the exchange of information, light and quick contacts."
+                  : "Дій через слова, обмін інформацією, легкі швидкі контакти.",
+    venus:   isRu ? "Действуй через мягкость, красоту, ценность; ищи гармонию, а не победу."
+                  : isEn ? "Act through softness, beauty, and value; seek harmony, not victory."
+                  : "Дій через мʼякість, красу, цінність; шукай гармонію, а не перемогу.",
+    mars:    isRu ? "Действуй прямо, решительно, без оглядки; день любит волю и движение."
+                  : isEn ? "Act directly, decisively, without looking back; the day loves will and motion."
+                  : "Дій прямо, рішуче, без оглядки; день любить волю і рух.",
+    jupiter: isRu ? "Действуй щедро, с верой в большее; видь масштаб, не цепляйся за мелочи."
+                  : isEn ? "Act generously, with faith in the bigger picture; see scale, don't cling to detail."
+                  : "Дій щедро, з вірою у більше; бач масштаб, не чіпляйся за дрібниці.",
+    saturn:  isRu ? "Действуй через структуру, дисциплину, долгую игру; терпение даст плод."
+                  : isEn ? "Act through structure, discipline, the long game; patience will bear fruit."
+                  : "Дій через структуру, дисципліну, довгу гру; терпіння дасть плід.",
+  };
 
   // Auto-calculate today on first render — use current hour/minute for live data
   const [initialized, setInitialized] = useState(false);
@@ -678,6 +704,16 @@ export default function MoonPhasePage() {
     } catch { return null; }
   })();
 
+  // Ref the result block so submit + calendar clicks can scroll users to
+  // what they actually want — the reading — instead of leaving them
+  // staring at the form thinking nothing happened.
+  const resultRef = useRef<HTMLDivElement>(null);
+  const scrollToResult = () => {
+    requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === "today") {
@@ -691,11 +727,12 @@ export default function MoonPhasePage() {
     setAiResult(null);
     setAiError(null);
     setAiRateLimited(false);
+    scrollToResult();
   };
 
   // Wired from the monthly calendar grid. Switches the form to "event"
   // mode, fills the date, recomputes the result, clears stale AI output,
-  // and scrolls the user back up so they see the reading.
+  // and scrolls the user down to the freshly-computed reading.
   const formRef = useRef<HTMLDivElement>(null);
   const handleCalendarSelect = (y: number, m: number, d: number) => {
     setMode("event");
@@ -704,10 +741,8 @@ export default function MoonPhasePage() {
     setAiResult(null);
     setAiError(null);
     setAiRateLimited(false);
-    // Smooth scroll on the next frame so React paints first.
-    requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    // Smooth scroll to the result (not the form) — they came here to read.
+    scrollToResult();
   };
 
   const handleAi = async () => {
@@ -1075,10 +1110,10 @@ export default function MoonPhasePage() {
                 )}
 
                 <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 min-h-[48px]">
-                  <ArrowRight size={16} />
                   {mode === "today"
-                    ? (isRu ? "Открыть послание" : isEn ? "Open the message" : "Відкрити послання")
-                    : (isRu ? "Рассчитать" : isEn ? "Calculate" : "Розрахувати")}
+                    ? (isRu ? "Перейти к посланию" : isEn ? "Go to the reading" : "Перейти до послання")
+                    : (isRu ? "Рассчитать и перейти" : isEn ? "Calculate & open" : "Розрахувати й перейти")}
+                  <ArrowRight size={16} />
                 </button>
               </form>
             </div>
@@ -1087,8 +1122,8 @@ export default function MoonPhasePage() {
           {/* ── Result ── */}
           {result && (
             <AnimatedSection delay={0.1}>
-              {/* Main moon card */}
-              <div className="card-luxury text-center mb-6">
+              {/* Main moon card — scroll target for submit + calendar clicks */}
+              <div ref={resultRef} className="card-luxury text-center mb-6">
                 <div className="text-6xl mb-3">{result.emoji}</div>
                 <h2
                   className="text-3xl text-[#1C1512] mb-2"
@@ -1324,6 +1359,18 @@ export default function MoonPhasePage() {
                       );
                     })}
                   </div>
+
+                  {/* "How to act today" — translates the active ruler into a one-line
+                      practical hint for a non-astrologer. */}
+                  <div className="mt-3 p-3 rounded-xl bg-[rgba(212,168,83,0.10)] border border-[rgba(212,168,83,0.3)]">
+                    <p className="text-[10px] text-[#B8883A] tracking-widest uppercase mb-1">
+                      ✦ {isRu ? "Сегодня действуй через" : isEn ? "Today, act through" : "Сьогодні дій через"}{" "}
+                      <span className="text-[#5C4530] normal-case tracking-normal">{planetLabel[result.rulerActive].name}</span>
+                    </p>
+                    <p className="text-sm text-[#5C4530] leading-relaxed">
+                      {planetAdvice[result.rulerActive]}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Best / Worst times — quality bucket + sign-change clock.
@@ -1335,67 +1382,95 @@ export default function MoonPhasePage() {
                     </TermHint>
                   </p>
 
-                  <div className={`flex items-start gap-3 p-3 rounded-xl mb-3 ${
-                    result.quality === "good"
-                      ? "bg-[rgba(122,170,108,0.10)] border border-[rgba(122,170,108,0.3)]"
-                      : result.quality === "caution"
-                      ? "bg-[rgba(212,168,83,0.12)] border border-[rgba(212,168,83,0.35)]"
-                      : "bg-[rgba(154,110,40,0.12)] border border-[rgba(154,110,40,0.35)]"
-                  }`}>
-                    <span className="text-xl flex-shrink-0 leading-none">
-                      {result.quality === "good" ? "✓" : result.quality === "caution" ? "⚠" : "✗"}
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium" style={{ color: result.quality === "good" ? "#3F6A35" : result.quality === "caution" ? "#9A6E28" : "#7A3E18" }}>
-                        {result.quality === "good"
-                          ? (isRu ? "Сприятливо для дій" : isEn ? "Favourable for action" : "Сприятливо для дій")
-                          : result.quality === "caution"
-                          ? (isRu ? "Утримайся від важливого" : isEn ? "Hold off on anything important" : "Утримайся від важливого")
-                          : (isRu ? "Не починай нічого нового" : isEn ? "Don't start anything new" : "Не починай нічого нового")}
-                      </p>
-                      <p className="text-xs text-[#7A6A58] mt-1 leading-relaxed">
-                        {result.quality === "good"
-                          ? (isRu ? "Чистое окно — можно подписывать, начинать, договариваться." : isEn ? "Clear window — sign, launch, negotiate as needed." : "Чисте вікно — можна підписувати, починати, домовлятися.")
-                          : result.quality === "caution"
-                          ? (isRu ? "VoC — рішення цього вікна рідко закріплюються. Краще рутина чи відпочинок." : isEn ? "VoC — decisions made in this window rarely stick. Routine or rest is better." : "VoC — рішення цього вікна рідко закріплюються. Краще рутина чи відпочинок.")
-                          : (result.eclipseType
-                              ? (isRu ? "День затмения — не запускай ничего нового, наблюдай." : isEn ? "Eclipse day — don't launch anything new, observe." : "День затемнення — не запускай нічого нового, спостерігай.")
-                              : (isRu ? "Тёмная Луна — пауза перед новым циклом, отдых." : isEn ? "Dark Moon — pause before a new cycle, rest." : "Темний Місяць — пауза перед новим циклом, відпочинок."))}
-                      </p>
-                    </div>
-                  </div>
+                  {(() => {
+                    // Display helpers for the quality block. "Until when does
+                    // this status hold?" — the longest defensible answer is
+                    // until the next major state change. The sign-change time
+                    // is the strongest hard boundary we can compute precisely
+                    // (VoC start would require an aspect-grid search). So we
+                    // surface that as the status window's outer edge.
+                    const tzLocale = language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA";
+                    const timeOnly = result.nextSignChangeDate.toLocaleTimeString(tzLocale, { hour: "2-digit", minute: "2-digit" });
+                    const fullStamp = result.hoursToNextSign < 24
+                      ? timeOnly
+                      : result.nextSignChangeDate.toLocaleString(tzLocale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+                    const relStamp = result.hoursToNextSign < 24
+                      ? `${Math.round(result.hoursToNextSign)} ${isRu ? "ч" : isEn ? "h" : "год"}`
+                      : `${Math.round(result.hoursToNextSign / 24)} ${isRu ? "дн" : isEn ? "d" : "дн"}`;
+                    return (
+                      <>
+                        <div className={`flex items-start gap-3 p-3 rounded-xl mb-3 ${
+                          result.quality === "good"
+                            ? "bg-[rgba(122,170,108,0.10)] border border-[rgba(122,170,108,0.3)]"
+                            : result.quality === "caution"
+                            ? "bg-[rgba(212,168,83,0.12)] border border-[rgba(212,168,83,0.35)]"
+                            : "bg-[rgba(154,110,40,0.12)] border border-[rgba(154,110,40,0.35)]"
+                        }`}>
+                          <span className="text-xl flex-shrink-0 leading-none">
+                            {result.quality === "good" ? "✓" : result.quality === "caution" ? "⚠" : "✗"}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium" style={{ color: result.quality === "good" ? "#3F6A35" : result.quality === "caution" ? "#9A6E28" : "#7A3E18" }}>
+                              {result.quality === "good"
+                                ? (isRu ? "Сприятливо для дій" : isEn ? "Favourable for action" : "Сприятливо для дій")
+                                : result.quality === "caution"
+                                ? (isRu ? "Утримайся від важливого" : isEn ? "Hold off on anything important" : "Утримайся від важливого")
+                                : (isRu ? "Не починай нічого нового" : isEn ? "Don't start anything new" : "Не починай нічого нового")}
+                            </p>
+                            <p className="text-xs text-[#7A6A58] mt-1 leading-relaxed">
+                              {result.quality === "good"
+                                ? (isRu ? "Чистое окно — можно подписывать, начинать, договариваться." : isEn ? "Clear window — sign, launch, negotiate as needed." : "Чисте вікно — можна підписувати, починати, домовлятися.")
+                                : result.quality === "caution"
+                                ? (isRu ? "VoC — рішення цього вікна рідко закріплюються. Краще рутина чи відпочинок." : isEn ? "VoC — decisions made in this window rarely stick. Routine or rest is better." : "VoC — рішення цього вікна рідко закріплюються. Краще рутина чи відпочинок.")
+                                : (result.eclipseType
+                                    ? (isRu ? "День затмения — не запускай ничего нового, наблюдай." : isEn ? "Eclipse day — don't launch anything new, observe." : "День затемнення — не запускай нічого нового, спостерігай.")
+                                    : (isRu ? "Тёмная Луна — пауза перед новым циклом, отдых." : isEn ? "Dark Moon — pause before a new cycle, rest." : "Темний Місяць — пауза перед новим циклом, відпочинок."))}
+                            </p>
+                            {/* "Until when does this hold?" — the user's first question. */}
+                            <p className="text-[11px] text-[#9A8A78] mt-2 italic">
+                              {isRu
+                                ? `Этот настрой действует ещё ~${relStamp} — до перехода Луны в следующий знак в ${timeOnly}.`
+                                : isEn
+                                ? `This mood holds for about ${relStamp} more — until the Moon enters the next sign at ${timeOnly}.`
+                                : `Цей настрій діє ще ~${relStamp} — до переходу Місяця у наступний знак о ${timeOnly}.`}
+                            </p>
+                          </div>
+                        </div>
 
-                  <div className="grid sm:grid-cols-2 gap-2.5">
-                    <div className="p-3 rounded-xl bg-white/40 border border-[rgba(196,169,122,0.18)]">
-                      <p className="text-[10px] text-[#9A8A78] tracking-widest uppercase mb-1">
-                        {isRu ? "Луна переходит в" : isEn ? "Moon enters" : "Місяць переходить у"}
-                      </p>
-                      <p className="text-sm text-[#5C4530]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-                        {SIGN_GLYPHS[result.nextSignIdx]} {signNames[result.nextSignIdx]}
-                      </p>
-                      <p className="text-xs text-[#B8883A] mt-1">
-                        {result.hoursToNextSign < 24
-                          ? `${result.nextSignChangeDate.toLocaleTimeString(language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA", { hour: "2-digit", minute: "2-digit" })}`
-                          : result.nextSignChangeDate.toLocaleString(language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        <span className="text-[#9A8A78] ml-2">
-                          (~{result.hoursToNextSign < 24 ? `${Math.round(result.hoursToNextSign)} ${isRu ? "ч" : isEn ? "h" : "год"}` : `${Math.round(result.hoursToNextSign / 24)} ${isRu ? "дн" : isEn ? "d" : "дн"}`})
-                        </span>
-                      </p>
-                    </div>
-                    {result.voidOfCourse && (
-                      <div className="p-3 rounded-xl bg-[rgba(212,168,83,0.10)] border border-[rgba(212,168,83,0.3)]">
-                        <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">
-                          ⊘ {isRu ? "VoC заканчивается в" : isEn ? "VoC ends at" : "VoC закінчується о"}
-                        </p>
-                        <p className="text-sm text-[#5C4530]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-                          {result.nextSignChangeDate.toLocaleTimeString(language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA", { hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                        <p className="text-xs text-[#9A8A78] mt-1">
-                          {isRu ? "коли Місяць увійде в наступний знак" : isEn ? "when the Moon enters the next sign" : "коли Місяць увійде в наступний знак"}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                        {/* "What changes when the Moon enters the next sign?" — give
+                            the keyword/energy of the next sign so the user knows what
+                            tone of the day they're walking into. */}
+                        <div className="p-3 rounded-xl bg-white/40 border border-[rgba(196,169,122,0.18)]">
+                          <p className="text-[10px] text-[#9A8A78] tracking-widest uppercase mb-1.5">
+                            {isRu ? "Что меняется в" : isEn ? "What changes at" : "Що змінюється о"}{" "}
+                            <span className="text-[#B8883A]">{fullStamp}</span>
+                          </p>
+                          <p className="text-sm text-[#5C4530] leading-relaxed">
+                            {isRu ? "Луна войдёт в" : isEn ? "The Moon enters" : "Місяць увійде у"}{" "}
+                            <strong className="text-[#B8883A]" style={{ fontFamily: "var(--font-cormorant)" }}>
+                              {SIGN_GLYPHS[result.nextSignIdx]} {signNames[result.nextSignIdx]}
+                            </strong>
+                            {" — "}
+                            {isRu ? "новый ~2,5-суточный тон дня:" : isEn ? "a new ~2.5-day tone:" : "новий ~2,5-добовий тон дня:"}{" "}
+                            <em className="text-[#7A6A58]">
+                              {moonSignContent[result.nextSignIdx].energy.toLowerCase()}
+                              {moonSignContent[result.nextSignIdx].keyword
+                                ? `, ${moonSignContent[result.nextSignIdx].keyword.toLowerCase()}`
+                                : ""}.
+                            </em>
+                          </p>
+                          {result.voidOfCourse && (
+                            <p className="text-xs text-[#B8883A] mt-2 flex items-center gap-1.5">
+                              <span>⊘</span>
+                              {isRu ? `В этот же момент закончится VoC (${timeOnly}) — снова можно решать важное.`
+                                : isEn ? `At the same moment the VoC window closes (${timeOnly}) — you can make decisions again.`
+                                : `У цей самий момент закінчується VoC (${timeOnly}) — знову можна вирішувати важливе.`}
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Next events */}
