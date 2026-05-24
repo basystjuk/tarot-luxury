@@ -58,6 +58,10 @@ interface MoonData {
   eclipseProximity: number;   // 0–100, higher = closer to exact alignment
   fixedStar: FixedStar | null; // closest fixed star within 1° orb, if any
   fixedStarOrb: number;        // arc-minutes from exact when fixedStar set
+  hoursToNextSign: number;      // until Moon enters next sign, from this jd
+  nextSignChangeDate: Date;     // wall-clock estimate of the sign change moment
+  nextSignIdx: number;          // 0–11, the sign the Moon will enter
+  quality: "good" | "caution" | "avoid"; // overall day-quality at this moment
 }
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
@@ -226,6 +230,25 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
   const moonDeclination = calcMoonDeclination(jd);
   const isOutOfBounds = Math.abs(moonDeclination) > OBLIQUITY_DEG;
 
+  // ── "When does this window close?" ──────────────────────────────────────
+  // Time-of-day timing for the Best/Worst Times panel. We compute how long
+  // until the Moon enters the next sign (also = the VoC end if VoC is
+  // currently active). hoursToNextSign uses today's |speed| as a constant —
+  // accurate to a few minutes over <30h windows, which is all we need.
+  const distToBoundary = ((Math.floor(moonLon / 30) + 1) * 30) - moonLon;
+  const hoursToNextSign = (distToBoundary / Math.abs(moonSpeedDegPerDay)) * 24;
+  const nextSignChangeDate = new Date((jd - 2440587.5) * 86400_000 + hoursToNextSign * 3600_000);
+  const nextSignIdx = (moonSignIdx + 1) % 12;
+
+  // Overall quality bucket — rolls eclipses / Dark Moon / VoC into one
+  // traffic-light call. Eclipse trumps everything, then Dark Moon, then
+  // VoC; otherwise the day is fine for most ordinary actions.
+  const quality: "good" | "caution" | "avoid" =
+    eclipseType ? "avoid"
+    : isDarkMoon ? "avoid"
+    : voidOfCourse ? "caution"
+    : "good";
+
   // Triplicity rulers for the Moon's sign element. Sect (day/night) is
   // approximated by local hour until natal-mode brings true sunrise data.
   const element = (["fire", "earth", "air", "water"] as const)[SIGN_TO_ELEMENT[moonSignIdx]];
@@ -252,6 +275,10 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
     eclipseProximity,
     fixedStar,
     fixedStarOrb,
+    hoursToNextSign,
+    nextSignChangeDate,
+    nextSignIdx,
+    quality,
   };
 }
 
@@ -1296,6 +1323,78 @@ export default function MoonPhasePage() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* Best / Worst times — quality bucket + sign-change clock.
+                    Sign-change time also marks the VoC end, when VoC is active. */}
+                <div className="mt-5 p-4 rounded-2xl bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.18)] text-left">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-3">
+                    <TermHint hint={moonHint(language, "bestWorstTimes")}>
+                      ⏱ {isRu ? "Время дня · качество момента" : isEn ? "Time of day · quality of the moment" : "Час дня · якість моменту"}
+                    </TermHint>
+                  </p>
+
+                  <div className={`flex items-start gap-3 p-3 rounded-xl mb-3 ${
+                    result.quality === "good"
+                      ? "bg-[rgba(122,170,108,0.10)] border border-[rgba(122,170,108,0.3)]"
+                      : result.quality === "caution"
+                      ? "bg-[rgba(212,168,83,0.12)] border border-[rgba(212,168,83,0.35)]"
+                      : "bg-[rgba(154,110,40,0.12)] border border-[rgba(154,110,40,0.35)]"
+                  }`}>
+                    <span className="text-xl flex-shrink-0 leading-none">
+                      {result.quality === "good" ? "✓" : result.quality === "caution" ? "⚠" : "✗"}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium" style={{ color: result.quality === "good" ? "#3F6A35" : result.quality === "caution" ? "#9A6E28" : "#7A3E18" }}>
+                        {result.quality === "good"
+                          ? (isRu ? "Сприятливо для дій" : isEn ? "Favourable for action" : "Сприятливо для дій")
+                          : result.quality === "caution"
+                          ? (isRu ? "Утримайся від важливого" : isEn ? "Hold off on anything important" : "Утримайся від важливого")
+                          : (isRu ? "Не починай нічого нового" : isEn ? "Don't start anything new" : "Не починай нічого нового")}
+                      </p>
+                      <p className="text-xs text-[#7A6A58] mt-1 leading-relaxed">
+                        {result.quality === "good"
+                          ? (isRu ? "Чистое окно — можно подписывать, начинать, договариваться." : isEn ? "Clear window — sign, launch, negotiate as needed." : "Чисте вікно — можна підписувати, починати, домовлятися.")
+                          : result.quality === "caution"
+                          ? (isRu ? "VoC — рішення цього вікна рідко закріплюються. Краще рутина чи відпочинок." : isEn ? "VoC — decisions made in this window rarely stick. Routine or rest is better." : "VoC — рішення цього вікна рідко закріплюються. Краще рутина чи відпочинок.")
+                          : (result.eclipseType
+                              ? (isRu ? "День затмения — не запускай ничего нового, наблюдай." : isEn ? "Eclipse day — don't launch anything new, observe." : "День затемнення — не запускай нічого нового, спостерігай.")
+                              : (isRu ? "Тёмная Луна — пауза перед новым циклом, отдых." : isEn ? "Dark Moon — pause before a new cycle, rest." : "Темний Місяць — пауза перед новим циклом, відпочинок."))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    <div className="p-3 rounded-xl bg-white/40 border border-[rgba(196,169,122,0.18)]">
+                      <p className="text-[10px] text-[#9A8A78] tracking-widest uppercase mb-1">
+                        {isRu ? "Луна переходит в" : isEn ? "Moon enters" : "Місяць переходить у"}
+                      </p>
+                      <p className="text-sm text-[#5C4530]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                        {SIGN_GLYPHS[result.nextSignIdx]} {signNames[result.nextSignIdx]}
+                      </p>
+                      <p className="text-xs text-[#B8883A] mt-1">
+                        {result.hoursToNextSign < 24
+                          ? `${result.nextSignChangeDate.toLocaleTimeString(language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA", { hour: "2-digit", minute: "2-digit" })}`
+                          : result.nextSignChangeDate.toLocaleString(language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        <span className="text-[#9A8A78] ml-2">
+                          (~{result.hoursToNextSign < 24 ? `${Math.round(result.hoursToNextSign)} ${isRu ? "ч" : isEn ? "h" : "год"}` : `${Math.round(result.hoursToNextSign / 24)} ${isRu ? "дн" : isEn ? "d" : "дн"}`})
+                        </span>
+                      </p>
+                    </div>
+                    {result.voidOfCourse && (
+                      <div className="p-3 rounded-xl bg-[rgba(212,168,83,0.10)] border border-[rgba(212,168,83,0.3)]">
+                        <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">
+                          ⊘ {isRu ? "VoC заканчивается в" : isEn ? "VoC ends at" : "VoC закінчується о"}
+                        </p>
+                        <p className="text-sm text-[#5C4530]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                          {result.nextSignChangeDate.toLocaleTimeString(language === "ru" ? "ru-RU" : language === "en" ? "en-US" : "uk-UA", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                        <p className="text-xs text-[#9A8A78] mt-1">
+                          {isRu ? "коли Місяць увійде в наступний знак" : isEn ? "when the Moon enters the next sign" : "коли Місяць увійде в наступний знак"}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

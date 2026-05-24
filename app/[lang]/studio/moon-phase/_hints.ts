@@ -29,7 +29,8 @@ export type HintKey =
   | "recommendations"
   | "eclipseSolar"
   | "eclipseLunar"
-  | "fixedStar";
+  | "fixedStar"
+  | "bestWorstTimes";
 
 type Lang = "uk" | "ru" | "en";
 
@@ -128,6 +129,11 @@ const HINTS: Record<HintKey, Record<Lang, string>> = {
     uk: "Сполучення з нерухомою зіркою — Місяць перебуває в орбі ≤1° від однієї з відомих стародавніх зірок (Альдебаран, Антарес, Регул, Алголь і т.д.). Це коротке (~2 години) вікно, коли день набуває яскраво вираженого характеру цієї зірки. Кожна зірка несе свою тему — детальніше в підказці біля назви.",
     ru: "Соединение с неподвижной звездой — Луна находится в орбе ≤1° от одной из известных древних звёзд (Альдебаран, Антарес, Регул, Алголь и т.д.). Это короткое (~2 часа) окно, когда день приобретает ярко выраженный характер этой звезды. У каждой звезды своя тема — подробнее в подсказке у названия.",
     en: "Fixed star conjunction — the Moon is within a ≤1° orb of one of the famous classical stars (Aldebaran, Antares, Regulus, Algol, etc.). A short (~2h) window when the day takes on that star's distinct character. Each star carries its own theme — see the tooltip on the star's name.",
+  },
+  bestWorstTimes: {
+    uk: "Час дня — коротка підказка щодо «вікна можливостей». Якість моменту враховує затемнення, Темний Місяць та Void of Course (VoC). Час переходу Місяця у наступний знак збігається з кінцем VoC (якщо він активний) і часто змінює тон дня.",
+    ru: "Время дня — короткая подсказка про «окно возможностей». Качество момента учитывает затмения, Тёмную Луну и Void of Course (VoC). Время перехода Луны в следующий знак совпадает с концом VoC (если он активен) и часто меняет тон дня.",
+    en: "Time of day — a short hint about today's 'window of opportunity'. The quality reading folds in eclipses, Dark Moon, and Void of Course (VoC). The Moon's sign-change time coincides with the end of VoC (when active) and often shifts the tone of the day.",
   },
   recommendations: {
     uk: "Кристали, олії та трав'яні чаї, що резонують зі знаком, у якому зараз Місяць. AI підбирає по три позиції в кожній категорії з коротким поясненням «чому саме воно». Окремий ліміт — 1 запит на добу; повторні відкриття цього самого знака беруться з кешу й не витрачають квоту.",
