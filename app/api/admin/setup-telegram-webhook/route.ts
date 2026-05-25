@@ -26,8 +26,18 @@ interface SetupResult {
   error?: string;
 }
 
+function authorised(req: NextRequest): boolean {
+  // Two auth paths: admin preview cookie (browser) OR CRON_SECRET bearer
+  // (CLI / scripts). The bearer is the same secret used by Vercel Cron,
+  // so it's already in env and rotated alongside cron auth.
+  if (isPreviewFromRequest(req)) return true;
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  return req.headers.get("authorization") === `Bearer ${secret}`;
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse<SetupResult>> {
-  if (!isPreviewFromRequest(req)) {
+  if (!authorised(req)) {
     return NextResponse.json({ configured: false, error: "unauthorized" }, { status: 404 });
   }
 
@@ -74,7 +84,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<SetupResult>>
 
 // Also expose GET that just reports current state (no mutation)
 export async function GET(req: NextRequest) {
-  if (!isPreviewFromRequest(req)) {
+  if (!authorised(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 404 });
   }
   const token = process.env.TELEGRAM_BOT_TOKEN;
