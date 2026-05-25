@@ -29,15 +29,17 @@ export const ALL_TOOL_IDS: ToolId[] = [
  *
  * Currently OFF (in active polish — owner can re-enable from admin once
  * admin save is verified working):
- *   - compatibility
- *   - natal-chart  (no AI integration yet)
+ *   - compatibility  (Phase N9 — needs synastry build-out)
+ *
+ * Natal Chart was enabled in Phase М7+М17 once the planet positions
+ * (М1), Placidus algorithm (М7) and AI portrait endpoint were live.
  */
 export const DEFAULT_TOOLS_ENABLED: Record<ToolId, boolean> = {
   "daily-card": true,
   numerology: true,
   compatibility: false,
   "moon-phase": true,
-  "natal-chart": false,
+  "natal-chart": true,
 };
 
 /** Human-readable labels for the admin toggles (uk/ru/en). */

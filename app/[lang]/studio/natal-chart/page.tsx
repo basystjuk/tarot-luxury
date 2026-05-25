@@ -1,166 +1,424 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+/**
+ * Natal Chart tool (Phase М17).
+ *
+ * What this is:
+ *   - Full birth chart with 10 planets + ASC + MC + Placidus houses
+ *   - Visual wheel (SVG): sign ring, house cusps, planets, aspect grid
+ *   - Aspect list (all natal-to-natal aspects within standard orbs)
+ *   - AI psychological portrait (3 sections: essence / gifts / work)
+ *
+ * Data source priority:
+ *   1. Cabinet profile (auto-fill if signed in)
+ *   2. Manual entry (Nominatim city autocomplete + tz-lookup, same as
+ *      the Moon Guide natal form)
+ *
+ * Auth posture (Phase В rule):
+ *   - Anonymous: can compute + see the full chart + houses + aspect
+ *     grid. Free educational value.
+ *   - AI portrait: signed-in only — that's the conversion hook.
+ */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Check, MapPin, Sparkles, Lock } from "lucide-react";
+import Link from "next/link";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useProfile } from "@/hooks/useProfile";
 import {
-  calcNatalChart,
-  formatDegree,
-  PLANET_NAMES_UA,
-  PLANET_GLYPHS,
-  SIGN_GLYPHS,
-  SIGNS_UA,
-  SIGNS_EN,
-  degToSign,
-  type NatalChartData,
+  dateToJD, calcPlanetDeg, calcLST, calcAscendant, calcMC,
+  calcPlacidusHouses, whichPlacidusHouse,
+  SIGN_GLYPHS, SIGNS_UA, SIGNS_EN,
 } from "@/lib/astro/calculations";
+import type { AspectKey } from "@/lib/astro/natal-snapshot";
+import {
+  type GeoCandidate,
+  searchCity, coordsToIana, ianaToOffsetHours,
+} from "@/app/[lang]/studio/moon-phase/_natal";
+import { track } from "@/lib/analytics/posthog";
 
 const SIGNS_RU = [
-  "Овен", "Телец", "Близнецы", "Рак",
-  "Лев", "Дева", "Весы", "Скорпион",
-  "Стрелец", "Козерог", "Водолей", "Рыбы",
+  "Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева",
+  "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы",
 ];
 
-const PLANET_NAMES_RU = ["Солнце", "Луна", "Меркурий", "Венера", "Марс", "Юпитер", "Сатурн", "Уран", "Нептун", "Плутон"];
-const PLANET_NAMES_EN = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
-
-const PLANET_KEYS: (keyof NatalChartData)[] = [
-  "sun", "moon", "mercury", "venus", "mars",
-  "jupiter", "saturn", "uranus", "neptune", "pluto",
-];
-
-const CITIES: Record<string, { lat: number; lon: number; tz: number }> = {
-  "Київ": { lat: 50.45, lon: 30.52, tz: 2 },
-  "Харків": { lat: 49.99, lon: 36.23, tz: 2 },
-  "Одеса": { lat: 46.48, lon: 30.73, tz: 2 },
-  "Дніпро": { lat: 48.46, lon: 35.05, tz: 2 },
-  "Львів": { lat: 49.84, lon: 24.03, tz: 2 },
-  "Запоріжжя": { lat: 47.82, lon: 35.19, tz: 2 },
-  "Вінниця": { lat: 49.23, lon: 28.47, tz: 2 },
-  "Чернівці": { lat: 48.29, lon: 25.94, tz: 2 },
-  "Варшава": { lat: 52.23, lon: 21.01, tz: 1 },
-  "Прага": { lat: 50.08, lon: 14.42, tz: 1 },
-  "Берлін": { lat: 52.52, lon: 13.41, tz: 1 },
-  "Відень": { lat: 48.21, lon: 16.37, tz: 1 },
+const PLANET_KEYS = ["sun","moon","mercury","venus","mars","jupiter","saturn","uranus","neptune","pluto"] as const;
+type PlanetKey = typeof PLANET_KEYS[number];
+const PLANET_GLYPH: Record<string, string> = {
+  Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂",
+  Jupiter: "♃", Saturn: "♄", Uranus: "♅", Neptune: "♆", Pluto: "♇",
+  ASC: "AC", MC: "MC",
+};
+const PLANET_LABEL: Record<string, { uk: string; ru: string; en: string }> = {
+  Sun:     { uk: "Сонце",   ru: "Солнце",   en: "Sun" },
+  Moon:    { uk: "Місяць",  ru: "Луна",     en: "Moon" },
+  Mercury: { uk: "Меркурій",ru: "Меркурий", en: "Mercury" },
+  Venus:   { uk: "Венера",  ru: "Венера",   en: "Venus" },
+  Mars:    { uk: "Марс",    ru: "Марс",     en: "Mars" },
+  Jupiter: { uk: "Юпітер",  ru: "Юпитер",   en: "Jupiter" },
+  Saturn:  { uk: "Сатурн",  ru: "Сатурн",   en: "Saturn" },
+  Uranus:  { uk: "Уран",    ru: "Уран",     en: "Uranus" },
+  Neptune: { uk: "Нептун",  ru: "Нептун",   en: "Neptune" },
+  Pluto:   { uk: "Плутон",  ru: "Плутон",   en: "Pluto" },
+  ASC:     { uk: "Асцендент", ru: "Асцендент", en: "Ascendant" },
+  MC:      { uk: "МедКоелі",  ru: "Медиум Коэли", en: "Midheaven" },
+};
+const ASPECT_GLYPH: Record<AspectKey, string> = {
+  conjunction: "☌", sextile: "⚹", square: "□", trine: "△", opposition: "☍",
+};
+const ASPECT_COLOR: Record<AspectKey, string> = {
+  conjunction: "#B8883A", trine: "#3F6A35", sextile: "#5A8A65",
+  square: "#9A6E28", opposition: "#7A3E18",
 };
 
-function SignWheel({ chart }: { chart: NatalChartData }) {
-  const cx = 120, cy = 120, r = 90, rp = 60;
-  const toXY = (deg: number, radius: number) => {
-    const a = (deg - 90) * (Math.PI / 180);
-    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+const T = {
+  uk: {
+    tag: "Натальна карта",
+    title: "Твоя натальна карта",
+    sub: "Повна карта народження з усіма планетами, домами Placidus та психологічним AI-портретом.",
+    section_input: "Дані народження",
+    cabinet_filled: "Дані підтягнуті з кабінету",
+    edit: "Редагувати",
+    name: "Як до тебе звертатись",
+    name_ph: "Олена",
+    date: "Дата народження",
+    time: "Час народження",
+    time_hint: "Якщо точно не знаєш — постав 12:00 (ASC і будинки будуть приблизні).",
+    place: "Місце народження",
+    place_ph: "Почни вводити — Київ, Львів, …",
+    tz: "Таймзона",
+    compute: "Розрахувати карту",
+    computing: "Розраховуємо…",
+    section_wheel: "Чарт",
+    section_planets: "Планети + Дома (Placidus)",
+    section_aspects: "Натальні аспекти",
+    section_portrait: "AI-портрет",
+    portrait_cta: "Отримати психологічний портрет",
+    portrait_loading: "Думаю над твоєю картою…",
+    portrait_anon: "AI-портрет доступний зареєстрованим. Сама карта + дома + аспекти вище — для всіх.",
+    portrait_signin: "Створити акаунт →",
+    portrait_rate: "Сьогодні портрет вже зроблений. Повертайся завтра ✨",
+    portrait_error: "Не вдалось згенерувати портрет. Спробуй пізніше.",
+    essence_label: "Сутність",
+    gifts_label: "Дари",
+    work_label: "Робота",
+    privacy: "Дані залишаються у твоєму браузері й акаунті — нікуди більше не йдуть.",
+    house_n: (n: number) => `${n}-й дім`,
+    no_aspects: "У межах класичних орбіт натальних аспектів не знайдено.",
+  },
+  ru: {
+    tag: "Натальная карта",
+    title: "Твоя натальная карта",
+    sub: "Полная карта рождения со всеми планетами, домами Placidus и психологическим AI-портретом.",
+    section_input: "Данные рождения",
+    cabinet_filled: "Данные подтянуты из кабинета",
+    edit: "Редактировать",
+    name: "Как к тебе обращаться",
+    name_ph: "Елена",
+    date: "Дата рождения",
+    time: "Время рождения",
+    time_hint: "Если точно не знаешь — поставь 12:00 (АСЦ и дома будут приблизительными).",
+    place: "Место рождения",
+    place_ph: "Начни вводить — Киев, Львов, …",
+    tz: "Таймзона",
+    compute: "Рассчитать карту",
+    computing: "Рассчитываем…",
+    section_wheel: "Чарт",
+    section_planets: "Планеты + Дома (Placidus)",
+    section_aspects: "Натальные аспекты",
+    section_portrait: "AI-портрет",
+    portrait_cta: "Получить психологический портрет",
+    portrait_loading: "Думаю над твоей картой…",
+    portrait_anon: "AI-портрет доступен зарегистрированным. Сама карта + дома + аспекты выше — для всех.",
+    portrait_signin: "Создать аккаунт →",
+    portrait_rate: "Сегодня портрет уже сделан. Возвращайся завтра ✨",
+    portrait_error: "Не удалось сгенерировать портрет. Попробуй позже.",
+    essence_label: "Суть",
+    gifts_label: "Дары",
+    work_label: "Работа",
+    privacy: "Данные остаются в твоём браузере и аккаунте — никуда больше не уходят.",
+    house_n: (n: number) => `${n}-й дом`,
+    no_aspects: "В пределах классических орбит натальных аспектов не найдено.",
+  },
+  en: {
+    tag: "Natal Chart",
+    title: "Your natal chart",
+    sub: "A complete birth chart with all planets, Placidus houses and a psychological AI portrait.",
+    section_input: "Birth data",
+    cabinet_filled: "Loaded from your account",
+    edit: "Edit",
+    name: "How should we address you",
+    name_ph: "Olena",
+    date: "Birth date",
+    time: "Birth time",
+    time_hint: "If you don't know exactly — use 12:00 (ASC and houses will be approximate).",
+    place: "Birth place",
+    place_ph: "Start typing — Kyiv, London, …",
+    tz: "Timezone",
+    compute: "Compute the chart",
+    computing: "Computing…",
+    section_wheel: "Chart",
+    section_planets: "Planets + Houses (Placidus)",
+    section_aspects: "Natal aspects",
+    section_portrait: "AI Portrait",
+    portrait_cta: "Get the psychological portrait",
+    portrait_loading: "Reading your chart…",
+    portrait_anon: "The AI portrait is for signed-in users. The chart, houses and aspects above are free.",
+    portrait_signin: "Create account →",
+    portrait_rate: "Today's portrait is already done. Come back tomorrow ✨",
+    portrait_error: "Could not generate the portrait. Try again later.",
+    essence_label: "Essence",
+    gifts_label: "Gifts",
+    work_label: "Work",
+    privacy: "Data stays in your browser + account — nowhere else.",
+    house_n: (n: number) => `house ${n}`,
+    no_aspects: "No natal aspects detected within classical orbs.",
+  },
+};
+
+// Natal-to-natal orbs (Phase М7 — wider than transit because natal is static).
+const NATAL_ORBS: Record<AspectKey, number> = {
+  conjunction: 8, opposition: 8, square: 7, trine: 7, sextile: 5,
+};
+
+function detectNatalAspects(planets: Record<string, number>): Array<{ a: string; b: string; kind: AspectKey; orb: number }> {
+  const ASPECT_ANGLES: Record<AspectKey, number> = {
+    conjunction: 0, sextile: 60, square: 90, trine: 120, opposition: 180,
   };
+  const names = Object.keys(planets);
+  const out: Array<{ a: string; b: string; kind: AspectKey; orb: number }> = [];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const a = names[i], b = names[j];
+      let diff = Math.abs(planets[a] - planets[b]) % 360;
+      if (diff > 180) diff = 360 - diff;
+      for (const [kind, angle] of Object.entries(ASPECT_ANGLES) as [AspectKey, number][]) {
+        const dev = Math.abs(diff - angle);
+        if (dev <= NATAL_ORBS[kind]) {
+          out.push({ a, b, kind, orb: dev });
+          break;
+        }
+      }
+    }
+  }
+  return out.sort((x, y) => x.orb - y.orb);
+}
 
-  return (
-    <svg viewBox="0 0 240 240" className="w-full max-w-[280px] mx-auto">
-      {/* Outer ring */}
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(196,169,122,0.3)" strokeWidth="1" />
-      <circle cx={cx} cy={cy} r={rp} fill="none" stroke="rgba(196,169,122,0.15)" strokeWidth="0.5" />
+interface NatalChartData {
+  planets: Record<string, number>;
+  asc: number;
+  mc: number;
+  cusps: number[];
+  jd: number;
+}
 
-      {/* Sign divisions */}
-      {Array.from({ length: 12 }).map((_, i) => {
-        const a = (i * 30 - 90) * (Math.PI / 180);
-        const inner = toXY(i * 30, rp + 2);
-        const outer = toXY(i * 30, r - 2);
-        const label = toXY(i * 30 + 15, (r + rp) / 2 + 2);
-        return (
-          <g key={i}>
-            <line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y}
-              stroke="rgba(196,169,122,0.25)" strokeWidth="0.5" />
-            <text x={label.x} y={label.y} textAnchor="middle" dominantBaseline="middle"
-              fontSize="7" fill="rgba(196,169,122,0.8)" style={{ fontFamily: "var(--font-cormorant)" }}>
-              {SIGN_GLYPHS[i]}
-            </text>
-          </g>
-        );
-      })}
+function computeChart(birthDate: string, birthTime: string, lat: number, lon: number, tz: string): NatalChartData | null {
+  const [y, mo, d] = birthDate.split("-").map(n => parseInt(n, 10));
+  const [h, mi] = birthTime.split(":").map(n => parseInt(n, 10));
+  if (![y, mo, d, h, mi].every(Number.isFinite)) return null;
 
-      {/* ASC line */}
-      {(() => {
-        const inner2 = toXY(chart.asc, rp);
-        const outer2 = toXY(chart.asc, r);
-        return <line x1={inner2.x} y1={inner2.y} x2={outer2.x} y2={outer2.y}
-          stroke="#D4A853" strokeWidth="1.5" />;
-      })()}
+  const approxUtc = new Date(Date.UTC(y, mo - 1, d, h, mi));
+  const tzOffset = ianaToOffsetHours(approxUtc, tz);
+  const jd = dateToJD(y, mo, d, h, mi, tzOffset);
+  const lst = calcLST(jd, lon);
+  const e = 23.439291111;
 
-      {/* Planets */}
-      {PLANET_KEYS.slice(0, 7).map((key, i) => {
-        const deg = chart[key] as number;
-        const pos = toXY(deg, rp - 15);
-        return (
-          <g key={key}>
-            <circle cx={pos.x} cy={pos.y} r="8" fill="rgba(253,251,247,0.9)" stroke="rgba(196,169,122,0.4)" strokeWidth="0.5" />
-            <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="middle"
-              fontSize="7" fill="#B8883A" style={{ fontFamily: "var(--font-cormorant)" }}>
-              {PLANET_GLYPHS[i]}
-            </text>
-          </g>
-        );
-      })}
+  const planets: Record<string, number> = {
+    Sun:     calcPlanetDeg(0, jd),
+    Moon:    calcPlanetDeg(1, jd),
+    Mercury: calcPlanetDeg(2, jd),
+    Venus:   calcPlanetDeg(3, jd),
+    Mars:    calcPlanetDeg(4, jd),
+    Jupiter: calcPlanetDeg(5, jd),
+    Saturn:  calcPlanetDeg(6, jd),
+    Uranus:  calcPlanetDeg(7, jd),
+    Neptune: calcPlanetDeg(8, jd),
+    Pluto:   calcPlanetDeg(9, jd),
+  };
+  const asc = calcAscendant(lst, lat, e);
+  const mc  = calcMC(lst, e);
+  const cusps = calcPlacidusHouses(lst, lat, e);
 
-      {/* Center */}
-      <circle cx={cx} cy={cy} r="10" fill="rgba(212,168,83,0.1)" stroke="rgba(196,169,122,0.4)" strokeWidth="0.5" />
-    </svg>
-  );
+  return { planets, asc, mc, cusps, jd };
 }
 
 export default function NatalChartPage() {
   const { language } = useLanguage();
-  const isRu = language === "ru";
-  const isEn = language === "en";
+  const lang: "uk" | "ru" | "en" = language === "ru" ? "ru" : language === "en" ? "en" : "uk";
+  const t = T[lang];
+  const signNames = lang === "ru" ? SIGNS_RU : lang === "en" ? SIGNS_EN : SIGNS_UA;
+  const { profile } = useProfile();
 
-  const signs = isRu ? SIGNS_RU : isEn ? SIGNS_EN : SIGNS_UA;
-  const planetNames = isRu ? PLANET_NAMES_RU : isEn ? PLANET_NAMES_EN : PLANET_NAMES_UA;
+  // ── Form state ─────────────────────────────────────────────────────────
+  const [name, setName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [birthTime, setBirthTime] = useState("12:00");
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [picked, setPicked] = useState<GeoCandidate | null>(null);
+  const [tz, setTz] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
-  const degToSignLocalized = (deg: number) => signs[degToSign(deg)];
+  // ── Cabinet auto-fill ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (hydrated || !profile) return;
+    if (profile.birth_date && profile.birth_time && profile.birth_place
+        && profile.birth_lat != null && profile.birth_lon != null && profile.birth_tz) {
+      setName(profile.display_name ?? profile.full_name?.split(/\s+/)[0] ?? "");
+      setBirthDate(profile.birth_date);
+      setBirthTime(profile.birth_time.slice(0, 5));
+      setPlaceQuery(profile.birth_place);
+      setPicked({ label: profile.birth_place, lat: profile.birth_lat, lon: profile.birth_lon, rawType: "saved" });
+      setTz(profile.birth_tz);
+    }
+    setHydrated(true);
+  }, [profile, hydrated]);
 
-  const [form, setForm] = useState({
-    year: "", month: "", day: "",
-    hour: "12", minute: "0",
-    city: "Київ",
-  });
-  const [result, setResult] = useState<NatalChartData | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Track tool view
+  useEffect(() => { track("tool_viewed", { tool: "natal-chart" }); }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  // ── City autocomplete ───────────────────────────────────────────────────
+  const [suggestions, setSuggestions] = useState<GeoCandidate[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (picked && placeQuery === picked.label) return;
+    if (placeQuery.trim().length < 2) { setSuggestions([]); return; }
+    abortRef.current?.abort();
+    const ac = new AbortController(); abortRef.current = ac;
+    const id = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const list = await searchCity(placeQuery, language);
+        if (!ac.signal.aborted) { setSuggestions(list); setOpen(list.length > 0); }
+      } finally { if (!ac.signal.aborted) setSearching(false); }
+    }, 350);
+    return () => { clearTimeout(id); ac.abort(); };
+  }, [placeQuery, language, picked]);
+
+  useEffect(() => {
+    if (!picked) { setTz(""); return; }
+    if (picked.rawType === "saved" && tz) return; // already known
+    let cancelled = false;
+    (async () => {
+      const resolved = await coordsToIana(picked.lat, picked.lon);
+      if (!cancelled) setTz(resolved);
+    })();
+    return () => { cancelled = true; };
+  }, [picked, tz]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  // ── Chart compute ───────────────────────────────────────────────────────
+  const [chart, setChart] = useState<NatalChartData | null>(null);
+  const [computing, setComputing] = useState(false);
+
+  function handleCompute() {
+    if (!birthDate || !birthTime || !picked || !tz) return;
+    setComputing(true);
     setTimeout(() => {
-      const city = CITIES[form.city] || CITIES["Київ"];
-      const chart = calcNatalChart(
-        parseInt(form.year), parseInt(form.month), parseInt(form.day),
-        parseInt(form.hour), parseInt(form.minute), city.tz,
-        city.lat, city.lon
-      );
-      setResult(chart);
-      setLoading(false);
-    }, 500);
-  };
+      const c = computeChart(birthDate, birthTime, picked.lat, picked.lon, tz);
+      setChart(c);
+      setPortrait(null);
+      setComputing(false);
+      track("natal_chart_computed");
+    }, 50);
+  }
 
+  // ── AI portrait ─────────────────────────────────────────────────────────
+  type Portrait = { essence?: string; gifts?: string; work?: string };
+  const [portrait, setPortrait] = useState<Portrait | null>(null);
+  const [portraitLoading, setPortraitLoading] = useState(false);
+  const [portraitError, setPortraitError] = useState<"none" | "auth" | "rate" | "other">("none");
+
+  async function handlePortrait() {
+    if (!chart) return;
+    setPortraitLoading(true);
+    setPortraitError("none");
+    try {
+      const venusIdx = Math.floor(((chart.planets.Venus % 360) + 360) % 360 / 30);
+      const marsIdx  = Math.floor(((chart.planets.Mars  % 360) + 360) % 360 / 30);
+      const sunIdx   = Math.floor(((chart.planets.Sun   % 360) + 360) % 360 / 30);
+      const moonIdx  = Math.floor(((chart.planets.Moon  % 360) + 360) % 360 / 30);
+      const ascIdx   = Math.floor(((chart.asc % 360) + 360) % 360 / 30);
+      const mcIdx    = Math.floor(((chart.mc  % 360) + 360) % 360 / 30);
+
+      // Stellium detection: which house holds 3+ planets?
+      const houseCount: Record<number, string[]> = {};
+      for (const pkey of ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto"] as const) {
+        const h = whichPlacidusHouse(chart.planets[pkey], chart.cusps);
+        houseCount[h] = houseCount[h] ?? [];
+        houseCount[h].push(pkey);
+      }
+      const stellia = Object.entries(houseCount).filter(([, ps]) => ps.length >= 3)
+        .map(([h, ps]) => `${h}: ${ps.join(", ")}`).join("; ") || "—";
+
+      // Aspect summary
+      const aspectList = detectNatalAspects(chart.planets);
+      const aspectsTxt = aspectList.slice(0, 12).map(a =>
+        `${a.a} ${ASPECT_GLYPH[a.kind]} ${a.b} (±${a.orb.toFixed(1)}°)`
+      ).join("\n") || "—";
+
+      const res = await fetch("/api/natal-chart-portrait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language,
+          name: name || "—",
+          sunSign:  signNames[sunIdx],
+          moonSign: signNames[moonIdx],
+          ascSign:  signNames[ascIdx],
+          mcSign:   signNames[mcIdx],
+          venusSign: signNames[venusIdx],
+          marsSign:  signNames[marsIdx],
+          stelliums: stellia,
+          majorAspects: aspectsTxt,
+        }),
+      });
+      if (res.status === 401) { setPortraitError("auth"); return; }
+      if (res.status === 429) { setPortraitError("rate"); return; }
+      const data = await res.json();
+      if (data.error) { setPortraitError("other"); return; }
+      setPortrait(data);
+      track("natal_chart_portrait");
+    } catch {
+      setPortraitError("other");
+    } finally {
+      setPortraitLoading(false);
+    }
+  }
+
+  // ── Derived display values ──────────────────────────────────────────────
+  const canCompute = Boolean(birthDate && birthTime && picked && tz);
+  const cabinetComplete = Boolean(profile?.birth_date && profile?.birth_time && profile?.birth_place
+                                  && profile?.birth_lat != null && profile?.birth_lon != null && profile?.birth_tz);
+
+  const aspects = useMemo(() => chart ? detectNatalAspects(chart.planets) : [], [chart]);
+
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
     <>
-      <section className="pt-36 pb-16 bg-[#FDFBF7] relative overflow-hidden">
+      <section className="pt-36 pb-12 bg-[#FDFBF7] relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(196,169,122,0.1),transparent)]" />
         <div className="relative max-w-3xl mx-auto px-6 text-center">
           <AnimatedSection>
-            <span className="tag mb-6 inline-block">
-              {isRu ? "Астрология" : isEn ? "Astrology" : "Астрологія"}
-            </span>
-            <h1
-              className="text-[clamp(2.5rem,5vw,4.5rem)] text-[#1C1512] mb-6 leading-[1.06]"
-              style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}
-            >
-              {isRu ? "Натальная карта" : isEn ? "Natal Chart" : "Натальна карта"}
+            <span className="tag mb-6 inline-block">{t.tag}</span>
+            <h1 className="text-[clamp(2.5rem,5vw,4.5rem)] text-[#1C1512] mb-6 leading-[1.06]"
+                style={{ fontFamily: "var(--font-cormorant)", fontWeight: 400 }}>
+              {t.title}
             </h1>
-            <p className="text-xl text-[#7A6A58] leading-relaxed">
-              {isRu
-                ? "Рассчитайте положение планет на момент вашего рождения."
-                : isEn
-                ? "Calculate the positions of the planets at the moment of your birth."
-                : "Розрахуйте положення планет на момент вашого народження."}
-            </p>
+            <p className="text-xl text-[#7A6A58] leading-relaxed">{t.sub}</p>
           </AnimatedSection>
         </div>
       </section>
@@ -168,217 +426,381 @@ export default function NatalChartPage() {
       <GoldDivider />
 
       <section className="section-padding bg-[#FDFBF7]">
-        <div className="max-w-4xl mx-auto px-6">
+        <div className="max-w-3xl mx-auto px-6 space-y-6">
+          {/* ── Input form ── */}
           <AnimatedSection>
-            <div className="card-luxury mb-10">
-              <h2
-                className="text-2xl text-[#1C1512] mb-8"
-                style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
-              >
-                {isRu ? "Введите данные рождения" : isEn ? "Enter birth data" : "Введіть дані народження"}
+            <div className="card-luxury space-y-5">
+              <h2 className="text-2xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                {t.section_input}
               </h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                      {isRu ? "День" : isEn ? "Day" : "День"}
-                    </label>
-                    <input
-                      type="number" min={1} max={31} required
-                      placeholder="14"
-                      value={form.day}
-                      onChange={(e) => setForm({ ...form, day: e.target.value })}
-                      className="input-luxury"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                      {isRu ? "Месяц" : isEn ? "Month" : "Місяць"}
-                    </label>
-                    <input
-                      type="number" min={1} max={12} required
-                      placeholder="3"
-                      value={form.month}
-                      onChange={(e) => setForm({ ...form, month: e.target.value })}
-                      className="input-luxury"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                      {isRu ? "Год" : isEn ? "Year" : "Рік"}
-                    </label>
-                    <input
-                      type="number" min={1900} max={2025} required
-                      placeholder="1990"
-                      value={form.year}
-                      onChange={(e) => setForm({ ...form, year: e.target.value })}
-                      className="input-luxury"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                      {isRu ? "Час (0-23)" : isEn ? "Hour (0-23)" : "Година (0-23)"}
-                    </label>
-                    <input
-                      type="number" min={0} max={23}
-                      value={form.hour}
-                      onChange={(e) => setForm({ ...form, hour: e.target.value })}
-                      className="input-luxury"
-                    />
+              {cabinetComplete && !editMode && hydrated ? (
+                <>
+                  <div className="p-4 rounded-xl bg-[rgba(122,170,108,0.10)] border border-[rgba(122,170,108,0.3)] flex items-start gap-3">
+                    <Check size={18} className="text-[#3F6A35] flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#3F6A35]">{t.cabinet_filled}</p>
+                      <p className="text-xs text-[#5C4530] mt-1.5">
+                        {profile?.birth_date} · {profile?.birth_time?.slice(0, 5)} · {profile?.birth_place}
+                      </p>
+                      <button type="button" onClick={() => setEditMode(true)}
+                              className="underline text-[#B8883A] hover:text-[#7A6A58] text-xs mt-1.5">
+                        {t.edit}
+                      </button>
+                    </div>
                   </div>
+                </>
+              ) : (
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                      {isRu ? "Минута" : isEn ? "Minute" : "Хвилина"}
-                    </label>
-                    <input
-                      type="number" min={0} max={59}
-                      value={form.minute}
-                      onChange={(e) => setForm({ ...form, minute: e.target.value })}
-                      className="input-luxury"
-                    />
+                    <label className="block text-xs text-[#B8883A] tracking-widest uppercase mb-2">{t.name}</label>
+                    <input type="text" value={name} onChange={e => setName(e.target.value)}
+                           placeholder={t.name_ph}
+                           className="input-luxury w-full" maxLength={80} />
                   </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-[#B8883A] tracking-widest uppercase mb-2">{t.date}</label>
+                      <input type="date" value={birthDate}
+                             onChange={e => setBirthDate(e.target.value)}
+                             min="1900-01-01" max={new Date().toISOString().slice(0, 10)}
+                             className="input-luxury w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[#B8883A] tracking-widest uppercase mb-2">{t.time}</label>
+                      <input type="time" value={birthTime}
+                             onChange={e => setBirthTime(e.target.value)}
+                             className="input-luxury w-full" />
+                      <p className="text-[11px] text-[#9A8A78] italic mt-1.5 leading-snug">{t.time_hint}</p>
+                    </div>
+                  </div>
+                  <div ref={containerRef}>
+                    <label className="block text-xs text-[#B8883A] tracking-widest uppercase mb-2">{t.place}</label>
+                    <div className="relative">
+                      <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C4A97A]" />
+                      <input type="text" value={placeQuery}
+                             onChange={e => { setPlaceQuery(e.target.value); setPicked(null); }}
+                             onFocus={() => suggestions.length > 0 && setOpen(true)}
+                             placeholder={t.place_ph}
+                             className="input-luxury w-full pl-10 pr-9" autoComplete="off" />
+                      {searching && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#C4A97A] animate-spin" />}
+                      {!searching && picked && <Check size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B8883A]" />}
+                      {open && suggestions.length > 0 && (
+                        <ul role="listbox"
+                            className="absolute z-30 mt-1 w-full max-h-72 overflow-y-auto rounded-xl border border-[rgba(196,169,122,0.3)] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] py-1">
+                          {suggestions.map((s, i) => (
+                            <li key={`${s.lat}-${s.lon}-${i}`}>
+                              <button type="button"
+                                      onClick={() => { setPicked(s); setPlaceQuery(s.label); setOpen(false); }}
+                                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[rgba(196,169,122,0.08)] flex items-start gap-2">
+                                <MapPin size={14} className="text-[#C4A97A] mt-0.5 flex-shrink-0" />
+                                <span className="text-[#1C1512]">{s.label}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    {picked && tz && (
+                      <p className="text-[11px] text-[#9A8A78] mt-1.5 leading-snug">
+                        {t.tz}: <span className="font-mono">{tz}</span>
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#9A8A78] italic leading-snug">🔒 {t.privacy}</p>
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-xs text-[#7A6A58] mb-2 tracking-wide">
-                    {isRu ? "Город рождения" : isEn ? "Birth city" : "Місто народження"}
-                  </label>
-                  <select
-                    value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className="input-luxury"
-                  >
-                    {Object.keys(CITIES).map((city) => (
-                      <option key={city} value={city}>{city}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <button type="submit" className="btn-primary w-full" disabled={loading}>
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-                  {loading
-                    ? (isRu ? "Рассчитываем..." : isEn ? "Calculating..." : "Розраховуємо...")
-                    : (isRu ? "Рассчитать натальную карту" : isEn ? "Calculate Natal Chart" : "Розрахувати натальну карту")}
-                </button>
-              </form>
+              <button type="button" onClick={handleCompute}
+                      disabled={!canCompute || computing}
+                      className="btn-primary w-full disabled:opacity-50">
+                {computing ? <><Loader2 size={14} className="animate-spin" /> {t.computing}</> : t.compute}
+              </button>
             </div>
           </AnimatedSection>
 
-          {result && (
-            <AnimatedSection delay={0.1}>
-              <div className="space-y-6">
-                {/* Wheel + Key placements */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="card-luxury flex items-center justify-center">
-                    <SignWheel chart={result} />
-                  </div>
-
-                  <div className="card-luxury">
-                    <h3
-                      className="text-2xl text-[#1C1512] mb-6"
-                      style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
-                    >
-                      {isRu ? "Ключевые позиции" : isEn ? "Key Placements" : "Ключові позиції"}
-                    </h3>
-                    <div className="space-y-4">
-                      {[
-                        { label: isRu ? "Солнце ☉" : isEn ? "Sun ☉" : "Сонце ☉", value: degToSignLocalized(result.sun), deg: result.sun },
-                        { label: isRu ? "Луна ☽" : isEn ? "Moon ☽" : "Місяць ☽", value: degToSignLocalized(result.moon), deg: result.moon },
-                        { label: isRu ? "Асцендент" : isEn ? "Ascendant" : "Асцендент", value: degToSignLocalized(result.asc), deg: result.asc },
-                        { label: isRu ? "МС (Зенит)" : isEn ? "MC (Midheaven)" : "МС (Зеніт)", value: degToSignLocalized(result.mc), deg: result.mc },
-                      ].map((item) => (
-                        <div key={item.label} className="flex justify-between items-center py-2 border-b border-[rgba(196,169,122,0.15)]">
-                          <span className="text-sm text-[#7A6A58]">{item.label}</span>
-                          <div className="text-right">
-                            <p className="font-medium text-[#1C1512] text-sm">{item.value}</p>
-                            <p className="text-xs text-[#C4A97A]">{formatDegree(item.deg)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Full planet table */}
-                <div className="card-luxury">
-                  <h3
-                    className="text-2xl text-[#1C1512] mb-6"
-                    style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
-                  >
-                    {isRu ? "Положение планет" : isEn ? "Planet Positions" : "Положення планет"}
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[rgba(196,169,122,0.2)]">
-                          <th className="text-left py-2 text-[#7A6A58] font-normal pr-4">
-                            {isRu ? "Планета" : isEn ? "Planet" : "Планета"}
-                          </th>
-                          <th className="text-left py-2 text-[#7A6A58] font-normal pr-4">
-                            {isRu ? "Знак" : isEn ? "Sign" : "Знак"}
-                          </th>
-                          <th className="text-left py-2 text-[#7A6A58] font-normal">
-                            {isRu ? "Градус" : isEn ? "Degree" : "Градус"}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {PLANET_KEYS.map((key, i) => {
-                          const deg = result[key] as number;
-                          const signIdx = degToSign(deg);
-                          return (
-                            <tr key={key} className="border-b border-[rgba(196,169,122,0.08)] hover:bg-[rgba(196,169,122,0.04)]">
-                              <td className="py-2.5 pr-4">
-                                <span className="text-[#B8883A] mr-2">{PLANET_GLYPHS[i]}</span>
-                                <span className="text-[#1C1512]">{planetNames[i]}</span>
-                              </td>
-                              <td className="py-2.5 pr-4 text-[#5C4530]">
-                                {SIGN_GLYPHS[signIdx]} {signs[signIdx]}
-                              </td>
-                              <td className="py-2.5 text-[#7A6A58] font-mono text-xs">
-                                {formatDegree(deg)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Houses */}
-                <div className="card-luxury">
-                  <h3
-                    className="text-2xl text-[#1C1512] mb-6"
-                    style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
-                  >
-                    {isRu ? "Куспиды домов (Плацидус)" : isEn ? "House Cusps (Placidus)" : "Куспіди будинків (Плацідус)"}
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {result.houses.map((cusp, i) => (
-                      <div key={i} className="text-sm py-2 px-3 rounded-lg bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.12)]">
-                        <span className="text-[#C4A97A] font-medium mr-2">{i + 1}</span>
-                        <span className="text-[#5C4530]">{formatDegree(cusp)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <p className="text-xs text-[#7A6A58] text-center">
-                  {isRu
-                    ? "Расчёты используют упрощённые формулы Миуса (точность ±1°). Для детального анализа обратитесь к консультанту."
-                    : isEn
-                    ? "Calculations use simplified Meeus formulas (accuracy ±1°). For a detailed analysis, consult a professional."
-                    : "Розрахунки використовують спрощені формули Міуса (точність ±1°). Для детального аналізу зверніться до консультанта."}
-                </p>
-              </div>
-            </AnimatedSection>
+          {/* ── Chart result ── */}
+          {chart && (
+            <>
+              <ChartWheel chart={chart} lang={lang} signNames={signNames} />
+              <PlanetTable chart={chart} lang={lang} signNames={signNames} t={t} />
+              <AspectsList aspects={aspects} lang={lang} />
+              <PortraitBlock
+                lang={lang}
+                portrait={portrait}
+                loading={portraitLoading}
+                error={portraitError}
+                onRun={handlePortrait}
+                t={t}
+              />
+            </>
           )}
         </div>
       </section>
     </>
+  );
+}
+
+// ── Chart wheel SVG ─────────────────────────────────────────────────────────
+function ChartWheel({ chart, lang, signNames }: {
+  chart: NatalChartData; lang: "uk" | "ru" | "en"; signNames: string[];
+}) {
+  const cx = 200, cy = 200;
+  const rOuter = 195, rSignInner = 165, rHouseInner = 145, rPlanet = 115;
+
+  // Astrology charts use the convention: 0° Aries at the LEFT (east horizon
+  // = Ascendant), increasing CCW. We map our longitudes so that the
+  // Ascendant always sits at the 9-o'clock (left) point of the wheel.
+  function toXY(deg: number, r: number): { x: number; y: number } {
+    // Place ASC at 180° (left). Rotate by -asc + 180° in screen coords.
+    const adj = ((deg - chart.asc + 180) % 360 + 360) % 360;
+    const rad = (adj * Math.PI) / 180;
+    return { x: cx - r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  return (
+    <div className="card-luxury">
+      <svg viewBox="0 0 400 400" className="w-full max-w-[400px] mx-auto" role="img" aria-label="Natal chart wheel">
+        {/* Outer ring */}
+        <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="rgba(196,169,122,0.4)" strokeWidth="1.2" />
+        <circle cx={cx} cy={cy} r={rSignInner} fill="none" stroke="rgba(196,169,122,0.3)" strokeWidth="0.6" />
+        <circle cx={cx} cy={cy} r={rHouseInner} fill="none" stroke="rgba(196,169,122,0.2)" strokeWidth="0.5" />
+
+        {/* Sign divisions (every 30° starting from ASC) */}
+        {Array.from({ length: 12 }, (_, i) => {
+          const deg = i * 30;
+          const a = toXY(deg, rOuter);
+          const b = toXY(deg, rSignInner);
+          const mid = toXY(deg + 15, (rOuter + rSignInner) / 2);
+          // The sign at this slot — depends on where ASC's sign starts.
+          // signIdx at this position = (floor((adj + asc) / 30)) % 12
+          const adj = deg;
+          const lonAtSlot = (chart.asc + adj) % 360;
+          const sIdx = Math.floor(((lonAtSlot % 360) + 360) % 360 / 30);
+          return (
+            <g key={`sign-${i}`}>
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(196,169,122,0.4)" strokeWidth="0.8" />
+              <text x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="central"
+                    fontSize="11" fill="#B8883A" style={{ fontFamily: "var(--font-cormorant)" }}>
+                {SIGN_GLYPHS[sIdx]}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* House cusps (Placidus) */}
+        {chart.cusps.map((cusp, i) => {
+          const inner = toXY(cusp, 25);
+          const outer = toXY(cusp, rHouseInner);
+          // Special styling for 1st, 4th, 7th, 10th — the angular houses.
+          const isAngular = i === 0 || i === 3 || i === 6 || i === 9;
+          const color = isAngular ? "#B8883A" : "rgba(196,169,122,0.4)";
+          const width = isAngular ? 1.5 : 0.6;
+          const dash  = isAngular ? "" : "2 3";
+          // Label position
+          const mid = toXY(cusp + 2, rHouseInner - 8);
+          return (
+            <g key={`cusp-${i}`}>
+              <line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke={color} strokeWidth={width} strokeDasharray={dash} />
+              <text x={mid.x} y={mid.y} textAnchor="start" dominantBaseline="central"
+                    fontSize="8" fill="rgba(122,106,88,0.7)">
+                {i + 1}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Planet markers — spread along radius if clustered */}
+        {Object.entries(chart.planets).map(([name, lon], idx) => {
+          const pos = toXY(lon, rPlanet);
+          return (
+            <g key={name}>
+              <circle cx={pos.x} cy={pos.y} r={11}
+                      fill="rgba(253,251,247,0.95)" stroke="rgba(196,169,122,0.5)" strokeWidth="0.8" />
+              <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central"
+                    fontSize="11" fill="#B8883A"
+                    style={{ fontFamily: "var(--font-cormorant)" }}>
+                {PLANET_GLYPH[name]}
+              </text>
+              {/* Tiny degree label below */}
+              <text x={pos.x} y={pos.y + 16} textAnchor="middle" dominantBaseline="central"
+                    fontSize="6" fill="rgba(122,106,88,0.7)">
+                {Math.floor(((lon % 30) + 30) % 30)}°
+              </text>
+              <text key={`spacer-${idx}`} />
+            </g>
+          );
+        })}
+
+        {/* ASC and MC labels */}
+        {(() => {
+          const ascPt = toXY(chart.asc, rOuter + 8);
+          const mcPt  = toXY(chart.mc,  rOuter + 8);
+          return (
+            <g>
+              <text x={ascPt.x} y={ascPt.y} textAnchor="middle" dominantBaseline="central"
+                    fontSize="9" fill="#B8883A" fontWeight="bold">AC</text>
+              <text x={mcPt.x}  y={mcPt.y}  textAnchor="middle" dominantBaseline="central"
+                    fontSize="9" fill="#B8883A" fontWeight="bold">MC</text>
+            </g>
+          );
+        })()}
+      </svg>
+      <p className="text-[11px] text-[#9A8A78] italic text-center mt-2">
+        {lang === "ru" ? "Дома Placidus. AC слева, MC сверху."
+          : lang === "en" ? "Placidus houses. AC on the left, MC on top."
+          : "Дома Placidus. AC ліворуч, MC згори."}
+      </p>
+      <p className="text-[10px] text-[#9A8A78] italic text-center">
+        {`Sign names: ${signNames.slice(0, 3).join(" · ")}…`}
+      </p>
+    </div>
+  );
+}
+
+// ── Planet table ─────────────────────────────────────────────────────────
+function PlanetTable({ chart, lang, signNames, t }: {
+  chart: NatalChartData; lang: "uk" | "ru" | "en"; signNames: string[];
+  t: typeof T["uk"];
+}) {
+  const rows = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","ASC","MC"];
+  return (
+    <div className="card-luxury">
+      <h3 className="text-xl text-[#1C1512] mb-3" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+        {t.section_planets}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        {rows.map(name => {
+          const lon = name === "ASC" ? chart.asc : name === "MC" ? chart.mc : chart.planets[name];
+          const signIdx = Math.floor(((lon % 360) + 360) % 360 / 30);
+          const inSign = ((lon % 30) + 30) % 30;
+          const deg = Math.floor(inSign);
+          const min = Math.floor((inSign - deg) * 60);
+          const house = (name === "ASC" || name === "MC") ? null : whichPlacidusHouse(lon, chart.cusps);
+          return (
+            <div key={name} className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.12)] text-sm">
+              <span className="flex items-center gap-2 text-[#5C4530]">
+                <span className="w-7 text-center text-[#C4A97A] text-base">{PLANET_GLYPH[name]}</span>
+                <span className="font-medium" style={{ fontFamily: "var(--font-cormorant)" }}>
+                  {PLANET_LABEL[name][lang]}
+                </span>
+              </span>
+              <span className="text-xs text-[#7A6A58] flex items-center gap-1.5">
+                {SIGN_GLYPHS[signIdx]}
+                <span className="text-[#1C1512]">{signNames[signIdx]}</span>
+                <span className="text-[#9A8A78] tabular-nums">{deg}°{min.toString().padStart(2, "0")}′</span>
+                {house != null && <span className="ml-1 text-[#B8883A] text-[10px]">· {t.house_n(house)}</span>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Aspects list ─────────────────────────────────────────────────────────
+function AspectsList({ aspects, lang }: {
+  aspects: Array<{ a: string; b: string; kind: AspectKey; orb: number }>;
+  lang: "uk" | "ru" | "en";
+}) {
+  const t = T[lang];
+  return (
+    <div className="card-luxury">
+      <h3 className="text-xl text-[#1C1512] mb-3" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+        {t.section_aspects}
+      </h3>
+      {aspects.length === 0 ? (
+        <p className="text-sm text-[#7A6A58] italic">{t.no_aspects}</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {aspects.map((a, i) => (
+            <li key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.12)] text-sm">
+              <span className="text-[#5C4530] flex-1 flex items-center gap-1.5">
+                <span className="text-base text-[#C4A97A]">{PLANET_GLYPH[a.a]}</span>
+                <span style={{ fontFamily: "var(--font-cormorant)" }}>{PLANET_LABEL[a.a][lang]}</span>
+              </span>
+              <span style={{ color: ASPECT_COLOR[a.kind] }} className="text-base">{ASPECT_GLYPH[a.kind]}</span>
+              <span className="text-[#5C4530] flex-1 text-right flex items-center justify-end gap-1.5">
+                <span style={{ fontFamily: "var(--font-cormorant)" }}>{PLANET_LABEL[a.b][lang]}</span>
+                <span className="text-base text-[#C4A97A]">{PLANET_GLYPH[a.b]}</span>
+              </span>
+              <span className="text-[10px] text-[#9A8A78] tabular-nums ml-2 w-12 text-right">
+                ±{a.orb.toFixed(1)}°
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Portrait block (AI, auth-gated) ──────────────────────────────────────
+function PortraitBlock({ lang, portrait, loading, error, onRun, t }: {
+  lang: "uk" | "ru" | "en";
+  portrait: { essence?: string; gifts?: string; work?: string } | null;
+  loading: boolean;
+  error: "none" | "auth" | "rate" | "other";
+  onRun: () => void;
+  t: typeof T["uk"];
+}) {
+  if (error === "auth") {
+    return (
+      <div className="card-luxury">
+        <div className="flex items-start gap-3 mb-3">
+          <Lock size={18} className="text-[#B8883A] flex-shrink-0 mt-0.5" />
+          <h3 className="text-xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+            {t.section_portrait}
+          </h3>
+        </div>
+        <p className="text-sm text-[#5C4530] leading-relaxed mb-4">{t.portrait_anon}</p>
+        <Link href={`/${lang}/account/sign-in?next=/${lang}/studio/natal-chart`} className="btn-primary inline-flex">
+          {t.portrait_signin}
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card-luxury">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D4A853] to-[#C4A97A] flex items-center justify-center text-white">
+          <Sparkles size={18} />
+        </div>
+        <h3 className="text-xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+          {t.section_portrait}
+        </h3>
+      </div>
+
+      {portrait ? (
+        <div className="space-y-4">
+          {([
+            { label: t.essence_label, text: portrait.essence, accent: true },
+            { label: t.gifts_label,   text: portrait.gifts },
+            { label: t.work_label,    text: portrait.work },
+          ]).map((b, i) => b.text && (
+            <div key={i} className={`p-4 rounded-xl border ${b.accent
+              ? "bg-[rgba(212,168,83,0.10)] border-[rgba(212,168,83,0.32)]"
+              : "bg-[rgba(196,169,122,0.05)] border-[rgba(196,169,122,0.18)]"
+            }`}>
+              <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">{b.label}</p>
+              <p className="text-sm text-[#5C4530] leading-relaxed whitespace-pre-wrap">{b.text}</p>
+            </div>
+          ))}
+        </div>
+      ) : error === "rate" ? (
+        <p className="text-sm text-[#7A6A58] italic text-center py-3">{t.portrait_rate}</p>
+      ) : (
+        <>
+          <button type="button" onClick={onRun} disabled={loading}
+                  className="btn-primary w-full disabled:opacity-60">
+            {loading ? <><Loader2 size={14} className="animate-spin" /> {t.portrait_loading}</>
+                     : <><Sparkles size={14} /> {t.portrait_cta}</>}
+          </button>
+          {error === "other" && <p className="text-sm text-[#9A6E28] mt-3 text-center">{t.portrait_error}</p>}
+        </>
+      )}
+    </div>
   );
 }

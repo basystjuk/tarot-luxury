@@ -22,6 +22,7 @@ export type PromptToolId =
   | "tarot-clarify"
   | "numerology-synthesis"
   | "numerology-activation"
+  | "natal-chart-portrait"
   | "moon-reading"
   | "moon-recommendations"
   | "compatibility-reading";
@@ -31,6 +32,7 @@ export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "tarot-clarify",
   "numerology-synthesis",
   "numerology-activation",
+  "natal-chart-portrait",
   "moon-reading",
   "moon-recommendations",
   "compatibility-reading",
@@ -344,6 +346,63 @@ Each "name" is the common name of the stone / essential oil / herb (1–3 words)
     defaultUser: `The Moon is currently in {{moonSign}} ({{element}}).
 
 Return exactly three crystals, three essential oils, and three herbal teas that resonate with this Moon-sign and element combination right now. Write all "name" and "why" values in {{language_name}}. Return ONLY the JSON object — no preamble, no closing remarks, no code fences.`,
+  },
+
+  "natal-chart-portrait": {
+    label: "Натальна карта (портрет)",
+    description: "Психологічний натальний портрет за повним набором планет, домів та аспектів. 1 запит/добу/юзер. Тільки для зареєстрованих.",
+    variables: [
+      { name: "language_name", description: "Мова відповіді.", required: true },
+      { name: "name", description: "Імʼя людини.", required: true },
+      { name: "sunSign", description: "Знак Сонця.", required: true },
+      { name: "moonSign", description: "Знак Місяця.", required: true },
+      { name: "ascSign", description: "Знак Асцендента.", required: true },
+      { name: "mcSign", description: "Знак Медіум Коелі.", required: true },
+      { name: "venusSign", description: "Знак Венери.", required: true },
+      { name: "marsSign", description: "Знак Марса.", required: true },
+      { name: "stelliums", description: "Будинки де 3+ планет, або «—».", required: false },
+      { name: "majorAspects", description: "Перелік основних натальних аспектів через перенос рядка.", required: false },
+    ],
+    defaultSystem: `You are a hellenistic + modern psychological astrologer. You write deeply personal natal portraits without astrology jargon — every technical term gets translated into a felt experience.
+
+Rules:
+— Honour the Sun / Moon / Ascendant triad as the spine of the portrait. Address the person by name when natural.
+— Mention only aspects that ACTUALLY appear in the data. Do NOT invent placements.
+— Connect planet placements to lived themes: career (10th house / MC), love (5th, 7th, Venus, Mars), inner life (4th, Moon).
+— Honour stelliums (3+ planets in one house) as compressed life themes.
+— Warm but precise. No "you are very intuitive" generic lines.
+
+${COMMON_LANG}
+
+Output structure: 3 sections separated by lines containing only three dashes "---".
+
+essence
+---
+gifts
+---
+work
+`,
+    defaultUser: `Natal chart for {{name}}:
+- Sun in {{sunSign}}
+- Moon in {{moonSign}}
+- Ascendant in {{ascSign}}
+- Midheaven in {{mcSign}}
+- Venus in {{venusSign}}
+- Mars in {{marsSign}}
+- Stelliums (3+ planets in one house): {{stelliums}}
+
+Major natal aspects:
+{{majorAspects}}
+
+Write three sections in {{language_name}}, separated by lines containing only three dashes.
+
+essence — 4-5 sentences about who this person fundamentally IS, anchored in the Sun/Moon/ASC triad. Translate every astro term into felt experience.
+---
+gifts — 3-4 sentences about natural gifts visible in the chart: helpful aspects, well-placed planets, the dominant element/modality.
+---
+work — 3-4 sentences about the growth edge: challenging aspects (squares, oppositions), tension points to integrate. End with one concrete suggestion for living this chart well.
+
+No greetings, no preamble, no headers in the text — let the three sections separated by "---" stand on their own.`,
   },
 
   "compatibility-reading": {

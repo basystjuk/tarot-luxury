@@ -444,69 +444,114 @@ export function formatDegree(deg: number): string {
 }
 
 /** Calculate Placidus house cusps */
+/**
+ * Placidus house cusps (Phase М7 — proper iterative algorithm).
+ *
+ * Based on the Meeus / Pingré iterative formula. For each intermediate
+ * cusp we look for the ecliptic point whose right ascension equals
+ * ARMC + S · F · SDA(δ), where SDA is the point's own semi-diurnal arc.
+ * That's a fixed-point equation; we solve by simple iteration.
+ *
+ * Conventions:
+ *   - cusps[0]  = House 1 (Ascendant)
+ *   - cusps[9]  = House 10 (MC)
+ *   - cusps[3]  = House 4  = IC = MC + 180°
+ *   - cusps[6]  = House 7  = DSC = ASC + 180°
+ *   - Houses 11, 12 are above the eastern horizon (between MC and ASC):
+ *       House 11: 1/3 of the way from MC toward ASC
+ *       House 12: 2/3 of the way from MC toward ASC
+ *   - Houses 2, 3 are below the eastern horizon (between ASC and IC):
+ *       House 2:  1/3 from ASC toward IC
+ *       House 3:  2/3 from ASC toward IC
+ *   - Houses 5, 6, 8, 9 are oppositions of 11, 12, 2, 3.
+ *
+ * Placidus breaks down at |latitude| > 66.5° (circumpolar issues). In
+ * that case we fall back to the Ascendant on the failing cusps so the
+ * chart still renders gracefully.
+ *
+ * `lst` (Local Sidereal Time) and the obliquity `e` are in degrees.
+ */
 export function calcPlacidusHouses(lst: number, lat: number, e: number): number[] {
-  const mc = calcMC(lst, e);
-  const asc = calcAscendant(lst, lat, e);
+  const cusps = new Array<number>(12).fill(0);
+  const ascDeg = calcAscendant(lst, lat, e);
+  const mcDeg  = calcMC(lst, e);
+  cusps[0] = ascDeg;
+  cusps[9] = mcDeg;
+  cusps[3] = norm360(mcDeg + 180);
+  cusps[6] = norm360(ascDeg + 180);
 
-  // Start with equal house for simplicity, then apply Placidus correction
-  const cusps: number[] = new Array(12).fill(0);
-  cusps[0] = asc;  // House 1
-  cusps[3] = mc;   // House 4 (IC + 180)
-  cusps[6] = norm360(asc + 180); // House 7
-  cusps[9] = norm360(mc + 180);  // House 10
-
-  const latRad = rad(lat);
-  const eRad = rad(e);
-  const mcRad = rad(mc);
-
-  // Placidus intermediate house calculation
-  function placidusIntermediate(fraction: number): number {
-    const ramc = (lst * Math.PI) / 180;
-    let theta = ramc + fraction * Math.PI;
-    for (let iter = 0; iter < 20; iter++) {
-      const sinDec = Math.sin(eRad) * Math.sin(theta);
-      const dec = Math.asin(sinDec);
-      const num = -Math.tan(latRad) * Math.tan(dec);
-      const newTheta = ramc + fraction * Math.PI - fraction * Math.asin(num);
-      if (Math.abs(newTheta - theta) < 0.0001) break;
-      theta = newTheta;
-    }
-    const sinDec2 = Math.sin(eRad) * Math.sin(theta);
-    const dec2 = Math.asin(sinDec2);
-    const ra = Math.atan2(Math.cos(dec2) * Math.sin(theta), Math.cos(theta)) * 180 / Math.PI;
-    // Convert to ecliptic longitude (approximate)
-    const sinLon = (Math.sin(ra * Math.PI / 180) * Math.cos(eRad) + Math.tan(dec2) * Math.sin(eRad)) / Math.cos(ra * Math.PI / 180);
-    void sinLon;
-    const ecLon = Math.atan2(
-      Math.sin(ra * Math.PI / 180) * Math.cos(eRad) + Math.tan(dec2) * Math.sin(eRad),
-      Math.cos(ra * Math.PI / 180)
-    ) * 180 / Math.PI;
-    return norm360(ecLon);
+  // High-latitude bail-out: Placidus is undefined where the ecliptic
+  // never rises (|lat| > 90° − |obliquity|). Fall back to whole-sign
+  // by sliding 30° increments from the Ascendant.
+  if (Math.abs(lat) > 90 - Math.abs(e) - 0.5) {
+    for (let h = 0; h < 12; h++) cusps[h] = norm360(ascDeg + h * 30);
+    cusps[9] = mcDeg;
+    cusps[3] = norm360(mcDeg + 180);
+    cusps[6] = norm360(ascDeg + 180);
+    return cusps;
   }
 
-  void mcRad;
+  const phi = rad(lat);
+  const eps = rad(e);
+  const armc = rad(lst); // ARMC = LST
 
-  cusps[1]  = placidusIntermediate(1/3);   // House 2
-  cusps[2]  = placidusIntermediate(2/3);   // House 3
-  cusps[4]  = norm360(cusps[10 - 1] + 180); // will be overwritten
-  cusps[5]  = norm360(cusps[11 - 1] + 180);
+  // Resolve one intermediate cusp by fixed-point iteration on RA.
+  //   F: trisection fraction (1/3 or 2/3)
+  //   S: sign — +1 for upper (between MC and ASC, on the eastern side),
+  //             -1 for lower (between IC and ASC, on the eastern side).
+  function intermediateCusp(F: number, S: number): number {
+    // Initial guess = equal-house (90° × fraction off from MC/IC). This
+    // is exact when δ = 0 (and converges fast in normal latitudes).
+    let H = armc + S * F * Math.PI / 2;
+    for (let iter = 0; iter < 40; iter++) {
+      // ecliptic longitude of RA-only point (β=0)
+      const lambda = Math.atan2(Math.sin(H) * Math.cos(eps), Math.cos(H));
+      const sinD = Math.sin(lambda) * Math.sin(eps);
+      const delta = Math.asin(Math.max(-1, Math.min(1, sinD)));
+      const cosArg = -Math.tan(phi) * Math.tan(delta);
+      if (Math.abs(cosArg) >= 1) break; // ran into circumpolar — stop
+      const sda = Math.acos(cosArg);
+      const newH = armc + S * F * sda;
+      if (Math.abs(newH - H) < 1e-9) { H = newH; break; }
+      H = newH;
+    }
+    // Final λ corresponding to the resolved RA.
+    const lambda = Math.atan2(Math.sin(H) * Math.cos(eps), Math.cos(H));
+    return norm360((lambda * 180) / Math.PI);
+  }
 
-  // Houses 11, 12 (above horizon)
-  cusps[10] = placidusIntermediate(2/3 + 1); // House 11
-  cusps[11] = placidusIntermediate(1/3 + 1); // House 12
+  cusps[10] = intermediateCusp(1 / 3, +1); // House 11
+  cusps[11] = intermediateCusp(2 / 3, +1); // House 12
+  cusps[1]  = intermediateCusp(1 / 3, -1); // House 2
+  cusps[2]  = intermediateCusp(2 / 3, -1); // House 3
 
-  // Opposite houses
-  cusps[4]  = norm360(cusps[10] + 180);
-  cusps[5]  = norm360(cusps[11] + 180);
+  // Opposite cusps
+  cusps[4] = norm360(cusps[10] + 180); // House 5
+  cusps[5] = norm360(cusps[11] + 180); // House 6
+  cusps[7] = norm360(cusps[1]  + 180); // House 8
+  cusps[8] = norm360(cusps[2]  + 180); // House 9
 
-  // Recalculate 2, 3, 5, 6 as equal from ASC if placidus failed
+  // Defensive: if any cusp became NaN (numeric breakdown), fall back to
+  // an equal-house value so the wheel still renders something.
   for (let i = 0; i < 12; i++) {
-    if (isNaN(cusps[i])) {
-      cusps[i] = norm360(asc + i * 30);
-    }
+    if (!Number.isFinite(cusps[i])) cusps[i] = norm360(ascDeg + i * 30);
   }
-
   return cusps;
+}
+
+/** Which house (1-12) does the given ecliptic longitude fall in,
+ *  according to a Placidus cusp array? Handles wrapping. */
+export function whichPlacidusHouse(lon: number, cusps: number[]): number {
+  const L = ((lon % 360) + 360) % 360;
+  for (let i = 0; i < 12; i++) {
+    const a = cusps[i];
+    const b = cusps[(i + 1) % 12];
+    // Test whether L lies on the arc going forward from a to b.
+    const arcLen = ((b - a) % 360 + 360) % 360;
+    const offset = ((L - a) % 360 + 360) % 360;
+    if (offset < arcLen) return i + 1;
+  }
+  return 1; // unreachable except for degenerate cusps
 }
 
 export interface NatalChartData {
