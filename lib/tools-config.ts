@@ -37,7 +37,10 @@ export const ALL_TOOL_IDS: ToolId[] = [
 export const DEFAULT_TOOLS_ENABLED: Record<ToolId, boolean> = {
   "daily-card": true,
   numerology: true,
-  compatibility: false,
+  // Enabled live for iteration (Phase N9 / co-design). The tool's
+  // synastry math leans on Phase M1 planet positions which are now
+  // correct, so visible-but-being-improved is the right state.
+  compatibility: true,
   "moon-phase": true,
   "natal-chart": true,
 };

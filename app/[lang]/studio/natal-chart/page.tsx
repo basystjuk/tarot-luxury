@@ -33,6 +33,7 @@ import {
   SIGN_GLYPHS, SIGNS_UA, SIGNS_EN,
 } from "@/lib/astro/calculations";
 import type { AspectKey } from "@/lib/astro/natal-snapshot";
+import { meaningSun, meaningMoon, meaningAsc, meaningMc, meaningAspect } from "./_meanings";
 import {
   type GeoCandidate,
   searchCity, coordsToIana, ianaToOffsetHours,
@@ -696,29 +697,49 @@ function ChartWheel({ chart, lang, signNames }: {
 function KeyPlacements({ chart, lang, signNames }: {
   chart: NatalChartData; lang: "uk" | "ru" | "en"; signNames: string[];
 }) {
-  const rows = [
-    { key: "Sun",  lon: chart.planets.Sun,  label: lang === "ru" ? "Солнце ☉" : lang === "en" ? "Sun ☉" : "Сонце ☉" },
-    { key: "Moon", lon: chart.planets.Moon, label: lang === "ru" ? "Луна ☽"   : lang === "en" ? "Moon ☽" : "Місяць ☽" },
-    { key: "ASC",  lon: chart.asc,          label: lang === "ru" ? "Асцендент" : lang === "en" ? "Ascendant" : "Асцендент" },
-    { key: "MC",   lon: chart.mc,           label: lang === "ru" ? "МС (Зенит)" : lang === "en" ? "MC (Midheaven)" : "МС (Зеніт)" },
+  const rows: Array<{
+    key: string; lon: number; label: string;
+    meaningFn: (idx: number, l: "uk" | "ru" | "en") => string;
+  }> = [
+    { key: "Sun",  lon: chart.planets.Sun,
+      label: lang === "ru" ? "Солнце ☉" : lang === "en" ? "Sun ☉" : "Сонце ☉",
+      meaningFn: meaningSun },
+    { key: "Moon", lon: chart.planets.Moon,
+      label: lang === "ru" ? "Луна ☽"   : lang === "en" ? "Moon ☽" : "Місяць ☽",
+      meaningFn: meaningMoon },
+    { key: "ASC",  lon: chart.asc,
+      label: lang === "ru" ? "Асцендент" : lang === "en" ? "Ascendant" : "Асцендент",
+      meaningFn: meaningAsc },
+    { key: "MC",   lon: chart.mc,
+      label: lang === "ru" ? "МС (Зенит)" : lang === "en" ? "MC (Midheaven)" : "МС (Зеніт)",
+      meaningFn: meaningMc },
   ];
   return (
     <div className="card-luxury">
       <h3 className="text-2xl text-[#1C1512] mb-5" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
         {lang === "ru" ? "Ключевые позиции" : lang === "en" ? "Key Placements" : "Ключові позиції"}
       </h3>
-      <div className="space-y-3">
-        {rows.map(({ key, lon, label }) => {
+      <div className="space-y-4">
+        {rows.map(({ key, lon, label, meaningFn }) => {
           const signIdx = Math.floor(((lon % 360) + 360) % 360 / 30);
           return (
-            <div key={key} className="flex justify-between items-center py-2 border-b border-[rgba(196,169,122,0.15)] last:border-0">
-              <span className="text-sm text-[#7A6A58]">{label}</span>
-              <div className="text-right">
-                <p className="text-[#1C1512] text-sm font-medium" style={{ fontFamily: "var(--font-cormorant)" }}>
-                  {SIGN_GLYPHS[signIdx]} {signNames[signIdx]}
-                </p>
-                <p className="text-xs text-[#C4A97A] font-mono">{formatDegree(lon)}</p>
+            <div key={key} className="pb-3 border-b border-[rgba(196,169,122,0.15)] last:border-0 last:pb-0">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-sm text-[#7A6A58]">{label}</span>
+                <div className="text-right">
+                  <p className="text-[#1C1512] text-sm font-medium" style={{ fontFamily: "var(--font-cormorant)" }}>
+                    {SIGN_GLYPHS[signIdx]} {signNames[signIdx]}
+                  </p>
+                  <p className="text-xs text-[#C4A97A] font-mono">{formatDegree(lon)}</p>
+                </div>
               </div>
+              {/* Canon interpretation — one short sentence per placement.
+                  Sourced from modern psychological astrology (Greene/Forrest/
+                  George); not AI-generated, so stable across reloads and
+                  available to anonymous users. */}
+              <p className="text-xs text-[#5C4530] italic leading-relaxed">
+                {meaningFn(signIdx, lang)}
+              </p>
             </div>
           );
         })}
@@ -820,21 +841,30 @@ function AspectsList({ aspects, lang }: {
       {aspects.length === 0 ? (
         <p className="text-sm text-[#7A6A58] italic">{t.no_aspects}</p>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {aspects.map((a, i) => (
-            <li key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.12)] text-sm">
-              <span className="text-[#5C4530] flex-1 flex items-center gap-1.5">
-                <span className="text-base text-[#C4A97A]">{PLANET_GLYPH[a.a]}</span>
-                <span style={{ fontFamily: "var(--font-cormorant)" }}>{PLANET_LABEL[a.a][lang]}</span>
-              </span>
-              <span style={{ color: ASPECT_COLOR[a.kind] }} className="text-base">{ASPECT_GLYPH[a.kind]}</span>
-              <span className="text-[#5C4530] flex-1 text-right flex items-center justify-end gap-1.5">
-                <span style={{ fontFamily: "var(--font-cormorant)" }}>{PLANET_LABEL[a.b][lang]}</span>
-                <span className="text-base text-[#C4A97A]">{PLANET_GLYPH[a.b]}</span>
-              </span>
-              <span className="text-[10px] text-[#9A8A78] tabular-nums ml-2 w-12 text-right">
-                ±{a.orb.toFixed(1)}°
-              </span>
+            <li key={i} className="px-3 py-2.5 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.12)]">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[#5C4530] flex-1 flex items-center gap-1.5">
+                  <span className="text-base text-[#C4A97A]">{PLANET_GLYPH[a.a]}</span>
+                  <span style={{ fontFamily: "var(--font-cormorant)" }}>{PLANET_LABEL[a.a][lang]}</span>
+                </span>
+                <span style={{ color: ASPECT_COLOR[a.kind] }} className="text-base">{ASPECT_GLYPH[a.kind]}</span>
+                <span className="text-[#5C4530] flex-1 text-right flex items-center justify-end gap-1.5">
+                  <span style={{ fontFamily: "var(--font-cormorant)" }}>{PLANET_LABEL[a.b][lang]}</span>
+                  <span className="text-base text-[#C4A97A]">{PLANET_GLYPH[a.b]}</span>
+                </span>
+                <span className="text-[10px] text-[#9A8A78] tabular-nums ml-2 w-12 text-right">
+                  ±{a.orb.toFixed(1)}°
+                </span>
+              </div>
+              {/* Aspect archetype description — what this kind of aspect
+                  generally MEANS (conjunction = fused, square = tension,
+                  etc.). Stable canonical text from _meanings.ts; deeper
+                  planet-specific interpretation belongs to the AI portrait. */}
+              <p className="text-xs text-[#7A6A58] italic mt-1.5 pl-1 leading-relaxed">
+                {meaningAspect(a.kind, lang)}
+              </p>
             </li>
           ))}
         </ul>
