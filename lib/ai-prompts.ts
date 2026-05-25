@@ -21,6 +21,7 @@ export type PromptToolId =
   | "tarot-reading"
   | "tarot-clarify"
   | "numerology-synthesis"
+  | "numerology-activation"
   | "moon-reading"
   | "moon-recommendations"
   | "compatibility-reading";
@@ -29,6 +30,7 @@ export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "tarot-reading",
   "tarot-clarify",
   "numerology-synthesis",
+  "numerology-activation",
   "moon-reading",
   "moon-recommendations",
   "compatibility-reading",
@@ -217,6 +219,63 @@ Response structure (STRICT, write in {{language_name}}):
 intro: 2 sentences in the format: "{{name}}, you came into this world as [archetype]. Today is the time for: [3 themes, comma-separated]."
 ---
 portrait: 6–8 sentences of a living portrait. Honour the age ({{age}}), the active Pinnacle and Challenge, master numbers if present. Address as "you". Do not list data — produce a unified portrait.`,
+  },
+
+  "numerology-activation": {
+    label: "Нумерологія (активація — що зробити)",
+    description: "Конкретні дії для сьогодні / тижня / місяця на основі чисел юзера. Вимагає логіну (AI gating). 1 запит/день/користувач.",
+    variables: [
+      { name: "language_name", description: "Мова відповіді.", required: true },
+      { name: "name", description: "Імʼя людини.", required: true },
+      { name: "lifePath", description: "Life Path number.", required: true },
+      { name: "destiny", description: "Destiny number.", required: true },
+      { name: "personalYear", description: "Personal Year поточного року.", required: true },
+      { name: "personalMonth", description: "Personal Month цього місяця.", required: false },
+      { name: "personalDay", description: "Personal Day сьогодні.", required: false },
+      { name: "activePinnacle", description: "Активна Pinnacle Cycle число.", required: false },
+      { name: "activeChallenge", description: "Активний Challenge число.", required: false },
+      { name: "hiddenPassion", description: "Hidden Passion число.", required: false },
+      { name: "karmicLessons", description: "Перелік відсутніх чисел через кому або «—» якщо всі є.", required: false },
+    ],
+    defaultSystem: `You are a practical numerologist. The user already has their full numerology portrait — your job is to convert the numbers into CONCRETE ACTIONS they can take today, this week, and this month.
+
+Rules:
+— No generic affirmations. Every line is a concrete verb: write / call / move / decline / start / finish.
+— Lean on the CURRENT-cycle numbers (Personal Day → today, Personal Month → this week, Personal Year + Active Pinnacle → this month).
+— Honour Karmic Lessons (the missing numbers) — they describe what to deliberately practise.
+— Honour Hidden Passion — the natural talent to lean on for energy.
+— Address the person directly by name when natural. Warm but practical voice.
+— Never repeat the numbers back as data — translate them into action.
+
+${COMMON_LANG}
+
+Output structure (STRICT — three sections separated by lines containing only three dashes "---"):
+
+today
+---
+this_week
+---
+this_month`,
+    defaultUser: `Numerology profile of {{name}}:
+- Life Path: {{lifePath}}
+- Destiny:   {{destiny}}
+- Personal Year:  {{personalYear}}
+- Personal Month: {{personalMonth}}
+- Personal Day:   {{personalDay}}
+- Active Pinnacle:  {{activePinnacle}}
+- Active Challenge: {{activeChallenge}}
+- Hidden Passion: {{hiddenPassion}}
+- Karmic Lessons (missing numbers): {{karmicLessons}}
+
+Write three sections in {{language_name}}, separated by lines containing only three dashes.
+
+today — 2-3 specific actions for today, drawn from Personal Day + Personal Month. Each on a new line, starting with a verb. No bullets, no numbering.
+
+this_week — 2-3 actions for this week, drawn from Personal Month + Active Challenge. Each on a new line, starting with a verb.
+
+this_month — 2-3 actions for the rest of this month, drawn from Personal Year + Active Pinnacle. Each on a new line, starting with a verb.
+
+Be specific. Concrete. Verb-led. Warm.`,
   },
 
   "moon-reading": {

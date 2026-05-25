@@ -43,6 +43,8 @@ import {
   type Bridges,
 } from "@/lib/numerology/calculators";
 import { type NumerologySchool, SCHOOL_LABELS } from "@/lib/numerology/letter-values";
+import { KarmicLessonsScale, PersonalYearGraph, CoreNumbersWheel } from "./_visuals";
+import { ActivationBlock } from "./_activation";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface NumEntry { keyword: string; meaning: string }
@@ -728,6 +730,8 @@ interface ResultViewProps {
   } | null;
   /** Active numerology school — for the badge at the bottom of the result. */
   school: NumerologySchool;
+  /** Display name for activation prompts (the person's first name only). */
+  displayName: string;
   /** raw birth day-of-month (1-31), needed for Personal Days */
   birthDay: number;
   /** raw birth month (1-12), needed for Personal Days */
@@ -752,7 +756,7 @@ interface ResultViewProps {
 function NumerologyResultView({
   result, extended, birthDay, birthMonth, data, language, isRu, isEn, t, labels,
   synthIntro, synthPortrait, loadingSynth, synthError, rateLimited, onRetrySynth,
-  expanded, onExpand, onCollapse, school,
+  expanded, onExpand, onCollapse, school, displayName,
 }: ResultViewProps) {
   const lifePathEntry = getEntry(data.lifePath, result.lifePath);
   const lpKarmic = result.lifePathKarmic
@@ -806,7 +810,24 @@ function NumerologyResultView({
         </div>
       )}
 
-      {/* ── 3. Expand button OR full breakdown ──────────────────────────── */}
+      {/* ── 3. Core Numbers Wheel — Phase Н2 visual gestalt ─────────────── */}
+      <div className="rounded-2xl p-5 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.18)]">
+        <CoreNumbersWheel
+          lifePath={result.lifePath}
+          destiny={result.destiny}
+          soul={result.soul}
+          personality={result.personality}
+          labels={{
+            title: t("Колесо ядрових чисел", "Колесо ядровых чисел", "Core Numbers Wheel"),
+            lifePath:    t("Життєвий шлях", "Жизненный путь", "Life Path"),
+            destiny:     ts(language, "destiny"),
+            soul:        ts(language, "soul"),
+            personality: ts(language, "personality"),
+          }}
+        />
+      </div>
+
+      {/* ── 4. Expand button OR full breakdown ──────────────────────────── */}
       {!expanded ? (
         <button onClick={onExpand} className="btn-primary w-full">
           <Sparkles size={15} />
@@ -1007,13 +1028,21 @@ function NumerologyResultView({
               entry={getEntry(data.balance, result.balance)}
               hint={tHint(language, "balance")}
             />
-            {/* Karmic lessons */}
-            <div className="rounded-xl p-4 bg-[rgba(212,168,83,0.06)] border border-[rgba(196,169,122,0.2)]">
-              <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
-                <TermHint hint={tHint(language, "karmicLessons")}>{ts(language, "karmicLessons")}</TermHint>
-              </p>
-              {result.karmicLessons.length > 0 ? (
-                <div className="space-y-2.5">
+            {/* Karmic lessons — Phase Н2: visual scale + text breakdown */}
+            <div className="rounded-xl p-4 bg-[rgba(212,168,83,0.06)] border border-[rgba(196,169,122,0.2)] space-y-4">
+              <KarmicLessonsScale
+                missing={result.karmicLessons}
+                labels={{
+                  title: ts(language, "karmicLessons"),
+                  missing: t("Уроки (відсутні)", "Уроки (отсутствуют)", "Lessons (missing)"),
+                  present: t("Присутні", "Присутствуют", "Present"),
+                  all_present: t("Усі вібрації 1–9 присутні — збалансований портрет.",
+                                 "Все вибрации 1–9 присутствуют — сбалансированный портрет.",
+                                 "All vibrations 1–9 are present — a balanced portrait."),
+                }}
+              />
+              {result.karmicLessons.length > 0 && (
+                <div className="space-y-2.5 pt-2 border-t border-[rgba(196,169,122,0.18)]">
                   {result.karmicLessons.map(n => (
                     <div key={n} className="pl-3 border-l-2 border-[rgba(196,169,122,0.3)]">
                       <p className="text-sm font-medium text-[#1C1512] tabular-nums">
@@ -1025,12 +1054,6 @@ function NumerologyResultView({
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-[#7A6A58] italic" style={{ fontFamily: "var(--font-cormorant)" }}>
-                  {t("Усі вібрації 1–9 присутні — збалансований портрет.",
-                     "Все вибрации 1–9 присутствуют — сбалансированный портрет.",
-                     "All vibrations 1–9 are present — a balanced portrait.")}
-                </p>
               )}
             </div>
           </CollapseSection>
@@ -1086,6 +1109,40 @@ function NumerologyResultView({
                   </div>
                 ))}
               </div>
+
+              {/* Phase Н2: Personal Year 12-month line chart. */}
+              {(() => {
+                // Compute Personal Month for each month of the current year.
+                const months = Array.from({ length: 12 }, (_, m) => {
+                  // calcPersonalMonth needs personalYear + calendarMonth.
+                  // Inline mini-reducer to avoid import for one helper.
+                  const reduce = (n: number): number => {
+                    if ([11, 22, 33].includes(n)) return n;
+                    if (n < 10) return n;
+                    return reduce(String(n).split("").reduce((a, d) => a + parseInt(d, 10), 0));
+                  };
+                  return reduce(result.personalYear + reduce(m + 1));
+                });
+                const M_UK = ["Січ","Лют","Бер","Кві","Тра","Чер","Лип","Сер","Вер","Жов","Лис","Гру"] as const;
+                const M_RU = ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"] as const;
+                const M_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"] as const;
+                const ms = (language === "ru" ? M_RU : language === "en" ? M_EN : M_UK) as unknown as
+                  [string,string,string,string,string,string,string,string,string,string,string,string];
+                return (
+                  <div className="pt-4 border-t border-[rgba(196,169,122,0.18)]">
+                    <PersonalYearGraph
+                      personalYear={result.personalYear}
+                      months={months}
+                      currentMonthIdx={new Date().getMonth()}
+                      labels={{
+                        title: t("Особистий рік помісячно", "Личный год помесячно", "Personal Year by month"),
+                        months: ms,
+                        today: t("сьогоднішній місяць", "сегодняшний месяц", "current month"),
+                      }}
+                    />
+                  </div>
+                );
+              })()}
             </CollapseSection>
           )}
 
@@ -1135,6 +1192,27 @@ function NumerologyResultView({
           )}
           </div>{/* /center column */}
         </div>
+      )}
+
+      {/* ── Phase Н2: Activation block — concrete actions via AI ──
+          Auth-gated by /api/numerology-activation (returns 401 for anon).
+          The component itself renders a "Sign in" CTA in that case. */}
+      {expanded && (
+        <ActivationBlock
+          language={language}
+          payload={{
+            name: displayName,
+            lifePath: result.lifePath,
+            destiny: result.destiny,
+            personalYear: result.personalYear,
+            personalMonth: extended?.personalMonth,
+            personalDay: extended?.personalDay,
+            activePinnacle: activePinnacle?.number,
+            activeChallenge: activeChallenge?.number,
+            hiddenPassion: result.hiddenPassion,
+            karmicLessons: result.karmicLessons,
+          }}
+        />
       )}
 
       {expanded && (
@@ -1798,6 +1876,7 @@ export default function NumerologyPage() {
                 onExpand={() => { setExpanded(true); track("numerology_expanded"); }}
                 onCollapse={() => setExpanded(false)}
                 school={school}
+                displayName={form.firstName || ""}
               />
             </AnimatedSection>
           </div>
