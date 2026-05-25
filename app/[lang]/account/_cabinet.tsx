@@ -23,6 +23,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Mail, MapPin, Loader2, Check, LogOut } from "lucide-react";
 import { TelegramSection } from "./_telegram-section";
+import { MigrationModal } from "./_migration-modal";
+import { useRouter } from "next/navigation";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -131,6 +133,7 @@ const T = {
 
 export function CabinetClient({ initialProfile, email, lang: langProp }: Props) {
   const { language } = useLanguage();
+  const router = useRouter();
   const lang: "uk" | "ru" | "en" = language === "ru" ? "ru" : language === "en" ? "en" : "uk";
   const t = T[lang];
 
@@ -249,6 +252,9 @@ export function CabinetClient({ initialProfile, email, lang: langProp }: Props) 
 
   return (
     <>
+      {/* Bonus 2: one-shot prompt to pull pre-account data from the browser */}
+      <MigrationModal language={language} onImported={() => router.refresh()} />
+
       <section className="pt-36 pb-12 bg-[#FDFBF7] relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_50%_0%,rgba(196,169,122,0.1),transparent)]" />
         <div className="relative max-w-2xl mx-auto px-6 text-center">
