@@ -1,27 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
+import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 
 export const maxDuration = 30;
 
 // Rate limit: 1 synthesis per IP per Kyiv calendar day
-const ipMap = new Map<string, { day: string }>();
-
-function getKyivDay(): string {
-  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
-}
-
-function checkRateLimit(ip: string): boolean {
-  const today = getKyivDay();
-  const entry = ipMap.get(ip);
-  if (!entry || entry.day !== today) {
-    ipMap.set(ip, { day: today });
-    return true;
-  }
-  return false;
-}
+// Per-user daily limit (Phase В policy: AI = signed-in only).
+const userMap = new Map<string, { day: string }>();
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -183,12 +171,20 @@ export async function POST(req: NextRequest) {
   const headersList = await headers();
   const ip = headersList.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
 
-  // Preview-cookie bypass: lets the owner iterate without burning quota.
-  if (!isPreviewFromRequest(req) && !checkRateLimit(ip)) {
-    return NextResponse.json(
-      { error: "rate_limit", message: "Ліміт 1 синтез на добу вичерпано. Повертайтесь завтра 🌙" },
-      { status: 429 }
-    );
+  // ── Auth gate (Phase В policy) ──────────────────────────────────────────
+  // Preview-cookie bypasses the gate entirely (owner iteration).
+  // Anonymous users → 401 with auth_required so the UI can offer sign-in.
+  // Signed-in users → per-user daily rate limit (not per-IP).
+  if (!isPreviewFromRequest(req)) {
+    const gate = await requireAiAuth();
+    if (gate.deny) return gate.deny;
+    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+      return NextResponse.json(
+        { error: "rate_limit", message: "Ліміт 1 синтез на добу вичерпано. Повертайтесь завтра 🌙" },
+        { status: 429 }
+      );
+    }
+    void ip; // keep parameter for legacy logging analysis
   }
 
   try {

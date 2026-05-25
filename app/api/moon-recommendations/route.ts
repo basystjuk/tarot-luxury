@@ -1,29 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
+import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
 
 export const maxDuration = 30;
 
-// Independent daily quota from /api/moon-reading — owner spec said this
-// should be its own bucket so a user can still get the main reading even
-// after they pulled today's recommendations.
-const ipMap = new Map<string, { day: string }>();
-
-function getKyivDay(): string {
-  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
-}
-
-function checkRateLimit(ip: string): boolean {
-  const today = getKyivDay();
-  const entry = ipMap.get(ip);
-  if (!entry || entry.day !== today) {
-    ipMap.set(ip, { day: today });
-    return true;
-  }
-  return false;
-}
+// Per-user daily limit (Phase В policy: AI = signed-in only). Separate
+// bucket from /api/moon-reading so a user can still pull a reading after
+// using recommendations.
+const userMap = new Map<string, { day: string }>();
 
 interface Recommendation {
   name: string;
@@ -59,15 +45,16 @@ function isValidPayload(x: unknown): x is RecPayload {
 }
 
 export async function POST(req: NextRequest) {
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-
-  // Preview-cookie bypass: lets the owner iterate without burning quota.
-  if (!isPreviewFromRequest(req) && !checkRateLimit(ip)) {
-    return NextResponse.json(
-      { error: "rate_limit", message: "Ліміт 1 запит на добу вичерпано." },
-      { status: 429 }
-    );
+  // ── Auth gate (Phase В) ─────────────────────────────────────────────────
+  if (!isPreviewFromRequest(req)) {
+    const gate = await requireAiAuth();
+    if (gate.deny) return gate.deny;
+    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+      return NextResponse.json(
+        { error: "rate_limit", message: "Ліміт 1 запит на добу вичерпано." },
+        { status: 429 }
+      );
+    }
   }
 
   const { language, moonSign, moonSignEn, element } = await req.json();

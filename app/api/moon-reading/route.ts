@@ -1,38 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
+import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
 
 export const maxDuration = 30;
 
-// Rate limit: 1 reading per IP per Kyiv calendar day
-const ipMap = new Map<string, { day: string }>();
-
-function getKyivDay(): string {
-  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
-}
-
-function checkRateLimit(ip: string): boolean {
-  const today = getKyivDay();
-  const entry = ipMap.get(ip);
-  if (!entry || entry.day !== today) {
-    ipMap.set(ip, { day: today });
-    return true;
-  }
-  return false;
-}
+// Per-user daily limit (Phase В policy: AI = signed-in only).
+const userMap = new Map<string, { day: string }>();
 
 export async function POST(req: NextRequest) {
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-
-  // Preview-cookie bypass: lets the owner iterate without burning quota.
-  if (!isPreviewFromRequest(req) && !checkRateLimit(ip)) {
-    return NextResponse.json(
-      { error: "rate_limit", message: "Ліміт 1 послання на добу вичерпано." },
-      { status: 429 }
-    );
+  // ── Auth gate (Phase В) ─────────────────────────────────────────────────
+  // Preview cookie bypasses everything (owner iteration).
+  // Anonymous → 401 auth_required.
+  // Signed in → 1 reading per Kyiv-day per user.
+  if (!isPreviewFromRequest(req)) {
+    const gate = await requireAiAuth();
+    if (gate.deny) return gate.deny;
+    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+      return NextResponse.json(
+        { error: "rate_limit", message: "Ліміт 1 послання на добу вичерпано." },
+        { status: 429 }
+      );
+    }
   }
 
   const {

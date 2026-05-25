@@ -629,6 +629,8 @@ export default function MoonPhasePage() {
   const [aiLoading, setAiLoading]     = useState(false);
   const [aiError, setAiError]         = useState<string | null>(null);
   const [aiRateLimited, setAiRateLimited] = useState(false);
+  const [aiAuthRequired, setAiAuthRequired] = useState(false);
+  const [recAuthRequired, setRecAuthRequired] = useState(false);
 
   // Phase #14 — crystal / oil / tea recommendations. Separate endpoint
   // and separate daily quota from the main AI message.
@@ -821,7 +823,9 @@ export default function MoonPhasePage() {
       });
       const data = await res.json();
 
-      if (data.error === "rate_limit") {
+      if (data.error === "auth_required") {
+        setAiAuthRequired(true);
+      } else if (data.error === "rate_limit") {
         setAiRateLimited(true);
         setAiError(
           isRu ? "Ліміт 1 послання на добу. Повертайтесь завтра 🌙"
@@ -892,7 +896,9 @@ export default function MoonPhasePage() {
         }),
       });
       const data = await res.json();
-      if (data.error === "rate_limit") {
+      if (data.error === "auth_required") {
+        setRecAuthRequired(true);
+      } else if (data.error === "rate_limit") {
         setRecRateLimited(true);
         setRecError(
           isRu ? "Лимит 1 запрос рекомендаций в сутки. Возвращайтесь завтра 🌿"
@@ -1590,7 +1596,20 @@ export default function MoonPhasePage() {
                       : `Місяць у ${signNames[result.moonSignIdx]}, ${result.moonDegree}° — особисте послання для цього моменту.`}
                   </p>
 
-                  {!aiRateLimited && (
+                  {aiAuthRequired ? (
+                    // Phase В: AI is for signed-in users. Anonymous → sign-in CTA.
+                    <div className="mx-auto max-w-md p-4 rounded-xl bg-[rgba(212,168,83,0.10)] border border-[rgba(212,168,83,0.35)] space-y-3">
+                      <p className="text-sm text-[#5C4530] leading-relaxed">
+                        {isRu ? "AI-послание доступно зарегистрированным. Все астро-данные выше — для всех."
+                          : isEn ? "AI messages are for signed-in users. All the astro data above is free for everyone."
+                          : "AI-послання доступне зареєстрованим. Усі астро-дані вище — для всіх."}
+                      </p>
+                      <a href={`/${language}/account/sign-in?next=/${language}/studio/moon-phase`}
+                         className="btn-primary text-sm inline-flex">
+                        {isRu ? "Создать аккаунт →" : isEn ? "Create account →" : "Створити акаунт →"}
+                      </a>
+                    </div>
+                  ) : !aiRateLimited && (
                     <button
                       onClick={handleAi}
                       disabled={aiLoading}
@@ -1603,7 +1622,7 @@ export default function MoonPhasePage() {
                     </button>
                   )}
 
-                  {aiError && (
+                  {aiError && !aiAuthRequired && (
                     <p className="mt-4 text-sm text-[#B8883A]">{aiError}</p>
                   )}
                 </div>
@@ -1667,7 +1686,19 @@ export default function MoonPhasePage() {
                   </div>
                 </div>
 
-                {!recResult && !recRateLimited && (
+                {recAuthRequired && !recResult ? (
+                  <div className="p-4 rounded-xl bg-[rgba(212,168,83,0.10)] border border-[rgba(212,168,83,0.35)] space-y-3">
+                    <p className="text-sm text-[#5C4530] leading-relaxed">
+                      {isRu ? "AI-рекомендации (кристаллы, масла, чаи) доступны зарегистрированным."
+                        : isEn ? "AI recommendations (crystals, oils, teas) are for signed-in users."
+                        : "AI-рекомендації (кристали, олії, чаї) доступні зареєстрованим."}
+                    </p>
+                    <a href={`/${language}/account/sign-in?next=/${language}/studio/moon-phase`}
+                       className="btn-primary text-sm inline-flex">
+                      {isRu ? "Создать аккаунт →" : isEn ? "Create account →" : "Створити акаунт →"}
+                    </a>
+                  </div>
+                ) : !recResult && !recRateLimited && (
                   <button
                     type="button"
                     onClick={handleRecommendations}

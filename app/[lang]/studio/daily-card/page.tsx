@@ -275,6 +275,13 @@ export default function DailyCardPage() {
           userQuestion: clarifyText.trim(),
         }),
       });
+      if (res.status === 401) {
+        // Anonymous → Phase В gate. Redirect through sign-in with `next` so
+        // we land back on this card after authenticating.
+        const next = encodeURIComponent(`/${language}/studio/daily-card`);
+        window.location.href = `/${language}/account/sign-in?next=${next}`;
+        return;
+      }
       if (res.status === 429) {
         setClarifyUsed(true);
         setClarifyError(t("clarifyUsed"));

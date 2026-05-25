@@ -747,6 +747,7 @@ interface ResultViewProps {
   loadingSynth: boolean;
   synthError: boolean;
   rateLimited: boolean;
+  authRequired: boolean;
   onRetrySynth: () => void;
   expanded: boolean;
   onExpand: () => void;
@@ -755,7 +756,7 @@ interface ResultViewProps {
 
 function NumerologyResultView({
   result, extended, birthDay, birthMonth, data, language, isRu, isEn, t, labels,
-  synthIntro, synthPortrait, loadingSynth, synthError, rateLimited, onRetrySynth,
+  synthIntro, synthPortrait, loadingSynth, synthError, rateLimited, authRequired, onRetrySynth,
   expanded, onExpand, onCollapse, school, displayName,
 }: ResultViewProps) {
   const lifePathEntry = getEntry(data.lifePath, result.lifePath);
@@ -849,7 +850,9 @@ function NumerologyResultView({
               loadingSynth={loadingSynth}
               synthError={synthError}
               rateLimited={rateLimited}
+              authRequired={authRequired}
               onRetrySynth={onRetrySynth}
+              language={language}
               isRu={isRu}
               isEn={isEn}
               t={t}
@@ -1305,19 +1308,23 @@ function PortraitPanel({
   loadingSynth,
   synthError,
   rateLimited,
+  authRequired,
   onRetrySynth,
   isRu,
   isEn,
   t,
+  language,
 }: {
   synthPortrait: string | null;
   loadingSynth: boolean;
   synthError: boolean;
   rateLimited: boolean;
+  authRequired: boolean;
   onRetrySynth: () => void;
   isRu: boolean;
   isEn: boolean;
   t: (uk: string, ru: string, en: string) => string;
+  language: string;
 }) {
   const heading = (
     <div className="flex items-center gap-3 mb-4">
@@ -1340,6 +1347,32 @@ function PortraitPanel({
         >
           {synthPortrait}
         </p>
+      </div>
+    );
+  }
+
+  // Phase В auth gate: anonymous users get a sign-in CTA in place of the
+  // portrait. They still see all the numbers + visuals — only AI is gated.
+  if (authRequired) {
+    const lang = language === "ru" ? "ru" : language === "en" ? "en" : "uk";
+    return (
+      <div className="card-luxury border-[rgba(212,168,83,0.3)]">
+        {heading}
+        <div className="rounded-xl p-5 bg-[rgba(212,168,83,0.10)] border border-[rgba(212,168,83,0.35)] space-y-3">
+          <p className="text-sm text-[#5C4530] leading-relaxed">
+            {t(
+              "AI-портрет доступний зареєстрованим. Числа, цикли й візуалізації вище — для всіх; персональний AI-розбір — за акаунтом. Це безкоштовно і займає 1 хвилину.",
+              "AI-портрет доступен зарегистрированным. Числа, циклы и визуализации выше — для всех; персональный AI-разбор — по аккаунту. Это бесплатно и занимает 1 минуту.",
+              "The AI portrait is for signed-in users. The numbers, cycles and visuals above are free for everyone; the personal AI breakdown lives behind a quick free sign-in.",
+            )}
+          </p>
+          <a
+            href={`/${lang}/account/sign-in?next=/${lang}/studio/numerology`}
+            className="btn-primary text-sm inline-flex"
+          >
+            {t("Створити акаунт →", "Создать аккаунт →", "Create account →")}
+          </a>
+        </div>
       </div>
     );
   }
@@ -1491,6 +1524,10 @@ export default function NumerologyPage() {
   // Separate from synthError so we can show a friendlier "1 portrait/day" copy
   // instead of the generic "could not load" + retry button.
   const [rateLimited, setRateLimited] = useState(false);
+  // Phase В: AI is gated behind sign-in. When the API returns 401 we set
+  // this and the result view renders a "Sign in to receive your portrait"
+  // CTA in place of the portrait panel.
+  const [authRequired, setAuthRequired] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
   // Phase 3: progressive reveal. The hero (Life Path) is shown first; the
   // four detail sections expand below on user request.
@@ -1561,6 +1598,7 @@ export default function NumerologyPage() {
     setSynthPortrait(null);
     setSynthError(false);
     setRateLimited(false);
+    setAuthRequired(false);
     setExpanded(false);
     autoFiredFor.current = null; // allow auto-fire for the new result
 
@@ -1645,6 +1683,13 @@ export default function NumerologyPage() {
             : null,
         }),
       });
+      if (res.status === 401) {
+        // Anonymous user — Phase В policy gates AI behind sign-in. We
+        // surface this as the dedicated `authRequired` state below so the
+        // UI can show a "Sign in" CTA instead of the generic error.
+        setAuthRequired(true);
+        return;
+      }
       if (res.status === 429) {
         // Today's portrait was already created (for a different person, since
         // we already checked the cache). Show the friendly message — NOT the
@@ -1871,6 +1916,7 @@ export default function NumerologyPage() {
                 loadingSynth={loadingSynth}
                 synthError={synthError}
                 rateLimited={rateLimited}
+                authRequired={authRequired}
                 onRetrySynth={handleSynthesis}
                 expanded={expanded}
                 onExpand={() => { setExpanded(true); track("numerology_expanded"); }}

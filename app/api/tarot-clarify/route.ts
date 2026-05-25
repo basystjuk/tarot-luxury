@@ -12,33 +12,29 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { getMeaning } from "@/lib/data/tarot-meanings";
+import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
 
 export const maxDuration = 30;
 
-const ipMap = new Map<string, { day: string }>();
-function getKyivDay(): string {
-  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
-}
-function checkRateLimit(ip: string): boolean {
-  const today = getKyivDay();
-  const entry = ipMap.get(ip);
-  if (!entry || entry.day !== today) { ipMap.set(ip, { day: today }); return true; }
-  return false;
-}
+// Per-user daily limit. Clarify is "secondary AI" on the daily card —
+// Phase В policy puts everything except the first card draw behind sign-in.
+const userMap = new Map<string, { day: string }>();
 
 export async function POST(req: NextRequest) {
-  const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-  if (!isPreviewFromRequest(req) && !checkRateLimit(ip)) {
-    return NextResponse.json(
-      { error: "rate_limit", message: "Ліміт 1 уточнення на добу вичерпано." },
-      { status: 429 }
-    );
+  // Auth gate per Phase В: only the first daily-card draw is anonymous.
+  if (!isPreviewFromRequest(req)) {
+    const gate = await requireAiAuth();
+    if (gate.deny) return gate.deny;
+    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+      return NextResponse.json(
+        { error: "rate_limit", message: "Ліміт 1 уточнення на добу вичерпано." },
+        { status: 429 }
+      );
+    }
   }
 
   const { cardName, language, reversed = false, previousReading = "", userQuestion = "" } = await req.json();
