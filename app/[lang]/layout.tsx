@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 const VALID_LANGS = ['uk', 'ru', 'en'] as const;
 type Lang = typeof VALID_LANGS[number];
 
-const SITE_URL = 'https://tarot-olena.com';
+const SITE_URL = 'https://ellen-soul.com';
 
 const PAGE_META: Record<Lang, { title: string; description: string }> = {
   uk: {

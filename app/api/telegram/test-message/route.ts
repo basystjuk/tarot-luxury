@@ -37,7 +37,7 @@ export async function POST() {
     `Якщо ти бачиш це повідомлення — Telegram підключено правильно. ` +
     `Сповіщення про затемнення, Lunar Return та інші важливі моменти ` +
     `надходитимуть сюди.\n\n` +
-    `Налаштування — у твоєму <a href="https://tarot-olena.com/uk/account">кабінеті</a>.`
+    `Налаштування — у твоєму <a href="https://ellen-soul.com/uk/account">кабінеті</a>.`
   );
   return NextResponse.json({ sent: ok });
 }

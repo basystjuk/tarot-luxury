@@ -129,13 +129,13 @@ function lunarReturnMessage(when: Date): string {
   return `<b>🌑 Місячне повернення</b>\n\n` +
     `Твій особистий «місячний новий місяць» починається ${fmtKyiv(when)}.\n\n` +
     `Це початок твого 27-денного емоційного циклу. ` +
-    `<a href="https://tarot-olena.com/uk/studio/moon-phase">Подивитись повний прогноз →</a>`;
+    `<a href="https://ellen-soul.com/uk/studio/moon-phase">Подивитись повний прогноз →</a>`;
 }
 
 function weeklyCardMessage(): string {
   return `<b>🃏 Карта тижня готова</b>\n\n` +
     `Понеділок — час витягти карту, яка задаватиме тон твого тижня.\n\n` +
-    `<a href="https://tarot-olena.com/uk/studio/daily-card">Витягнути карту тижня →</a>`;
+    `<a href="https://ellen-soul.com/uk/studio/daily-card">Витягнути карту тижня →</a>`;
 }
 
 function phasePeakMessage(p: { type: "new" | "full"; date: Date }, moonSignIdx: number): string {
@@ -145,7 +145,7 @@ function phasePeakMessage(p: { type: "new" | "full"; date: Date }, moonSignIdx: 
     (p.type === "new"
       ? "Час нових намірів. Посій бажання — цикл починається з чистого аркуша."
       : "Кульмінація і відпускання. Подивись, що тримає тебе і вже не служить.") +
-    `\n\n<a href="https://tarot-olena.com/uk/studio/moon-phase">Повне послання →</a>`;
+    `\n\n<a href="https://ellen-soul.com/uk/studio/moon-phase">Повне послання →</a>`;
 }
 
 // ── Send + log ─────────────────────────────────────────────────────────────

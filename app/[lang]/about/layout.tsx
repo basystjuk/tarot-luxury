@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { type Language, getTranslation } from '@/lib/i18n/translations';
 
 const VALID_LANGS = ['uk', 'ru', 'en'] as const;
-const SITE_URL = 'https://tarot-olena.com';
+const SITE_URL = 'https://ellen-soul.com';
 
 export function generateStaticParams() {
   return VALID_LANGS.map((lang) => ({ lang }));

@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   await sendMessage(chatId,
     `Привіт${firstName ? ` ${escapeHtml(firstName)}` : ""} ✨\n\n` +
     `Я бот для нотифікацій з Ellen Soul. Я не приймаю команд тут — ` +
-    `налаштовуй сповіщення у <a href="https://tarot-olena.com/uk/account">кабінеті на сайті</a>.`
+    `налаштовуй сповіщення у <a href="https://ellen-soul.com/uk/account">кабінеті на сайті</a>.`
   );
   return NextResponse.json({ ok: true });
 }
@@ -147,6 +147,6 @@ async function handleStartWithToken(
     `Привіт${firstName ? `, ${escapeHtml(firstName)}` : ""} ✨\n\n` +
     `Тепер ти отримуватимеш сповіщення про затемнення, ` +
     `Lunar Return, важливі моменти Місяця та особисті повідомлення від Ellen.\n\n` +
-    `Налаштувати які саме — у <a href="https://tarot-olena.com/uk/account">кабінеті</a>.`
+    `Налаштувати які саме — у <a href="https://ellen-soul.com/uk/account">кабінеті</a>.`
   );
 }

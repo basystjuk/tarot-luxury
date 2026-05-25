@@ -52,19 +52,19 @@ export const metadata: Metadata = {
   creator: "Ellen Soul",
   robots: { index: true, follow: true },
   alternates: {
-    canonical: "https://tarot-olena.com",
+    canonical: "https://ellen-soul.com",
   },
   openGraph: {
     type: "website",
     locale: "uk_UA",
-    url: "https://tarot-olena.com",
+    url: "https://ellen-soul.com",
     siteName: "Ellen Soul Таро",
     title: "Ellen Soul — Таролог онлайн | Розклади таро на відносини",
     description:
       "Таролог-емпат з 5+ роками практики. Розклади на відносини, любов, вибір шляху. Онлайн від $20.",
     images: [
       {
-        url: "https://tarot-olena.com/og-image.jpg",
+        url: "https://ellen-soul.com/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "Ellen Soul — таролог онлайн",
