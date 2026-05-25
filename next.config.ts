@@ -1,6 +1,21 @@
 import type { NextConfig } from "next";
 
+// ── PostHog defaults baked at build time ────────────────────────────────────
+// `NEXT_PUBLIC_*` env vars are inlined into the client bundle by design and
+// visible to every visitor (PostHog officially supports this — see
+// https://posthog.com/docs/libraries/js). We ship the project key as a build-
+// time default so analytics work without any Vercel env-var configuration.
+//
+// If you ever rotate the key or fork the project, just override via Vercel
+// env vars — Vercel env values take priority over this default.
+const POSTHOG_KEY_DEFAULT  = "phc_qoKe2aS3cw2kEsxnja8JpeXqRckn8WmRU3b9aT7QkVbe";
+const POSTHOG_HOST_DEFAULT = "/ingest"; // reverse-proxy via the rewrites below
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_POSTHOG_KEY:  process.env.NEXT_PUBLIC_POSTHOG_KEY  ?? POSTHOG_KEY_DEFAULT,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? POSTHOG_HOST_DEFAULT,
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "tarot-olena.com" },
