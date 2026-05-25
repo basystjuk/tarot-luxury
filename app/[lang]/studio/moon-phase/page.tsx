@@ -14,6 +14,9 @@ import { findMoonStarConjunction, type FixedStar } from "./_fixed-stars";
 import { NatalForm } from "./_natal-form";
 import { loadNatal, type NatalProfile } from "./_natal";
 import { NatalCompareBlock, LunarReturnBlock } from "./_natal-display";
+import { NatalChartBlock } from "./_natal-chart";
+import type { ZodiacMode } from "@/lib/astro/natal-snapshot";
+import { useProfile } from "@/hooks/useProfile";
 import { track } from "@/lib/analytics/posthog";
 
 type PhaseKey =
@@ -627,6 +630,24 @@ export default function MoonPhasePage() {
     setNatalProfile(loadNatal());
     track("tool_viewed", { tool: "moon-phase" });
   }, []);
+
+  // Phase М10: tropical / sidereal zodiac toggle. Persisted to localStorage
+  // so the user's choice survives reloads. Default is tropical (western).
+  const [zodiac, setZodiac] = useState<ZodiacMode>("tropical");
+  useEffect(() => {
+    try {
+      const s = window.localStorage.getItem("ellen-soul:zodiac");
+      if (s === "tropical" || s === "sidereal") setZodiac(s);
+    } catch { /* */ }
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem("ellen-soul:zodiac", zodiac); } catch { /* */ }
+  }, [zodiac]);
+
+  // Cloud profile (Phase В) — used by the new natal chart block. It's
+  // the same data type as natalProfile (localStorage) but in the cloud
+  // schema; we just access the relevant fields via useProfile.
+  const { profile: cloudProfile } = useProfile();
 
   const [form, setForm] = useState({
     year:   today.getFullYear().toString(),
@@ -1597,6 +1618,16 @@ export default function MoonPhasePage() {
                     language={language}
                     natalProfile={natalProfile}
                     signNames={signNames}
+                  />
+                  {/* Phase М8+М9+М10: full natal chart + transit aspects all-to-all
+                      + whole-sign houses + zodiac toggle. Uses cloudProfile
+                      because the cabinet stores all fields needed for ASC/MC
+                      (birth_time + birth_tz + birth_lat/lon). */}
+                  <NatalChartBlock
+                    language={language}
+                    profile={cloudProfile}
+                    zodiac={zodiac}
+                    onZodiacChange={setZodiac}
                   />
                 </>
               )}
