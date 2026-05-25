@@ -35,6 +35,7 @@ import {
   getKyivDay, getEntry, saveEntry, type HistoryEntry,
 } from "./_history";
 import { shareElementAsPng } from "@/lib/share/png-share";
+import { track } from "@/lib/analytics/posthog";
 
 type Step = "form" | "breathing" | "reading" | "result";
 
@@ -90,6 +91,7 @@ export default function DailyCardPage() {
 
   // ── Mount: restore today's entry if any ──────────────────────────────────
   useEffect(() => {
+    track("tool_viewed", { tool: "daily-card" });
     const day = getKyivDay();
     const entry = getEntry(day);
     if (entry) {
@@ -171,6 +173,7 @@ export default function DailyCardPage() {
     // Otherwise, draw fresh.
     let card = chosenCardRef.current;
     let cardReversed = reversed;
+    const isFreshDraw = !card;
     if (!card) {
       const drawn = drawCard(withReversed);
       card = drawn.card;
@@ -179,6 +182,15 @@ export default function DailyCardPage() {
       setReversed(cardReversed);
     }
     setNetError(false);
+    // Analytics: only count a real first-of-day draw, not the restored re-reveal.
+    if (isFreshDraw) {
+      track("daily_card_drawn", {
+        arcana: card.suit === "major" ? "major" : "minor",
+        suit: card.suit,
+        reversed: cardReversed,
+        has_question: question.trim().length > 0,
+      });
+    }
 
     const arcanaType = card.suit === "major" ? "major" : "minor";
     const suitElement =
@@ -276,6 +288,13 @@ export default function DailyCardPage() {
           setClarifyResult(data.clarification ?? "");
           setClarifyUsed(true);
           try { window.localStorage.setItem(clarifyKey(getKyivDay()), "1"); } catch { /* */ }
+          if (card) {
+            track("daily_card_clarify_used", {
+              arcana: card.suit === "major" ? "major" : "minor",
+              suit: card.suit,
+              reversed,
+            });
+          }
         }
       }
     } catch {
@@ -294,6 +313,7 @@ export default function DailyCardPage() {
       const day = getKyivDay();
       await shareElementAsPng(resultRef.current, { filename: `ellen-soul-card-${day}`, scale: 2 });
       setShareStatus("done");
+      track("daily_card_pdf_shared", { from: "current" });
       setTimeout(() => setShareStatus("idle"), 2400);
     } catch (e) {
       console.error("share error:", e);

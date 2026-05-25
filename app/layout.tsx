@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ModalProvider } from '@/contexts/ModalContext';
+import { PostHogProvider } from '@/components/PostHogProvider';
 import BookingModal from '@/components/ui/BookingModal';
 import QuickContactModal from '@/components/ui/QuickContactModal';
 import { Analytics } from "@vercel/analytics/next";
@@ -96,15 +97,17 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://www.google-analytics.com" />
       </head>
       <body className="min-h-full flex flex-col bg-[#FDFBF7] text-[#1C1512]">
-        <LanguageProvider>
-          <ModalProvider>
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-            <BookingModal />
-            <QuickContactModal />
-          </ModalProvider>
-        </LanguageProvider>
+        <PostHogProvider>
+          <LanguageProvider>
+            <ModalProvider>
+              <Header />
+              <main className="flex-1">{children}</main>
+              <Footer />
+              <BookingModal />
+              <QuickContactModal />
+            </ModalProvider>
+          </LanguageProvider>
+        </PostHogProvider>
         <Analytics />
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-CMP800PXJZ" strategy="lazyOnload" />
         <Script id="google-analytics" strategy="lazyOnload">{`

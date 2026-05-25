@@ -12,6 +12,7 @@ import {
   PersonalDaysCalendar,
 } from "./_components";
 import { t as ts, hint as tHint, letterMeaning, planeDominantNote, pinnacleMeaning, challengeMeaning } from "./_strings";
+import { track } from "@/lib/analytics/posthog";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -1238,6 +1239,11 @@ export default function NumerologyPage() {
   const isEn = language === "en";
   const data = isRu ? DATA_RU : isEn ? DATA_EN : DATA_UK;
 
+  // Fire a tool_viewed event once on mount — separate from the auto-pageview
+  // so we can build a per-tool funnel in PostHog without depending on URL
+  // patterns (which can shift when we restructure routes).
+  useEffect(() => { track("tool_viewed", { tool: "numerology" }); }, []);
+
   const [form, setForm] = useState({
     lastName: "", firstName: "", middleName: "",
     day: "", month: "", year: "",
@@ -1287,11 +1293,13 @@ export default function NumerologyPage() {
     const y = parseInt(form.year);
     const lpEx = calcLifePathEx(d, m, y);
     const destEx = calcDestinyEx(fullName);
+    const soulN = calcSoul(fullName);
+    const personalityN = calcPersonality(fullName);
     setResult({
       lifePath: lpEx.num, lifePathKarmic: lpEx.karmic,
       destiny: destEx.num, destinyKarmic: destEx.karmic,
-      soul: calcSoul(fullName),
-      personality: calcPersonality(fullName),
+      soul: soulN,
+      personality: personalityN,
       birthday: calcBirthday(d),
       personalYear: calcPersonalYear(d, m),
       maturity: calcMaturity(lpEx.num, destEx.num),
@@ -1317,6 +1325,18 @@ export default function NumerologyPage() {
     setRateLimited(false);
     setExpanded(false);
     autoFiredFor.current = null; // allow auto-fire for the new result
+
+    // Analytics: never personally-identifying — only the structural features
+    // of the chart (numbers, presence of master/karmic, age bucket).
+    track("numerology_calculated", {
+      life_path: lpEx.num,
+      destiny: destEx.num,
+      has_master_number: [11, 22, 33].some(n =>
+        [lpEx.num, destEx.num, soulN, personalityN].includes(n)),
+      has_karmic_debt: Boolean(lpEx.karmic || destEx.karmic),
+      personal_year: calcPersonalYear(d, m),
+      age_bucket: age < 18 ? "u18" : age < 30 ? "18-29" : age < 45 ? "30-44" : age < 60 ? "45-59" : "60+",
+    });
   };
 
   const handleSynthesis = async () => {
@@ -1576,7 +1596,7 @@ export default function NumerologyPage() {
                 rateLimited={rateLimited}
                 onRetrySynth={handleSynthesis}
                 expanded={expanded}
-                onExpand={() => setExpanded(true)}
+                onExpand={() => { setExpanded(true); track("numerology_expanded"); }}
                 onCollapse={() => setExpanded(false)}
               />
             </AnimatedSection>

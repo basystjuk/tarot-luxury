@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { TAROT_CARDS, getCardName, drawCard } from "@/lib/data/tarot-cards";
 import { getMeaning } from "@/lib/data/tarot-meanings";
+import { track } from "@/lib/analytics/posthog";
 
 const STORAGE_KEY = "ellen-soul:weekly-card";
 
@@ -118,6 +119,11 @@ export function WeeklyCard({ language }: Props) {
     };
     saveDraw(next);
     setDraw(next);
+    track("daily_card_weekly_drawn", {
+      arcana: picked.card.suit === "major" ? "major" : "minor",
+      suit: picked.card.suit,
+      reversed: picked.reversed,
+    });
   };
 
   if (!mounted) return null; // avoid SSR mismatch

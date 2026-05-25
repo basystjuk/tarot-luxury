@@ -14,6 +14,7 @@ import { findMoonStarConjunction, type FixedStar } from "./_fixed-stars";
 import { NatalForm } from "./_natal-form";
 import { loadNatal, type NatalProfile } from "./_natal";
 import { NatalCompareBlock, LunarReturnBlock } from "./_natal-display";
+import { track } from "@/lib/analytics/posthog";
 
 type PhaseKey =
   | "new"
@@ -610,7 +611,10 @@ export default function MoonPhasePage() {
   // Persistent natal profile. Lazy-loaded on mount (avoids SSR mismatch),
   // refreshed whenever NatalForm saves or clears it.
   const [natalProfile, setNatalProfile] = useState<NatalProfile | null>(null);
-  useEffect(() => { setNatalProfile(loadNatal()); }, []);
+  useEffect(() => {
+    setNatalProfile(loadNatal());
+    track("tool_viewed", { tool: "moon-phase" });
+  }, []);
 
   const [form, setForm] = useState({
     year:   today.getFullYear().toString(),
@@ -739,6 +743,7 @@ export default function MoonPhasePage() {
     setAiError(null);
     setAiRateLimited(false);
     scrollToResult();
+    track("moon_event_calculated", { mode, has_natal: !!natalProfile });
   };
 
   // Wired from the monthly calendar grid. Switches the form to "event"
@@ -760,6 +765,7 @@ export default function MoonPhasePage() {
     if (!result) return;
     setAiLoading(true);
     setAiError(null);
+    track("moon_ai_message_open", { sign_idx: result.moonSignIdx, mode });
     try {
       const moonSign   = signNames[result.moonSignIdx];
       const moonSignEn = SIGNS_EN[result.moonSignIdx];
@@ -854,6 +860,7 @@ export default function MoonPhasePage() {
 
   const handleRecommendations = async () => {
     if (!result) return;
+    track("moon_recs_requested", { sign_idx: result.moonSignIdx });
 
     // Client-side cache by (language × moon sign) — recommendations don't
     // change with the day, only with the sign, so the same sign hits the
@@ -996,7 +1003,7 @@ export default function MoonPhasePage() {
               {mode === "natal" ? (
                 <NatalForm
                   language={language}
-                  onSaved={(p) => setNatalProfile(p)}
+                  onSaved={(p) => { setNatalProfile(p); track(p ? "moon_natal_saved" : "moon_natal_cleared"); }}
                 />
               ) : (
               <>
