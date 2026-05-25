@@ -64,6 +64,59 @@ const S = {
   soul:               ["Число Душі", "Число Души", "Soul Number"] as Trio,
   personality:        ["Особистість", "Личность", "Personality"] as Trio,
   birthday:           ["День народження", "День рождения", "Birthday"] as Trio,
+
+  // ─── Phase Н1 additions ───────────────────────────────────────────────
+  personalCyclesHeading:   ["Цикли · Сьогодні", "Циклы · Сегодня", "Cycles · Today"] as Trio,
+  personalCyclesHint:      [
+    "Особистий рік (тема року) + Особистий місяць (тема місяця) + Особистий день (вібрація сьогодні).",
+    "Личный год (тема года) + Личный месяц (тема месяца) + Личный день (вибрация сегодня).",
+    "Personal Year (year's theme) + Personal Month (month's theme) + Personal Day (today's vibration).",
+  ] as Trio,
+  personalYearLabel:       ["Цей рік", "Этот год", "This year"] as Trio,
+  personalYearHint:        [
+    "Тема всього року для тебе особисто.", "Тема всего года для тебя лично.", "The year's theme for you personally.",
+  ] as Trio,
+  personalMonthLabel:      ["Цей місяць", "Этот месяц", "This month"] as Trio,
+  personalMonthHint:       [
+    "Субтема цього місяця в межах року.", "Субтема этого месяца в рамках года.", "The month's subtheme within the year.",
+  ] as Trio,
+  personalDayLabel:        ["Сьогодні", "Сегодня", "Today"] as Trio,
+  personalDayHint:         [
+    "Точна вібрація сьогоднішнього дня для тебе.",
+    "Точная вибрация сегодняшнего дня для тебя.",
+    "The exact vibration of today for you.",
+  ] as Trio,
+
+  innerMechanicsHeading:   ["Внутрішні механізми", "Внутренние механизмы", "Inner mechanics"] as Trio,
+  innerMechanicsHint:      [
+    "Підсвідома самість (скільки граней личності активовано) + Мости (як з'єднуються ядерні числа).",
+    "Подсознательная самость (сколько граней личности активировано) + Мосты (как соединяются ядерные числа).",
+    "Subconscious Self (how many facets of personality are active) + Bridges (how core numbers connect).",
+  ] as Trio,
+  subconsciousSelfLabel:   ["Підсвідома самість", "Подсознательная самость", "Subconscious Self"] as Trio,
+  subconsciousSelfHint:    [
+    "9 − (кількість відсутніх чисельних вібрацій у твоєму імені). Чим вище, тим більше граней особистості активовано.",
+    "9 − (количество отсутствующих числовых вибраций в твоём имени). Чем выше, тем больше граней личности активировано.",
+    "9 minus the count of missing letter-values in your name. The higher, the more facets of you are active.",
+  ] as Trio,
+  subconsciousSelfMeaning: [
+    "Скільки внутрішніх ресурсів у тебе під рукою у складних ситуаціях.",
+    "Сколько внутренних ресурсов у тебя под рукой в сложных ситуациях.",
+    "How many inner resources you can reach for under pressure.",
+  ] as Trio,
+  bridgesLabel:            ["Мости між ядрами", "Мосты между ядрами", "Bridges between core numbers"] as Trio,
+  bridgesHint:             [
+    "Різниця між парами ядрових чисел — показує що з'єднує (або розділяє) частини твоєї особистості.",
+    "Разница между парами ядровых чисел — показывает что соединяет (или разделяет) части твоей личности.",
+    "The gap between pairs of core numbers — shows what bridges (or splits) parts of you.",
+  ] as Trio,
+  bridgeLpDest:            ["Життєвий шлях ↔ Доля", "Жизненный путь ↔ Судьба", "Life Path ↔ Destiny"] as Trio,
+  bridgeSoulPers:          ["Душа ↔ Особистість", "Душа ↔ Личность", "Soul ↔ Personality"] as Trio,
+  bridgesMeaning:          [
+    "0 = повний резонанс; чим більше, тим більше зусилля потрібно для гармонізації.",
+    "0 = полный резонанс; чем больше, тем больше усилий нужно для гармонизации.",
+    "0 = perfect resonance; the larger the gap, the more effort needed to harmonise.",
+  ] as Trio,
 };
 
 export function t(lang: Lang, key: keyof typeof S): string {

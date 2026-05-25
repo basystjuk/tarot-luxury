@@ -26,12 +26,23 @@ import {
   calcPlaneOfExpression,
   calcMasterPhase,
   calcPersonalDays,
+  calcPersonalMonth,
+  calcPersonalYear as calcPersonalYearLib,
+  calcSoulSchool,
+  calcPersonalitySchool,
+  calcDestinySchool,
+  calcHiddenPassionSchool,
+  calcSubconsciousSelfSchool,
+  calcBalanceSchool,
+  calcBridges,
   type Pinnacle,
   type Challenge,
   type LetterReading,
   type PlaneOfExpression,
   type MasterPhase,
+  type Bridges,
 } from "@/lib/numerology/calculators";
+import { type NumerologySchool, SCHOOL_LABELS } from "@/lib/numerology/letter-values";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface NumEntry { keyword: string; meaning: string }
@@ -709,7 +720,14 @@ interface ResultViewProps {
     planeOfExpression: PlaneOfExpression;
     masterPhase: MasterPhase;
     age: number;
+    // Phase Н1 extras
+    subconsciousSelf?: number;
+    bridges?: Bridges;
+    personalMonth?: number;
+    personalDay?: number;
   } | null;
+  /** Active numerology school — for the badge at the bottom of the result. */
+  school: NumerologySchool;
   /** raw birth day-of-month (1-31), needed for Personal Days */
   birthDay: number;
   /** raw birth month (1-12), needed for Personal Days */
@@ -734,7 +752,7 @@ interface ResultViewProps {
 function NumerologyResultView({
   result, extended, birthDay, birthMonth, data, language, isRu, isEn, t, labels,
   synthIntro, synthPortrait, loadingSynth, synthError, rateLimited, onRetrySynth,
-  expanded, onExpand, onCollapse,
+  expanded, onExpand, onCollapse, school,
 }: ResultViewProps) {
   const lifePathEntry = getEntry(data.lifePath, result.lifePath);
   const lpKarmic = result.lifePathKarmic
@@ -1046,6 +1064,75 @@ function NumerologyResultView({
               </>
             )}
           </CollapseSection>
+
+          {/* ── Phase Н1: Personal Day / Month / Year (cycles cluster) ── */}
+          {extended && (extended.personalDay != null || extended.personalMonth != null) && (
+            <CollapseSection
+              title={<TermHint hint={ts(language, "personalCyclesHint")}>{ts(language, "personalCyclesHeading")}</TermHint>}
+              defaultOpen
+            >
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: ts(language, "personalYearLabel"),  value: result.personalYear,            hint: ts(language, "personalYearHint") },
+                  { label: ts(language, "personalMonthLabel"), value: extended.personalMonth ?? null,  hint: ts(language, "personalMonthHint") },
+                  { label: ts(language, "personalDayLabel"),   value: extended.personalDay ?? null,    hint: ts(language, "personalDayHint"), accent: true },
+                ].map((cell, i) => (
+                  <div key={i} className={`rounded-xl p-3 text-center border ${cell.accent ? "bg-[rgba(212,168,83,0.12)] border-[rgba(212,168,83,0.4)]" : "bg-[rgba(196,169,122,0.05)] border-[rgba(196,169,122,0.18)]"}`}>
+                    <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1.5">{cell.label}</p>
+                    <p className="text-3xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                      {cell.value ?? "—"}
+                    </p>
+                    <p className="text-[11px] text-[#7A6A58] mt-1.5 italic leading-snug">{cell.hint}</p>
+                  </div>
+                ))}
+              </div>
+            </CollapseSection>
+          )}
+
+          {/* ── Phase Н1: Subconscious Self + Bridge Numbers ── */}
+          {extended && extended.bridges && (
+            <CollapseSection
+              title={<TermHint hint={ts(language, "innerMechanicsHint")}>{ts(language, "innerMechanicsHeading")}</TermHint>}
+            >
+              <div className="grid sm:grid-cols-2 gap-3">
+                {extended.subconsciousSelf != null && (
+                  <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.2)]">
+                    <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                      <TermHint hint={ts(language, "subconsciousSelfHint")}>{ts(language, "subconsciousSelfLabel")}</TermHint>
+                    </p>
+                    <p className="text-2xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                      {extended.subconsciousSelf}<span className="text-sm text-[#9A8A78]">/9</span>
+                    </p>
+                    <p className="text-xs text-[#7A6A58] mt-2 leading-relaxed">
+                      {ts(language, "subconsciousSelfMeaning")}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-xl p-4 bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.2)]">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                    <TermHint hint={ts(language, "bridgesHint")}>{ts(language, "bridgesLabel")}</TermHint>
+                  </p>
+                  <div className="space-y-1.5 text-sm text-[#5C4530]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#9A8A78]">{ts(language, "bridgeLpDest")}</span>
+                      <span className="text-lg" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                        {extended.bridges.lifePathDestiny}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#9A8A78]">{ts(language, "bridgeSoulPers")}</span>
+                      <span className="text-lg" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                        {extended.bridges.soulPersonality}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#7A6A58] mt-2 leading-relaxed italic">
+                    {ts(language, "bridgesMeaning")}
+                  </p>
+                </div>
+              </div>
+            </CollapseSection>
+          )}
           </div>{/* /center column */}
         </div>
       )}
@@ -1056,12 +1143,11 @@ function NumerologyResultView({
         </button>
       )}
 
-      <p className="text-xs text-[#7A6A58] text-center pt-2">
-        {isRu
-          ? "Нумерологический портрет рассчитан по системе Пифагора."
-          : isEn
-          ? "Numerological portrait calculated using the Pythagorean system."
-          : "Нумерологічний портрет розраховано за системою Піфагора."}
+      <p className="text-xs text-[#7A6A58] text-center pt-2 italic leading-relaxed">
+        {isRu ? "Расчёт по школе Hans Decoz · " : isEn ? "Calculation by Hans Decoz school · " : "Розрахунок за школою Hans Decoz · "}
+        <span className="text-[#B8883A]">
+          {SCHOOL_LABELS[school][language === "ru" ? "ru" : language === "en" ? "en" : "uk"]}
+        </span>
       </p>
     </div>
   );
@@ -1245,6 +1331,23 @@ export default function NumerologyPage() {
   // patterns (which can shift when we restructure routes).
   useEffect(() => { track("tool_viewed", { tool: "numerology" }); }, []);
 
+  // ── Phase Н1: Numerology school selector ───────────────────────────────
+  // Default is Slavic Pythagorean (Aleksandrov mapping) — matches the
+  // pre-Phase-Н1 calculations for CIS users. Persisted to localStorage so
+  // returning users see their choice.
+  const [school, setSchool] = useState<NumerologySchool>("slavic-pythagorean");
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("ellen-soul:num-school");
+      if (stored === "slavic-pythagorean" || stored === "western-pythagorean" || stored === "chaldean") {
+        setSchool(stored);
+      }
+    } catch { /* private mode — fine */ }
+  }, []);
+  useEffect(() => {
+    try { window.localStorage.setItem("ellen-soul:num-school", school); } catch { /* */ }
+  }, [school]);
+
   // Phase В: if signed in, pre-fill name + date from the cloud profile.
   // The user can still edit before submitting — this is a soft autofill.
   const { profile } = useProfile();
@@ -1296,6 +1399,11 @@ export default function NumerologyPage() {
     planeOfExpression: PlaneOfExpression;
     masterPhase: MasterPhase;
     age: number;
+    // Phase Н1 additions
+    subconsciousSelf?: number;
+    bridges?: Bridges;
+    personalMonth?: number;
+    personalDay?: number;
   } | null>(null);
   const [synthesis, setSynthesis] = useState<string | null>(null);
   const [synthIntro, setSynthIntro] = useState<string | null>(null);
@@ -1324,9 +1432,16 @@ export default function NumerologyPage() {
     const m = parseInt(form.month);
     const y = parseInt(form.year);
     const lpEx = calcLifePathEx(d, m, y);
-    const destEx = calcDestinyEx(fullName);
-    const soulN = calcSoul(fullName);
-    const personalityN = calcPersonality(fullName);
+    // Phase Н1: route name-based calculations through the school-aware lib.
+    // For Slavic school the math equals the legacy in-page functions (same
+    // cyrillic-position table). For Western it transliterates; for Chaldean
+    // it transliterates + uses the Chaldean grouping.
+    const destEx = calcDestinySchool(fullName, school);
+    const soulN  = calcSoulSchool(fullName, school);
+    const personalityN = calcPersonalitySchool(fullName, school);
+    const hpResult = calcHiddenPassionSchool(fullName, school);
+    const balanceN = calcBalanceSchool(fullName, school);
+
     setResult({
       lifePath: lpEx.num, lifePathKarmic: lpEx.karmic,
       destiny: destEx.num, destinyKarmic: destEx.karmic,
@@ -1336,10 +1451,18 @@ export default function NumerologyPage() {
       personalYear: calcPersonalYear(d, m),
       maturity: calcMaturity(lpEx.num, destEx.num),
       karmicLessons: calcKarmicLessons(fullName),
-      balance: calcBalance(fullName),
-      hiddenPassion: calcHiddenPassion(fullName),
+      balance: balanceN,
+      hiddenPassion: hpResult.numbers[0] ?? 1,
     });
     const age = Math.max(0, new Date().getFullYear() - y);
+
+    // Phase Н1 extras
+    const subconsciousSelf = calcSubconsciousSelfSchool(fullName, school);
+    const bridges = calcBridges(lpEx.num, destEx.num, soulN, personalityN);
+    const today = new Date();
+    const personalYearLib = calcPersonalYearLib(d, m, today.getFullYear());
+    const personalMonth   = calcPersonalMonth(personalYearLib, today.getMonth() + 1);
+
     setExtended({
       pinnacles:         calcPinnacles(d, m, y, lpEx.num),
       challenges:        calcChallenges(d, m, y, lpEx.num),
@@ -1349,6 +1472,11 @@ export default function NumerologyPage() {
       planeOfExpression: calcPlaneOfExpression(fullName),
       masterPhase:       calcMasterPhase(lpEx.num, age),
       age,
+      subconsciousSelf,
+      bridges,
+      personalMonth,
+      personalDay: calcPersonalDays(d, m, today.getFullYear(), today.getMonth() + 1)
+                     .find(pd => pd.day === today.getDate())?.number,
     });
     setSynthesis(null);
     setSynthIntro(null);
@@ -1597,6 +1725,45 @@ export default function NumerologyPage() {
                     </div>
                   ))}
                 </div>
+                {/* ── Phase Н1: numerology school selector ──
+                    Slavic = cyrillic-position (school of Aleksandrov) — default
+                    for CIS users so historical readings stay identical.
+                    Western = transliterate cyrillic → latin, then Decoz Pythagorean.
+                    Chaldean = transliterate + Babylonian sound-grouping (8 numbers). */}
+                <div className="pt-1">
+                  <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
+                    {isRu ? "Школа розрахунку" : isEn ? "Calculation school" : "Школа розрахунку"}
+                  </p>
+                  <div role="tablist" aria-label="school" className="flex flex-wrap p-1 rounded-2xl bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)]">
+                    {([
+                      { id: "slavic-pythagorean" as NumerologySchool, glyph: "А" },
+                      { id: "western-pythagorean" as NumerologySchool, glyph: "W" },
+                      { id: "chaldean"            as NumerologySchool, glyph: "✦" },
+                    ]).map(s => {
+                      const active = school === s.id;
+                      const label = SCHOOL_LABELS[s.id][language === "ru" ? "ru" : language === "en" ? "en" : "uk"];
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setSchool(s.id)}
+                          className={`flex-1 min-w-[90px] px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                            active ? "bg-white text-[#1C1512] shadow-sm" : "text-[#7A6A58] hover:text-[#5C4530]"
+                          }`}
+                        >
+                          <span className="mr-1.5 text-[#C4A97A]">{s.glyph}</span>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-[#9A8A78] italic mt-2 leading-snug">
+                    {SCHOOL_LABELS[school].basis}
+                  </p>
+                </div>
+
                 <button type="submit" className="btn-primary w-full">
                   {isRu ? "Рассчитать портрет" : isEn ? "Calculate portrait" : "Розрахувати портрет"}
                 </button>
@@ -1630,6 +1797,7 @@ export default function NumerologyPage() {
                 expanded={expanded}
                 onExpand={() => { setExpanded(true); track("numerology_expanded"); }}
                 onCollapse={() => setExpanded(false)}
+                school={school}
               />
             </AnimatedSection>
           </div>

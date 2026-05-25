@@ -22,6 +22,11 @@ import {
   firstLetter,
   lastLetter,
   firstVowel,
+  letterValue,
+  canonicaliseName,
+  sumVowels,
+  sumConsonants,
+  type NumerologySchool,
 } from "./letter-values";
 
 // ─── Pinnacles ───────────────────────────────────────────────────────────────
@@ -273,6 +278,126 @@ export function calcPersonalDays(
   }
   return out;
 }
+
+// ─── School-aware Soul / Personality / Destiny ──────────────────────────────
+// These have been in the page-level code as Slavic-only. Re-exposed here as
+// school-aware library functions so the UI can switch at runtime.
+
+export function calcSoulSchool(name: string, school: NumerologySchool): number {
+  return reduceNum(sumVowels(name, school) || 0);
+}
+
+export function calcPersonalitySchool(name: string, school: NumerologySchool): number {
+  return reduceNum(sumConsonants(name, school) || 0);
+}
+
+export interface DestinyResult { num: number; karmic: number | null }
+export function calcDestinySchool(name: string, school: NumerologySchool): DestinyResult {
+  const canon = canonicaliseName(name, school);
+  let total = 0;
+  for (const ch of canon) total += letterValue(ch, school);
+  // Reduce per word? Decoz standard: sum letters of EACH word, reduce each
+  // (preserving master numbers), then sum + reduce. Slavic school typically
+  // does single-pass total. We follow Decoz when school is Western/Chaldean,
+  // single-pass for Slavic to match historic results.
+  if (school === "slavic-pythagorean") {
+    const raw = total;
+    return { num: reduceNum(raw), karmic: __findKarmic(raw) };
+  }
+  const words = canon.split(/\s+/).filter(Boolean);
+  let perWordSum = 0;
+  for (const w of words) {
+    let wSum = 0;
+    for (const ch of w) wSum += letterValue(ch, school);
+    perWordSum += reduceNum(wSum);
+  }
+  return { num: reduceNum(perWordSum), karmic: __findKarmic(perWordSum) };
+}
+
+function __findKarmic(raw: number): number | null {
+  if ([13, 14, 16, 19].includes(raw)) return raw;
+  if (raw < 10) return null;
+  const next = String(raw).split("").reduce((a, d) => a + parseInt(d, 10), 0);
+  return __findKarmic(next);
+}
+
+// ─── Hidden Passion ─────────────────────────────────────────────────────────
+// The letter value that occurs MOST frequently in the full name. Reveals
+// the natural talent that draws the person back again and again. When two
+// values tie, Decoz convention is to surface them BOTH ("dual hidden
+// passion"); we return the array.
+
+export interface HiddenPassion { numbers: number[]; counts: Record<number, number> }
+export function calcHiddenPassionSchool(name: string, school: NumerologySchool): HiddenPassion {
+  const canon = canonicaliseName(name, school);
+  const counts: Record<number, number> = {};
+  for (const ch of canon) {
+    const v = letterValue(ch, school);
+    if (v > 0) counts[v] = (counts[v] ?? 0) + 1;
+  }
+  if (Object.keys(counts).length === 0) return { numbers: [], counts };
+  const max = Math.max(...Object.values(counts));
+  const numbers = Object.entries(counts)
+    .filter(([, c]) => c === max)
+    .map(([n]) => parseInt(n, 10))
+    .sort((a, b) => a - b);
+  return { numbers, counts };
+}
+
+// ─── Subconscious Self ──────────────────────────────────────────────────────
+// Decoz definition: 9 − (number of MISSING letter values 1..9 in the name).
+// Chaldean has no 9, so the range is 1..8 there; we cap at 8 in that mode.
+
+export function calcSubconsciousSelfSchool(name: string, school: NumerologySchool): number {
+  const canon = canonicaliseName(name, school);
+  const present = new Set<number>();
+  for (const ch of canon) {
+    const v = letterValue(ch, school);
+    if (v > 0) present.add(v);
+  }
+  const range = school === "chaldean" ? 8 : 9;
+  const distinct = present.size;
+  return Math.max(1, range - (range - distinct)); // = distinct, but clamp
+}
+
+// ─── Balance Number ─────────────────────────────────────────────────────────
+// Sum the initials of every name token, reduce to a single digit.
+// Used to describe how the person regains balance under stress.
+
+export function calcBalanceSchool(fullName: string, school: NumerologySchool): number {
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  let sum = 0;
+  for (const w of words) {
+    sum += letterValue(canonicaliseName(w, school)[0] ?? "", school);
+  }
+  return reduceToDigit(sum);
+}
+
+// ─── Bridge Numbers ─────────────────────────────────────────────────────────
+// Decoz "Bridges" between pairs of core numbers. The bridge is what helps
+// you cross the gap between two parts of yourself. Always reduced to a
+// single digit.
+
+export interface Bridges {
+  lifePathDestiny:    number;  // |Life Path − Destiny|
+  soulPersonality:    number;  // |Soul − Personality|
+}
+export function calcBridges(
+  lifePath: number, destiny: number, soul: number, personality: number,
+): Bridges {
+  // Use raw reduced numbers, not masters — Decoz collapses to single digit
+  // for the bridge math.
+  const lp = lifePath > 9 ? digitSum(lifePath) : lifePath;
+  const de = destiny  > 9 ? digitSum(destiny)  : destiny;
+  const so = soul     > 9 ? digitSum(soul)     : soul;
+  const pe = personality > 9 ? digitSum(personality) : personality;
+  return {
+    lifePathDestiny: Math.abs(lp - de),
+    soulPersonality: Math.abs(so - pe),
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 
 export function calcMasterPhase(num: number, age: number): MasterPhase {
   if (num === 11) {
