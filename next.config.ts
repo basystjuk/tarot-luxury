@@ -42,7 +42,11 @@ const nextConfig: NextConfig = {
     // WebP only — AVIF encoding on Vercel free tier first-hit takes 5–10s
     // and blows up LCP. WebP first-hit is sub-second.
     formats: ["image/webp"],
-    minimumCacheTTL: 86400,
+    // 30-day cache for optimised images. Tarot card art + blog photography
+    // is effectively immutable, so a longer TTL slashes our Image
+    // Optimization quota on Hobby plan (5K sources/month). The cache
+    // resets on each deploy regardless, so a stale image is impossible.
+    minimumCacheTTL: 2_592_000,
   },
   reactStrictMode: true,
   compress: true,

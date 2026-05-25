@@ -48,7 +48,11 @@ export function initPostHog(): void {
     autocapture: true,
     person_profiles: "identified_only", // anonymous unless we ever call identify()
     persistence: "localStorage+cookie",
-    disable_session_recording: false,
+    // Session recording disabled — it captures every click/scroll on the
+    // page and uploads it as a replayable video. Useful for debugging UX
+    // bugs, but eats both PostHog's event budget and the user's bandwidth.
+    // Re-enable per-incident by setting NEXT_PUBLIC_POSTHOG_REPLAY=1.
+    disable_session_recording: process.env.NEXT_PUBLIC_POSTHOG_REPLAY !== "1",
     loaded: () => {
       initialised = true;
     },

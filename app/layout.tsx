@@ -9,7 +9,11 @@ import { ModalProvider } from '@/contexts/ModalContext';
 import { PostHogProvider } from '@/components/PostHogProvider';
 import BookingModal from '@/components/ui/BookingModal';
 import QuickContactModal from '@/components/ui/QuickContactModal';
-import { Analytics } from "@vercel/analytics/next";
+// Vercel Analytics disabled — PostHog (Phase Б) is our product analytics
+// and Hobby plan's Vercel Analytics has a 1500-event/month cap that's
+// useless for any real traffic. Re-enable only if upgrading to Pro AND
+// removing PostHog (unlikely).
+// import { Analytics } from "@vercel/analytics/next";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin", "cyrillic"],
@@ -108,7 +112,7 @@ export default function RootLayout({
             </ModalProvider>
           </LanguageProvider>
         </PostHogProvider>
-        <Analytics />
+        {/* <Analytics />  — see import comment above */}
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-CMP800PXJZ" strategy="lazyOnload" />
         <Script id="google-analytics" strategy="lazyOnload">{`
           window.dataLayer = window.dataLayer || [];
