@@ -29,7 +29,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useProfile } from "@/hooks/useProfile";
 import {
   dateToJD, calcPlanetDeg, calcLST, calcAscendant, calcMC,
-  calcPlacidusHouses, whichPlacidusHouse,
+  calcPlacidusHouses, whichPlacidusHouse, formatDegree,
   SIGN_GLYPHS, SIGNS_UA, SIGNS_EN,
 } from "@/lib/astro/calculations";
 import type { AspectKey } from "@/lib/astro/natal-snapshot";
@@ -522,9 +522,28 @@ export default function NatalChartPage() {
           {/* ── Chart result ── */}
           {chart && (
             <>
-              <ChartWheel chart={chart} lang={lang} signNames={signNames} />
+              {/* Wheel + Key Placements (side-by-side on desktop, stacked on mobile).
+                  The Key Placements card surfaces the chart's "spine" (Sun/Moon/ASC/MC)
+                  so a first-time visitor doesn't need to scan the full planet table to
+                  find their core identity points. */}
+              <div className="grid md:grid-cols-2 gap-5 items-start">
+                <ChartWheel chart={chart} lang={lang} signNames={signNames} />
+                <KeyPlacements chart={chart} lang={lang} signNames={signNames} />
+              </div>
+
+              {/* Full planet table */}
               <PlanetTable chart={chart} lang={lang} signNames={signNames} t={t} />
+
+              {/* House cusps — explicit grid of all 12 cusps with formatted
+                  degrees (mirrors the prior tool's "Куспіди будинків (Плацідус)"
+                  card). The planet table already shows the house each planet
+                  occupies; this block shows the cusp LONGITUDES themselves. */}
+              <HouseCusps cusps={chart.cusps} lang={lang} />
+
+              {/* Aspects between natal planets */}
               <AspectsList aspects={aspects} lang={lang} />
+
+              {/* AI portrait (auth-gated) */}
               <PortraitBlock
                 lang={lang}
                 portrait={portrait}
@@ -533,6 +552,17 @@ export default function NatalChartPage() {
                 onRun={handlePortrait}
                 t={t}
               />
+
+              {/* Accuracy disclaimer — same posture as the prior tool, but
+                  rephrased to reflect the M1+M7 upgrades (planet positions
+                  better than 0.1° for Mercury-Saturn; Placidus proper). */}
+              <p className="text-xs text-[#7A6A58] text-center max-w-2xl mx-auto leading-relaxed">
+                {lang === "ru"
+                  ? "Расчёты используют JPL J2000 элементы планет (точность ~0.1° для Меркурия-Сатурна, ~1° для Урана-Плутона) и алгоритм Placidus (Meeus). Для глубокого разбора обратись к Ellen."
+                  : lang === "en"
+                  ? "Calculations use JPL J2000 planetary elements (~0.1° accuracy for Mercury-Saturn, ~1° for Uranus-Pluto) and the Placidus algorithm (Meeus). For a deep reading, book a session with Ellen."
+                  : "Розрахунки використовують JPL J2000 елементи планет (точність ~0.1° для Меркурія-Сатурна, ~1° для Урана-Плутона) і алгоритм Placidus (Meeus). Для глибокого розбору запиши консультацію з Ellen."}
+              </p>
             </>
           )}
         </div>
@@ -659,6 +689,83 @@ function ChartWheel({ chart, lang, signNames }: {
 }
 
 // ── Planet table ─────────────────────────────────────────────────────────
+// ── Key Placements (Sun/Moon/ASC/MC summary card) ───────────────────────
+// The chart's "spine" — what most laypeople check first. We highlight the
+// four points in a compact card next to the wheel so they're visible
+// without scrolling through the full planet table below.
+function KeyPlacements({ chart, lang, signNames }: {
+  chart: NatalChartData; lang: "uk" | "ru" | "en"; signNames: string[];
+}) {
+  const rows = [
+    { key: "Sun",  lon: chart.planets.Sun,  label: lang === "ru" ? "Солнце ☉" : lang === "en" ? "Sun ☉" : "Сонце ☉" },
+    { key: "Moon", lon: chart.planets.Moon, label: lang === "ru" ? "Луна ☽"   : lang === "en" ? "Moon ☽" : "Місяць ☽" },
+    { key: "ASC",  lon: chart.asc,          label: lang === "ru" ? "Асцендент" : lang === "en" ? "Ascendant" : "Асцендент" },
+    { key: "MC",   lon: chart.mc,           label: lang === "ru" ? "МС (Зенит)" : lang === "en" ? "MC (Midheaven)" : "МС (Зеніт)" },
+  ];
+  return (
+    <div className="card-luxury">
+      <h3 className="text-2xl text-[#1C1512] mb-5" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+        {lang === "ru" ? "Ключевые позиции" : lang === "en" ? "Key Placements" : "Ключові позиції"}
+      </h3>
+      <div className="space-y-3">
+        {rows.map(({ key, lon, label }) => {
+          const signIdx = Math.floor(((lon % 360) + 360) % 360 / 30);
+          return (
+            <div key={key} className="flex justify-between items-center py-2 border-b border-[rgba(196,169,122,0.15)] last:border-0">
+              <span className="text-sm text-[#7A6A58]">{label}</span>
+              <div className="text-right">
+                <p className="text-[#1C1512] text-sm font-medium" style={{ fontFamily: "var(--font-cormorant)" }}>
+                  {SIGN_GLYPHS[signIdx]} {signNames[signIdx]}
+                </p>
+                <p className="text-xs text-[#C4A97A] font-mono">{formatDegree(lon)}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── House Cusps grid ────────────────────────────────────────────────────
+// 12-cell grid showing each Placidus cusp's full ecliptic longitude.
+// Complements the planet table (which shows which house each planet
+// lives in) by exposing the cusp longitudes themselves — important for
+// astrologers who want to read the chart precisely.
+function HouseCusps({ cusps, lang }: { cusps: number[]; lang: "uk" | "ru" | "en" }) {
+  return (
+    <div className="card-luxury">
+      <h3 className="text-2xl text-[#1C1512] mb-5" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+        {lang === "ru" ? "Куспиды домов (Placidus)" : lang === "en" ? "House Cusps (Placidus)" : "Куспіди будинків (Placidus)"}
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {cusps.map((cusp, i) => {
+          // 1, 4, 7, 10 are the angular cusps (ASC/IC/DSC/MC) — accent in gold.
+          const isAngular = i === 0 || i === 3 || i === 6 || i === 9;
+          return (
+            <div key={i}
+                 className={`text-sm py-2.5 px-3 rounded-lg border ${
+                   isAngular
+                     ? "bg-[rgba(212,168,83,0.10)] border-[rgba(212,168,83,0.35)]"
+                     : "bg-[rgba(196,169,122,0.06)] border-[rgba(196,169,122,0.12)]"
+                 }`}>
+              <span className={`font-medium mr-2 ${isAngular ? "text-[#B8883A]" : "text-[#C4A97A]"}`}>
+                {i + 1}
+              </span>
+              <span className="text-[#5C4530] font-mono text-xs">{formatDegree(cusp)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-[#9A8A78] italic mt-3 text-center">
+        {lang === "ru" ? "1 = АСЦ, 4 = IC, 7 = ДСЦ, 10 = МС (угловые дома)"
+          : lang === "en" ? "1 = ASC, 4 = IC, 7 = DSC, 10 = MC (angular houses)"
+          : "1 = АСЦ, 4 = IC, 7 = ДСЦ, 10 = МС (кутові доми)"}
+      </p>
+    </div>
+  );
+}
+
 function PlanetTable({ chart, lang, signNames, t }: {
   chart: NatalChartData; lang: "uk" | "ru" | "en"; signNames: string[];
   t: typeof T["uk"];
