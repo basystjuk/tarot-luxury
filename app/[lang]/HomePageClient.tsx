@@ -7,6 +7,7 @@ import HeroPhoto from "@/components/ui/HeroPhoto";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
+import { TodayWidget } from "./_today-widget";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useLanguage } from '@/hooks/useLanguage';
 import { isToolEnabled, type ToolId } from "@/lib/tools-config";
@@ -298,6 +299,11 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       </section>
 
       <GoldDivider />
+
+      {/* ── Today widget (Bonus 1) — single-glance combined daily state ──
+           Auto-switches between anonymous teaser and personalised view
+           depending on whether the visitor is signed in with natal data. */}
+      <TodayWidget />
 
       {/* ── Soul Studio ──────────────────────────────────────────────── */}
       <section data-nav-section="studio" className="section-padding relative overflow-hidden bg-[#F2EBD9]">
