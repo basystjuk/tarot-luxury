@@ -12,7 +12,7 @@ import { moonAdvice, type AdviceKey } from "./_advice";
 import { MoonCalendar } from "./_calendar";
 import { findMoonStarConjunction, type FixedStar } from "./_fixed-stars";
 import { NatalForm } from "./_natal-form";
-import { loadNatal, type NatalProfile } from "./_natal";
+import { loadNatal, saveNatal, computeNatalMoonLon, type NatalProfile } from "./_natal";
 import { NatalCompareBlock, LunarReturnBlock } from "./_natal-display";
 import { NatalChartBlock } from "./_natal-chart";
 import type { ZodiacMode } from "@/lib/astro/natal-snapshot";
@@ -648,6 +648,39 @@ export default function MoonPhasePage() {
   // the same data type as natalProfile (localStorage) but in the cloud
   // schema; we just access the relevant fields via useProfile.
   const { profile: cloudProfile } = useProfile();
+
+  // Auto-sync cloud profile → natalProfile state. When the cabinet has
+  // everything filled in and localStorage is empty, the user shouldn't
+  // need to visit the "Natal" tab + click Save to see the natal blocks
+  // here. We materialise the NatalProfile synchronously on profile load.
+  const [autoSyncedFromCloud, setAutoSyncedFromCloud] = useState(false);
+  useEffect(() => {
+    if (autoSyncedFromCloud) return;
+    if (!cloudProfile) return;
+    if (natalProfile) { setAutoSyncedFromCloud(true); return; }
+    if (cloudProfile.birth_date && cloudProfile.birth_time && cloudProfile.birth_place
+        && cloudProfile.birth_lat != null && cloudProfile.birth_lon != null && cloudProfile.birth_tz) {
+      let natalMoonLon = cloudProfile.natal_moon_lon ?? 0;
+      if (!natalMoonLon) {
+        try {
+          natalMoonLon = computeNatalMoonLon(cloudProfile.birth_date, cloudProfile.birth_time.slice(0, 5), cloudProfile.birth_tz);
+        } catch { /* leave 0 */ }
+      }
+      const synth: NatalProfile = {
+        birthDate: cloudProfile.birth_date,
+        birthTime: cloudProfile.birth_time.slice(0, 5),
+        birthPlace: cloudProfile.birth_place,
+        lat: cloudProfile.birth_lat,
+        lon: cloudProfile.birth_lon,
+        tz: cloudProfile.birth_tz,
+        natalMoonLon,
+        savedAt: new Date().toISOString(),
+      };
+      saveNatal(synth);
+      setNatalProfile(synth);
+    }
+    setAutoSyncedFromCloud(true);
+  }, [cloudProfile, natalProfile, autoSyncedFromCloud]);
 
   const [form, setForm] = useState({
     year:   today.getFullYear().toString(),

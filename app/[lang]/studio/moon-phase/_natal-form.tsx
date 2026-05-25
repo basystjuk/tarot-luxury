@@ -105,14 +105,22 @@ export function NatalForm({ language, onSaved }: Props) {
   );
   const [tz, setTz] = useState<string>(existing?.tz ?? "");
   const [hydratedFromProfile, setHydratedFromProfile] = useState(false);
+  // When the cloud profile is complete, we hide the form and show a
+  // compact "✓ Loaded from your account · Edit" panel instead. The
+  // user can flip back into edit mode if they want to override.
+  const [editMode, setEditMode] = useState(false);
 
-  // One-shot hydration from profile when it lands (only if localStorage was empty).
+  // One-shot AUTO-SYNC from cloud profile. When the cabinet has all
+  // natal fields and localStorage is empty, we silently save the
+  // synthesised NatalProfile so the parent page can render natal-aware
+  // blocks immediately (no manual "Save" click required).
   useEffect(() => {
     if (hydratedFromProfile) return;
     if (!profile) return;
     if (existing) { setHydratedFromProfile(true); return; }
     if (profile.birth_date && profile.birth_time && profile.birth_place
         && profile.birth_lat != null && profile.birth_lon != null && profile.birth_tz) {
+      // Mirror to UI state in case the user enters edit mode.
       setBirthDate(profile.birth_date);
       setBirthTime(profile.birth_time.slice(0, 5));
       setPlaceQuery(profile.birth_place);
@@ -123,9 +131,34 @@ export function NatalForm({ language, onSaved }: Props) {
         rawType: "profile",
       });
       setTz(profile.birth_tz);
+
+      // Compute the cached natal Moon longitude. Skip if the cloud
+      // already has it (preserves precision across signups).
+      let natalMoonLon = profile.natal_moon_lon ?? 0;
+      if (!natalMoonLon) {
+        try {
+          natalMoonLon = computeNatalMoonLon(profile.birth_date, profile.birth_time.slice(0, 5), profile.birth_tz);
+        } catch { natalMoonLon = 0; }
+      }
+
+      // Write the synthesised NatalProfile to localStorage + notify
+      // the parent. The user sees natal-aware blocks immediately on
+      // page load, no click needed.
+      const synth: NatalProfile = {
+        birthDate: profile.birth_date,
+        birthTime: profile.birth_time.slice(0, 5),
+        birthPlace: profile.birth_place,
+        lat: profile.birth_lat,
+        lon: profile.birth_lon,
+        tz: profile.birth_tz,
+        natalMoonLon,
+        savedAt: new Date().toISOString(),
+      };
+      saveNatal(synth);
+      onSaved(synth);
     }
     setHydratedFromProfile(true);
-  }, [profile, existing, hydratedFromProfile]);
+  }, [profile, existing, hydratedFromProfile, onSaved]);
 
   const [suggestions, setSuggestions] = useState<GeoCandidate[]>([]);
   const [searching, setSearching] = useState(false);
@@ -245,6 +278,57 @@ export function NatalForm({ language, onSaved }: Props) {
     setSuggestions([]);
     onSaved(null);
   };
+
+  // ── Compact "loaded from cloud" view ─────────────────────────────────────
+  // When the cabinet profile is complete AND we haven't been asked to edit,
+  // collapse the whole form into a single "✓ Loaded from your account" card.
+  // The user can still edit by clicking the pencil — that re-opens the
+  // full form below.
+  const cloudComplete = Boolean(
+    profile?.birth_date && profile?.birth_time && profile?.birth_place
+    && profile?.birth_lat != null && profile?.birth_lon != null && profile?.birth_tz,
+  );
+  if (cloudComplete && !editMode && hydratedFromProfile) {
+    return (
+      <div className="space-y-3">
+        <div>
+          <h2
+            className="text-2xl text-[#1C1512] mb-1.5"
+            style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
+          >
+            {t.title}
+          </h2>
+        </div>
+        <div className="p-4 rounded-xl bg-[rgba(122,170,108,0.10)] border border-[rgba(122,170,108,0.3)] flex items-start gap-3">
+          <Check size={18} className="text-[#3F6A35] flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[#3F6A35]">
+              {language === "ru" ? "Натальные данные подтянуты из кабинета"
+                : language === "en" ? "Birth data loaded from your account"
+                : "Натальні дані підтягнуті з кабінету"}
+            </p>
+            <p className="text-xs text-[#5C4530] mt-1.5">
+              {profile?.birth_date} · {profile?.birth_time?.slice(0, 5)} · {profile?.birth_place}
+            </p>
+            <p className="text-[11px] text-[#9A8A78] italic mt-1.5">
+              {language === "ru" ? "Хочешь использовать другие данные?"
+                : language === "en" ? "Want to use different data?"
+                : "Хочеш використати інші дані?"}{" "}
+              <button type="button"
+                onClick={() => setEditMode(true)}
+                className="underline text-[#B8883A] hover:text-[#7A6A58]"
+              >
+                {language === "ru" ? "Изменить" : language === "en" ? "Edit" : "Редагувати"}
+              </button>
+            </p>
+          </div>
+        </div>
+        <p className="text-[11px] text-[#9A8A78] italic leading-snug">
+          {t.privacy}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
