@@ -182,12 +182,13 @@ type AspectKey = "conjunction" | "sextile" | "square" | "trine" | "opposition" |
 function detectAspect(a: number, b: number): { key: AspectKey; orb: number } {
   let diff = Math.abs(a - b) % 360;
   if (diff > 180) diff = 360 - diff;
+  // Phase М6 — tighter transit-Moon orbs (see Moon Guide _natal-display).
   const candidates: { key: Exclude<AspectKey, "none">; angle: number; orb: number }[] = [
-    { key: "conjunction", angle: 0,   orb: 8 },
-    { key: "sextile",     angle: 60,  orb: 4 },
-    { key: "square",      angle: 90,  orb: 6 },
-    { key: "trine",       angle: 120, orb: 6 },
-    { key: "opposition",  angle: 180, orb: 8 },
+    { key: "conjunction", angle: 0,   orb: 5 },
+    { key: "sextile",     angle: 60,  orb: 2 },
+    { key: "square",      angle: 90,  orb: 3 },
+    { key: "trine",       angle: 120, orb: 3 },
+    { key: "opposition",  angle: 180, orb: 5 },
   ];
   for (const c of candidates) {
     const dev = Math.abs(diff - c.angle);

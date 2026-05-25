@@ -108,6 +108,21 @@ export const FIXED_STARS: readonly FixedStar[] = [
 /** Half-orb tolerance in degrees — Moon within ±1° of star counts as conjunction. */
 export const FIXED_STAR_ORB_DEG = 1.0;
 
+// ── Precession adjustment (Phase М5) ───────────────────────────────────────
+// Fixed-star ecliptic longitudes drift due to the precession of the
+// equinoxes at ≈ 50.290966″ / year. Our table holds J2000 values; without
+// adjustment, by year 2100 every star is shifted ~1.4° from its true
+// longitude — past our 1° conjunction orb. Below we apply a simple linear
+// precession term, which is sufficient to ±1″ for any year inside the
+// 1900-2100 working range.
+const PRECESSION_DEG_PER_DAY = 50.290966 / 3600 / 365.25;
+
+/** Adjust J2000 longitude for precession to a given Julian Day. */
+function precessedLon(j2000Lon: number, jd: number): number {
+  const lon = j2000Lon + (jd - 2451545.0) * PRECESSION_DEG_PER_DAY;
+  return ((lon % 360) + 360) % 360;
+}
+
 /** Smallest absolute angular distance (deg) between two ecliptic longitudes. */
 function angDist(a: number, b: number): number {
   let d = Math.abs(((a - b) % 360 + 360) % 360);
@@ -115,11 +130,13 @@ function angDist(a: number, b: number): number {
   return d;
 }
 
-/** If the Moon at moonLon is within FIXED_STAR_ORB_DEG of any star, return it. */
-export function findMoonStarConjunction(moonLon: number): { star: FixedStar; orb: number } | null {
+/** If the Moon at moonLon is within FIXED_STAR_ORB_DEG of any star (using
+ *  precession-adjusted longitudes for the given JD), return the closest. */
+export function findMoonStarConjunction(moonLon: number, jd: number = 2451545.0): { star: FixedStar; orb: number } | null {
   let best: { star: FixedStar; orb: number } | null = null;
   for (const star of FIXED_STARS) {
-    const orb = angDist(moonLon, star.ecliptic);
+    const starLon = precessedLon(star.ecliptic, jd);
+    const orb = angDist(moonLon, starLon);
     if (orb <= FIXED_STAR_ORB_DEG && (!best || orb < best.orb)) {
       best = { star, orb };
     }

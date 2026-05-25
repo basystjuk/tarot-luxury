@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles, ChevronDown, Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
-import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, calcTrueNode, findNextLunarReturn, jdToDate, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
+import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, calcTrueNode, findNextLunarReturn, jdToDate, isDayChartByCoords, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
@@ -118,7 +118,15 @@ function calcVoidOfCourse(jd: number, moonLon: number): boolean {
   return true;
 }
 
-function calcMoonPhase(year: number, month: number, day: number, hour: number = 12, minute: number = 0, tzHours: number = 0): MoonData {
+function calcMoonPhase(
+  year: number, month: number, day: number,
+  hour: number = 12, minute: number = 0, tzHours: number = 0,
+  /** Optional observer coords from the natal profile — when given we
+   *  compute the true sect (Sun above horizon), falling back to the
+   *  hour-of-day heuristic when absent. */
+  observerLat?: number,
+  observerLon?: number,
+): MoonData {
   const jd = dateToJD(year, month, day, hour, minute, tzHours);
   const synodicMonth = 29.53058867;
 
@@ -185,7 +193,8 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
 
   // Fixed star conjunction — only the closest star within 1°. The Moon
   // moves ~13°/day so this is a ~2-hour window when it does happen.
-  const starHit = findMoonStarConjunction(moonLon);
+  // Pass jd so the star table is precession-adjusted (Phase М5).
+  const starHit = findMoonStarConjunction(moonLon, jd);
   const fixedStar = starHit?.star ?? null;
   const fixedStarOrb = starHit ? Math.round(starHit.orb * 60) : 0; // arc-minutes
 
@@ -259,7 +268,10 @@ function calcMoonPhase(year: number, month: number, day: number, hour: number = 
   // approximated by local hour until natal-mode brings true sunrise data.
   const element = (["fire", "earth", "air", "water"] as const)[SIGN_TO_ELEMENT[moonSignIdx]];
   const triplicity = TRIPLICITY[element];
-  const isDayChart = isDayChartByHour(hour);
+  // Phase М2: true sect when we have coordinates, hour-heuristic otherwise.
+  const isDayChart = (observerLat != null && observerLon != null)
+    ? isDayChartByCoords(observerLat, observerLon, jd)
+    : isDayChartByHour(hour);
   const rulerActive = isDayChart ? triplicity.day : triplicity.night;
 
   return {
@@ -688,11 +700,17 @@ export default function MoonPhasePage() {
                   : "Дій через структуру, дисципліну, довгу гру; терпіння дасть плід.",
   };
 
+  // Phase М2: when the user has saved natal coordinates, every calcMoonPhase
+  // call passes them so the day/night sect is true (Sun above horizon) and
+  // not the 06-18 hour heuristic. Spread to keep call sites readable.
+  const obsLat = natalProfile?.lat;
+  const obsLon = natalProfile?.lon;
+
   // Auto-calculate today on first render — use current hour/minute for live data
   const [initialized, setInitialized] = useState(false);
   if (!initialized) {
     setInitialized(true);
-    setResult(calcMoonPhase(today.getFullYear(), today.getMonth() + 1, today.getDate(), today.getHours(), today.getMinutes(), tzHours));
+    setResult(calcMoonPhase(today.getFullYear(), today.getMonth() + 1, today.getDate(), today.getHours(), today.getMinutes(), tzHours, obsLat, obsLon));
   }
 
   // Keep "today" mode live: recompute whenever the mode flips back to today,
@@ -701,12 +719,12 @@ export default function MoonPhasePage() {
     if (mode !== "today") return;
     const refresh = () => {
       const now = new Date();
-      setResult(calcMoonPhase(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tzHours));
+      setResult(calcMoonPhase(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tzHours, obsLat, obsLon));
     };
     refresh();
     const id = setInterval(refresh, 60_000);
     return () => clearInterval(id);
-  }, [mode, tzHours]);
+  }, [mode, tzHours, obsLat, obsLon]);
 
   // Live preview computed on every form change (only meaningful in "event" mode).
   const previewResult = (() => {
@@ -717,7 +735,7 @@ export default function MoonPhasePage() {
     const min = useExactTime ? parseInt(form.minute || "0") : 0;
     if (useExactTime && (isNaN(h) || h < 0 || h > 23 || isNaN(min) || min < 0 || min > 59)) return null;
     try {
-      return calcMoonPhase(y, m, d, h, min, useExactTime ? tzHours : 0);
+      return calcMoonPhase(y, m, d, h, min, useExactTime ? tzHours : 0, obsLat, obsLon);
     } catch { return null; }
   })();
 
@@ -735,11 +753,11 @@ export default function MoonPhasePage() {
     e.preventDefault();
     if (mode === "today") {
       const now = new Date();
-      setResult(calcMoonPhase(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tzHours));
+      setResult(calcMoonPhase(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tzHours, obsLat, obsLon));
     } else {
       const h = useExactTime ? parseInt(form.hour || "12") : 12;
       const min = useExactTime ? parseInt(form.minute || "0") : 0;
-      setResult(calcMoonPhase(parseInt(form.year), parseInt(form.month), parseInt(form.day), h, min, useExactTime ? tzHours : 0));
+      setResult(calcMoonPhase(parseInt(form.year), parseInt(form.month), parseInt(form.day), h, min, useExactTime ? tzHours : 0, obsLat, obsLon));
     }
     setAiResult(null);
     setAiError(null);
@@ -755,7 +773,7 @@ export default function MoonPhasePage() {
   const handleCalendarSelect = (y: number, m: number, d: number) => {
     setMode("event");
     setForm(f => ({ ...f, year: String(y), month: String(m), day: String(d) }));
-    setResult(calcMoonPhase(y, m, d, 12, 0, 0));
+    setResult(calcMoonPhase(y, m, d, 12, 0, 0, obsLat, obsLon));
     setAiResult(null);
     setAiError(null);
     setAiRateLimited(false);
@@ -1358,6 +1376,11 @@ export default function MoonPhasePage() {
                           ? (isRu ? "☀ Дневная секта" : isEn ? "☀ Day chart" : "☀ Денна секта")
                           : (isRu ? "🌙 Ночная секта" : isEn ? "🌙 Night chart" : "🌙 Нічна секта")}
                       </TermHint>
+                      {natalProfile && (
+                        <span className="ml-1 text-[#3F6A35]" title={isRu ? "Точная секта по твоим координатам" : isEn ? "True sect from your coordinates" : "Точна секта за твоїми координатами"}>
+                          ✓
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="grid grid-cols-3 gap-2">

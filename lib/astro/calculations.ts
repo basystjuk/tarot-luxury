@@ -587,18 +587,116 @@ export function calcMoonSpeed(jd: number): number {
 // form is within the precision needed for OOB classification (we only
 // care about a binary "is |δ| > 23.4365°" decision).
 
-/** Moon's equatorial declination in degrees at jd. */
-export function calcMoonDeclination(jd: number): number {
+// ── Moon ecliptic latitude (Phase М3) ──────────────────────────────────────
+//
+// The first-term approximation β ≈ 5.128° sin(F) is accurate to ~0.5°,
+// which is enough to flag Out-of-Bounds but not enough for serious
+// astrological work (declination affects house cusps + parans).
+//
+// Below is the top-15 term ELP2000 latitude series from Meeus Table 47.B.
+// These cover the largest periodic perturbations and bring accuracy to
+// ~0.05° — within professional range. The remaining 45 series terms are
+// each < 30″ and don't materially change sign placement.
+//
+// Each row: [D, M, M', F, coefficient × 1e6] — same fundamental arguments
+// as the longitude series.
+
+const MOON_LATITUDE_TERMS: ReadonlyArray<readonly [number, number, number, number, number]> = [
+  [0, 0, 0,  1,  5128122],
+  [0, 0, 1,  1,  280602],
+  [0, 0, 1, -1,  277693],
+  [2, 0, 0, -1,  173237],
+  [2, 0, -1, 1,  55413],
+  [2, 0, -1, -1, 46271],
+  [2, 0, 0,  1,  32573],
+  [0, 0, 2,  1,  17198],
+  [2, 0, 1, -1,  9266],
+  [0, 0, 2, -1,  8822],
+  [2, -1, 0, -1, 8216],
+  [2, 0, -2, -1, 4324],
+  [2, 0, 1,  1,  4200],
+  [2, 1, 0, -1, -3359],
+  [2, -1, -1, 1, 2463],
+];
+
+/** Moon's ecliptic latitude (β) in degrees at jd. ~0.05° accuracy. */
+export function calcMoonLatitude(jd: number): number {
   const T = (jd - 2451545.0) / 36525.0;
-  const F = 93.2720950 + 483202.0175233 * T; // argument of latitude (degrees)
-  const beta   = 5.128 * Math.sin(rad(F));   // approximate ecliptic latitude (degrees)
-  const lambda = moonLongitudeFull(jd);      // ecliptic longitude (degrees)
-  const e = calcObliquity(jd);               // obliquity of ecliptic (degrees)
+  const T2 = T * T;
+  const T3 = T2 * T;
+  const T4 = T3 * T;
+
+  const D  = norm360(297.8501921 + 445267.1114034 * T - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000);
+  const M  = norm360(357.5291092 +  35999.0502909 * T - 0.0001536 * T2 + T3 / 24490000);
+  const Mp = norm360(134.9633964 + 477198.8675055 * T + 0.0087414 * T2 + T3 / 69699   - T4 / 14712000);
+  const F  = norm360( 93.2720950 + 483202.0175233 * T - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000);
+
+  const E = 1 - 0.002516 * T - 0.0000074 * T2;
+  let sumB = 0;
+  for (const [d, m, mp, f, coeff] of MOON_LATITUDE_TERMS) {
+    const arg = d * D + m * M + mp * Mp + f * F;
+    let c = coeff * Math.sin(rad(arg));
+    if (Math.abs(m) === 1) c *= E;
+    if (Math.abs(m) === 2) c *= E * E;
+    sumB += c;
+  }
+  return sumB / 1_000_000;
+}
+
+/** Moon's equatorial declination in degrees at jd. ~0.05° accuracy (M3). */
+export function calcMoonDeclination(jd: number): number {
+  const beta   = calcMoonLatitude(jd);       // full latitude series
+  const lambda = moonLongitudeFull(jd);      // full longitude series
+  const e = calcObliquity(jd);
   const sinDec =
     Math.sin(rad(beta)) * Math.cos(rad(e)) +
     Math.cos(rad(beta)) * Math.sin(rad(e)) * Math.sin(rad(lambda));
   const clamped = Math.max(-1, Math.min(1, sinDec));
   return (Math.asin(clamped) * 180) / Math.PI;
+}
+
+// ── True Sect (Phase М2) ───────────────────────────────────────────────────
+//
+// The hellenistic sect distinction (day chart vs. night chart) depends on
+// whether the Sun is above or below the horizon. The previous shortcut
+// "hour ∈ [6, 18) ⇒ day" is off by up to 1-2h depending on latitude and
+// season — sunrise in Kyiv ranges from 04:00 (June) to 08:30 (December).
+//
+// With lat/lon now in the profile (Phase В), we can compute the Sun's
+// true altitude at the given JD. Above the horizon → day chart.
+//
+// Formula:  sin(alt) = sin(δ)·sin(φ) + cos(δ)·cos(φ)·cos(H)
+// where H is the Sun's local hour angle. H = LST − α (Sun's RA).
+//
+// Returns true if Sun is above horizon (day chart), false otherwise.
+
+/** Convert ecliptic (λ, β=0 for Sun) → equatorial (α, δ). */
+function eclipticToEquatorial(lonDeg: number, latDeg: number, obliquityDeg: number): { ra: number; dec: number } {
+  const l = rad(lonDeg);
+  const b = rad(latDeg);
+  const e = rad(obliquityDeg);
+  const sinDec = Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l);
+  const dec = Math.asin(Math.max(-1, Math.min(1, sinDec)));
+  const y = Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e);
+  const x = Math.cos(l);
+  let ra = Math.atan2(y, x) * 180 / Math.PI;
+  if (ra < 0) ra += 360;
+  return { ra, dec: dec * 180 / Math.PI };
+}
+
+/** True sect: is the Sun above the local horizon at this JD?
+ *  Lat north positive, lon east positive (degrees). */
+export function isDayChartByCoords(lat: number, lon: number, jd: number): boolean {
+  const obliquity = calcObliquity(jd);
+  const sunLon = sunLongitude(jd);
+  const { ra, dec } = eclipticToEquatorial(sunLon, 0, obliquity);
+  const lst = calcLST(jd, lon);
+  let H = lst - ra;
+  H = ((H + 180) % 360 + 360) % 360 - 180; // wrap to [-180, 180]
+  const sinAlt =
+    Math.sin(rad(dec)) * Math.sin(rad(lat)) +
+    Math.cos(rad(dec)) * Math.cos(rad(lat)) * Math.cos(rad(H));
+  return sinAlt > 0;
 }
 
 /** Obliquity of the ecliptic — the threshold for the Moon being Out of Bounds. */

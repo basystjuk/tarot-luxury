@@ -29,12 +29,20 @@ function detectAspect(transitLon: number, natalLon: number): AspectInfo {
   let diff = Math.abs(transitLon - natalLon) % 360;
   if (diff > 180) diff = 360 - diff;
 
+  // Phase М6 — tightened orbs for transit-to-natal Moon. The Moon moves
+  // ~13°/day, so an 8° orb (the old value) means an aspect "lasts" ~12 h
+  // — way too long for the moment-by-moment guidance this tool gives.
+  // Hellenistic+modern consensus for transit-Moon orbs is ~5/3/2°:
+  //   conjunction / opposition : 5°
+  //   square / trine           : 3°
+  //   sextile                  : 2°
+  // Closer to real signal, fewer false-positive "you've got a square today".
   const candidates: { key: NonNullable<AspectKey>; angle: number; orb: number }[] = [
-    { key: "conjunction", angle: 0,   orb: 8 },
-    { key: "sextile",     angle: 60,  orb: 4 },
-    { key: "square",      angle: 90,  orb: 6 },
-    { key: "trine",       angle: 120, orb: 6 },
-    { key: "opposition",  angle: 180, orb: 8 },
+    { key: "conjunction", angle: 0,   orb: 5 },
+    { key: "sextile",     angle: 60,  orb: 2 },
+    { key: "square",      angle: 90,  orb: 3 },
+    { key: "trine",       angle: 120, orb: 3 },
+    { key: "opposition",  angle: 180, orb: 5 },
   ];
 
   for (const c of candidates) {
