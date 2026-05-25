@@ -15,6 +15,8 @@ import { NatalForm } from "./_natal-form";
 import { loadNatal, saveNatal, computeNatalMoonLon, type NatalProfile } from "./_natal";
 import { NatalCompareBlock, LunarReturnBlock } from "./_natal-display";
 import { NatalChartBlock } from "./_natal-chart";
+import { SkyLivePreview } from "./_sky-live";
+import { SpecialSignals } from "./_special-signals";
 import type { ZodiacMode } from "@/lib/astro/natal-snapshot";
 import { useProfile } from "@/hooks/useProfile";
 import { track } from "@/lib/analytics/posthog";
@@ -1229,6 +1231,20 @@ export default function MoonPhasePage() {
           {/* ── Result ── */}
           {mode !== "natal" && result && (
             <AnimatedSection delay={0.1}>
+              {/* Phase М14 — sticky compact Sky Live Preview at the top of
+                  the result column. As the user scrolls through 1.5K lines
+                  of data, the current Moon state stays glued to the top. */}
+              <SkyLivePreview
+                moonSignIdx={result.moonSignIdx}
+                moonDegree={result.moonDegree}
+                illumination={result.illumination}
+                phaseKey={result.phaseKey}
+                phaseName={phaseContent[result.phaseKey].name}
+                phaseEmoji={result.emoji}
+                language={isRu ? "ru" : isEn ? "en" : "uk"}
+                signNames={signNames}
+              />
+
               {/* Main moon card — scroll target for submit + calendar clicks */}
               <div ref={resultRef} className="card-luxury text-center mb-6">
                 <div className="text-6xl mb-3">{result.emoji}</div>
@@ -1298,9 +1314,11 @@ export default function MoonPhasePage() {
                   </p>
                 </div>
 
-                {/* Astrological flags — always shows Moon speed; Dark Moon / VoC / OOB only when active */}
+                {/* Phase М11 — Moon speed badge stays inline (it's neutral
+                    info — every day has a speed). Dark Moon / VoC / OOB /
+                    Eclipse / Fixed Star are extracted into SpecialSignals
+                    below so the result doesn't shout with 6 pills at once. */}
                 <div className="flex flex-wrap justify-center gap-2 mt-5">
-                  {/* Moon speed — always visible, colour-coded */}
                   <span
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border ${
                       result.moonSpeedClass === "fast"
@@ -1321,57 +1339,20 @@ export default function MoonPhasePage() {
                       </span>
                     </TermHint>
                   </span>
-
-                  {result.isDarkMoon && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#1C1512] text-[#C4A97A] border border-[rgba(196,169,122,0.3)]">
-                      <TermHint hint={moonHint(language, "darkMoon")}>
-                        🌑 {isRu ? "Тёмная Луна" : isEn ? "Dark Moon" : "Темний Місяць"}
-                      </TermHint>
-                    </span>
-                  )}
-                  {result.voidOfCourse && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(196,169,122,0.12)] text-[#7A6A58] border border-[rgba(196,169,122,0.3)]">
-                      <TermHint hint={moonHint(language, "voc")}>
-                        ⊘ {isRu ? "Пустая Луна (VoC)" : isEn ? "Void of Course" : "Пустий Місяць (VoC)"}
-                      </TermHint>
-                    </span>
-                  )}
-                  {result.isOutOfBounds && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(28,21,18,0.85)] text-[#E8C98A] border border-[rgba(232,201,138,0.5)]">
-                      <TermHint hint={moonHint(language, "outOfBounds")}>
-                        🌠 {isRu ? "Out of Bounds" : isEn ? "Out of Bounds" : "Out of Bounds"}
-                        <span className="ml-1.5 opacity-80 normal-case">
-                          δ {result.moonDeclination >= 0 ? "+" : ""}{result.moonDeclination.toFixed(1)}°
-                        </span>
-                      </TermHint>
-                    </span>
-                  )}
-                  {result.eclipseType && (
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
-                        result.eclipseType === "solar"
-                          ? "bg-[#1C1512] text-[#E8C98A] border-[rgba(232,201,138,0.55)] shadow-sm"
-                          : "bg-[rgba(184,136,58,0.95)] text-[#FDFBF7] border-[rgba(184,136,58,0.8)] shadow-sm"
-                      }`}
-                    >
-                      <TermHint hint={moonHint(language, result.eclipseType === "solar" ? "eclipseSolar" : "eclipseLunar")}>
-                        {result.eclipseType === "solar"
-                          ? (isRu ? "🌒 СОЛНЕЧНОЕ ЗАТМЕНИЕ" : isEn ? "🌒 SOLAR ECLIPSE" : "🌒 СОНЯЧНЕ ЗАТЕМНЕННЯ")
-                          : (isRu ? "🌕 ЛУННОЕ ЗАТМЕНИЕ" : isEn ? "🌕 LUNAR ECLIPSE" : "🌕 МІСЯЧНЕ ЗАТЕМНЕННЯ")}
-                      </TermHint>
-                    </span>
-                  )}
-                  {result.fixedStar && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[rgba(212,168,83,0.18)] text-[#5C4530] border border-[rgba(212,168,83,0.45)]">
-                      <TermHint
-                        hint={`${result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].name} — ${result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].meaning}`}
-                      >
-                        ✦ {result.fixedStar.i18n[language === "ru" ? "ru" : language === "en" ? "en" : "uk"].name}
-                        <span className="ml-1.5 opacity-70 normal-case">±{result.fixedStarOrb}′</span>
-                      </TermHint>
-                    </span>
-                  )}
                 </div>
+
+                {/* Phase М11 + М15 — special signals with "why I'm seeing this". */}
+                <SpecialSignals
+                  language={isRu ? "ru" : isEn ? "en" : "uk"}
+                  isDarkMoon={result.isDarkMoon}
+                  voidOfCourse={result.voidOfCourse}
+                  isOutOfBounds={result.isOutOfBounds}
+                  moonDeclination={result.moonDeclination}
+                  eclipseType={result.eclipseType}
+                  eclipseProximity={result.eclipseProximity}
+                  fixedStar={result.fixedStar}
+                  fixedStarOrb={result.fixedStarOrb}
+                />
 
                 {/* Lunar nodes + Lilith */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 text-left">
