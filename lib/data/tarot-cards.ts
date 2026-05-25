@@ -106,11 +106,68 @@ export function getZodiacSign(day: number, month: number): string {
   return "Pisces";
 }
 
+/**
+ * Cryptographically-secure card draw (Phase A overhaul).
+ *
+ * The previous implementation summed date+time components modulo 78, which
+ * is deterministic and biased — two users drawing in the same second got
+ * identical cards. Real tarot relies on the entropy of the shuffle itself,
+ * so we use `crypto.getRandomValues` (Web Crypto API, available in browsers
+ * and modern Node runtimes alike). Falls back to `Math.random` only if
+ * `crypto` is somehow unavailable, with a console warning.
+ *
+ * Optionally returns a `reversed` flag. When `withReversed` is true, each
+ * card has a 50% chance of being drawn upside-down — the second half of
+ * the RWS tradition we were missing.
+ */
+export interface PickedCard {
+  card: TarotCard;
+  reversed: boolean;
+}
+
+function secureRandomInt(maxExclusive: number): number {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    // Rejection sampling to avoid modulo bias.
+    const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
+    const buf = new Uint32Array(1);
+    let n: number;
+    do {
+      crypto.getRandomValues(buf);
+      n = buf[0];
+    } while (n >= limit);
+    return n % maxExclusive;
+  }
+  if (typeof console !== "undefined") {
+    console.warn("crypto.getRandomValues unavailable — falling back to Math.random");
+  }
+  return Math.floor(Math.random() * maxExclusive);
+}
+
+/** Backwards-compatible single-card pick (upright always). */
 export function pickCard(): TarotCard {
-  const now = new Date();
-  const idx = (now.getFullYear() + (now.getMonth() + 1) + now.getDate()
-             + now.getMinutes() + now.getSeconds()) % 78;
-  return TAROT_CARDS[idx];
+  return TAROT_CARDS[secureRandomInt(78)];
+}
+
+/**
+ * Draw a card with optional reversed orientation.
+ *
+ * @param withReversed when true (default), 50% chance the card is reversed.
+ */
+export function drawCard(withReversed: boolean = true): PickedCard {
+  return {
+    card: TAROT_CARDS[secureRandomInt(78)],
+    reversed: withReversed ? secureRandomInt(2) === 1 : false,
+  };
+}
+
+/** Cryptographic Fisher-Yates shuffle of the deck — returns ordered indices. */
+export function shuffleDeck(): number[] {
+  const deck = Array.from({ length: 78 }, (_, i) => i);
+  for (let i = 77; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
 }
 
 // ── Localised card names ──────────────────────────────────────────────────────

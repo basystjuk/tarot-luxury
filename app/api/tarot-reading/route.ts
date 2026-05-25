@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
+import { getMeaning } from "@/lib/data/tarot-meanings";
 
 export const maxDuration = 30;
 
@@ -36,12 +37,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { cardName, language, arcanaType, suitElement } = await req.json();
+  const {
+    cardName,
+    language,
+    arcanaType,
+    suitElement,
+    reversed = false,
+    userQuestion = "",
+  } = await req.json();
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "not_configured" }, { status: 500 });
   }
+
+  // ── Pull canonical RWS meaning ─────────────────────────────────────────────
+  // This is the authoritative anchor — AI contextualises it but cannot
+  // invent contradicting interpretations. Major upgrade vs. the previous
+  // "AI knows RWS" assumption.
+  const canon = getMeaning(cardName);
+  const orientation = reversed ? "reversed" : "upright";
+  const facet = canon?.[orientation] ?? null;
+
+  const canonicalCore        = facet?.core ?? "";
+  const canonicalPsychology  = facet?.psychology ?? "";
+  const canonicalAdvice      = facet?.advice ?? "";
+  const canonicalKeywords    = facet?.keywords.join(", ") ?? "";
 
   // Pre-render the arcana-context sentence in the response language. The
   // admin-editable template only sees the final string — it doesn't know
@@ -65,7 +86,13 @@ export async function POST(req: NextRequest) {
   const vars = {
     language_name: getLanguageName(language),
     cardName,
+    orientation,
     arcanaContext,
+    canonicalCore,
+    canonicalPsychology,
+    canonicalAdvice,
+    canonicalKeywords,
+    userQuestion: typeof userQuestion === "string" ? userQuestion.trim() : "",
   };
   const SYSTEM_PROMPT = renderTemplate(tpl.system, vars);
   const prompt = renderTemplate(tpl.user, vars);
@@ -83,7 +110,7 @@ export async function POST(req: NextRequest) {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: prompt },
         ],
-        max_tokens: 650,
+        max_tokens: 700,
         temperature: 0.85,
       }),
     });
