@@ -13,6 +13,7 @@ import {
 } from "./_components";
 import { t as ts, hint as tHint, letterMeaning, planeDominantNote, pinnacleMeaning, challengeMeaning } from "./_strings";
 import { track } from "@/lib/analytics/posthog";
+import { useProfile } from "@/hooks/useProfile";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -1244,10 +1245,41 @@ export default function NumerologyPage() {
   // patterns (which can shift when we restructure routes).
   useEffect(() => { track("tool_viewed", { tool: "numerology" }); }, []);
 
+  // Phase В: if signed in, pre-fill name + date from the cloud profile.
+  // The user can still edit before submitting — this is a soft autofill.
+  const { profile } = useProfile();
+
   const [form, setForm] = useState({
     lastName: "", firstName: "", middleName: "",
     day: "", month: "", year: "",
   });
+
+  const [autofilled, setAutofilled] = useState(false);
+  useEffect(() => {
+    if (autofilled || !profile) return;
+    // Only autofill empty form fields — never overwrite typed input.
+    setForm(f => {
+      const next = { ...f };
+      if (!f.firstName && !f.lastName && profile.full_name) {
+        const parts = profile.full_name.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          next.firstName = parts[0];
+          next.middleName = parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
+          next.lastName = parts[parts.length - 1];
+        } else if (parts.length === 1) {
+          next.firstName = parts[0];
+        }
+      }
+      if (!f.day && !f.month && !f.year && profile.birth_date) {
+        const [y, m, d] = profile.birth_date.split("-");
+        next.day = String(parseInt(d, 10));
+        next.month = String(parseInt(m, 10));
+        next.year = y;
+      }
+      return next;
+    });
+    setAutofilled(true);
+  }, [profile, autofilled]);
   // Assembled full name in the canonical order the calculators expect:
   // [firstName, middleName, lastName] — so Cornerstone/Capstone/FirstVowel
   // operate on the FIRST NAME (the first space-separated token).

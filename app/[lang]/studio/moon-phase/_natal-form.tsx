@@ -21,6 +21,7 @@ import {
   searchCity, coordsToIana, computeNatalMoonLon,
   loadNatal, saveNatal, clearNatal,
 } from "./_natal";
+import { useProfile, invalidateProfileCache } from "@/hooks/useProfile";
 
 interface Props {
   language: string;
@@ -87,6 +88,11 @@ const T = {
 export function NatalForm({ language, onSaved }: Props) {
   const t = T[language === "ru" ? "ru" : language === "en" ? "en" : "uk"];
 
+  // Phase В: when signed in, prefer the cloud profile over localStorage.
+  // The profile arrives async via useProfile(); we mirror it into the
+  // form state once on arrival (only if the user hasn't started editing).
+  const { profile } = useProfile();
+
   const existing = typeof window !== "undefined" ? loadNatal() : null;
 
   const [birthDate, setBirthDate] = useState(existing?.birthDate ?? "");
@@ -98,6 +104,28 @@ export function NatalForm({ language, onSaved }: Props) {
       : null
   );
   const [tz, setTz] = useState<string>(existing?.tz ?? "");
+  const [hydratedFromProfile, setHydratedFromProfile] = useState(false);
+
+  // One-shot hydration from profile when it lands (only if localStorage was empty).
+  useEffect(() => {
+    if (hydratedFromProfile) return;
+    if (!profile) return;
+    if (existing) { setHydratedFromProfile(true); return; }
+    if (profile.birth_date && profile.birth_time && profile.birth_place
+        && profile.birth_lat != null && profile.birth_lon != null && profile.birth_tz) {
+      setBirthDate(profile.birth_date);
+      setBirthTime(profile.birth_time.slice(0, 5));
+      setPlaceQuery(profile.birth_place);
+      setPicked({
+        label: profile.birth_place,
+        lat: profile.birth_lat,
+        lon: profile.birth_lon,
+        rawType: "profile",
+      });
+      setTz(profile.birth_tz);
+    }
+    setHydratedFromProfile(true);
+  }, [profile, existing, hydratedFromProfile]);
 
   const [suggestions, setSuggestions] = useState<GeoCandidate[]>([]);
   const [searching, setSearching] = useState(false);
@@ -164,7 +192,7 @@ export function NatalForm({ language, onSaved }: Props) {
 
   const canSave = Boolean(birthDate && birthTime && picked && tz);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave || !picked) return;
     setSaving(true);
     setError(null);
@@ -180,6 +208,24 @@ export function NatalForm({ language, onSaved }: Props) {
       };
       saveNatal(profile);
       onSaved(profile);
+      // Phase В: if signed in, mirror to the cloud profile so all tools
+      // share the same source-of-truth.
+      try {
+        await fetch("/api/account/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            birth_date: birthDate,
+            birth_time: birthTime,
+            birth_place: picked.label,
+            birth_lat: picked.lat,
+            birth_lon: picked.lon,
+            birth_tz: tz,
+            natal_moon_lon: natalMoonLon,
+          }),
+        });
+        invalidateProfileCache();
+      } catch { /* not signed in (401) or offline — non-fatal */ }
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 2400);
     } catch {

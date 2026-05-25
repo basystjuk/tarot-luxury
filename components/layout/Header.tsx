@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu, X, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from '@/hooks/useLanguage';
 import { useModal } from '@/contexts/ModalContext';
@@ -153,6 +153,19 @@ export default function Header() {
                 </React.Fragment>
               ))}
             </div>
+            {/* Account link — visible if Supabase is configured (env var
+                set in production). At build time the var is inlined so the
+                rendering decision happens client-side per the runtime value. */}
+            {process.env.NEXT_PUBLIC_SUPABASE_URL && (
+              <Link
+                href={`/${language}/account`}
+                aria-label={language === "ru" ? "Кабинет" : language === "en" ? "Account" : "Кабінет"}
+                title={language === "ru" ? "Кабинет" : language === "en" ? "Account" : "Кабінет"}
+                className="hidden sm:inline-flex p-2 text-[#5C4530] hover:text-[#B8883A] transition-colors"
+              >
+                <UserRound size={20} />
+              </Link>
+            )}
             <button
               onClick={() => openBooking()}
               className="hidden sm:inline-flex btn-primary text-sm px-6 py-3"
