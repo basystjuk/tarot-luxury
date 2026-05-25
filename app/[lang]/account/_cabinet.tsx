@@ -21,7 +21,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Mail, MapPin, Loader2, Check, X, LogOut, Send } from "lucide-react";
+import { Mail, MapPin, Loader2, Check, LogOut } from "lucide-react";
+import { TelegramSection } from "./_telegram-section";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -34,10 +35,6 @@ interface Props {
   email: string;
   lang: string;
 }
-
-// Ellen's Telegram channel — public, used for the "Subscribe" CTA.
-// If/when the handle changes, this is the only place to update.
-const ELLEN_CHANNEL_URL = "https://t.me/ellen_rouge";
 
 const T = {
   uk: {
@@ -149,7 +146,6 @@ export function CabinetClient({ initialProfile, email, lang: langProp }: Props) 
       : null,
   );
   const [tz, setTz]               = useState(initialProfile?.birth_tz ?? "");
-  const [telegram, setTelegram]   = useState(initialProfile?.telegram_username ?? "");
 
   // ── Autocomplete state ────────────────────────────────────────────────────
   const [suggestions, setSuggestions] = useState<GeoCandidate[]>([]);
@@ -230,7 +226,6 @@ export function CabinetClient({ initialProfile, email, lang: langProp }: Props) 
         birth_lon: picked?.lon ?? null,
         birth_tz: tz || null,
         natal_moon_lon: natalMoonLon,
-        telegram_username: telegram || null,
       };
 
       const res = await fetch("/api/account/profile", {
@@ -357,27 +352,14 @@ export function CabinetClient({ initialProfile, email, lang: langProp }: Props) 
               </div>
             </div>
 
-            {/* ── Telegram ── */}
-            <div className="card-luxury space-y-4">
-              <div>
-                <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase">{t.section_telegram}</p>
-                <p className="text-xs text-[#7A6A58] mt-1 leading-snug">{t.section_telegram_hint}</p>
-              </div>
-              <div>
-                <label className="block text-xs text-[#B8883A] tracking-widest uppercase mb-2">{t.telegram_label}</label>
-                <div className="relative">
-                  <Send size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C4A97A]" />
-                  <input type="text" value={telegram}
-                         onChange={e => setTelegram(e.target.value.replace(/^@/, "").trim())}
-                         placeholder={t.telegram_ph}
-                         className="input-luxury w-full pl-10" maxLength={64} />
-                </div>
-              </div>
-              <a href={ELLEN_CHANNEL_URL} target="_blank" rel="noopener noreferrer"
-                 className="inline-flex items-center gap-2 text-sm text-[#B8883A] hover:text-[#7A6A58]">
-                <Send size={14} /> {t.subscribe_cta} →
-              </a>
-            </div>
+            {/* ── Telegram & notifications (Phase Д) ──
+                Self-contained: fetches link state, prefs, channel sub. */}
+            <TelegramSection
+              language={language}
+              initialChatId={initialProfile?.telegram_chat_id ?? null}
+              initialUsername={initialProfile?.telegram_username ?? null}
+              initialSubscribed={initialProfile?.subscribed_to_channel ?? false}
+            />
 
             {/* ── Save bar ── */}
             <div className="flex items-center gap-3 flex-wrap">
