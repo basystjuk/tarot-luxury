@@ -5,12 +5,15 @@ import { ArrowRight, Sparkles, ChevronDown, Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
-import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
+import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, calcTrueNode, findNextLunarReturn, jdToDate, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
 import { MoonCalendar } from "./_calendar";
 import { findMoonStarConjunction, type FixedStar } from "./_fixed-stars";
+import { NatalForm } from "./_natal-form";
+import { loadNatal, type NatalProfile } from "./_natal";
+import { NatalCompareBlock, LunarReturnBlock } from "./_natal-display";
 
 type PhaseKey =
   | "new"
@@ -66,11 +69,13 @@ interface MoonData {
 
 // ── Astrology helpers ────────────────────────────────────────────────────────
 
+// True (apparent) North Lunar Node — Rahu. Replaces the old mean-node
+// formula (Phase #8). True node accuracy is ~1 arc-minute, which is
+// inside our eclipse tolerance window; mean node was ±1.5° off, which
+// triggered false-positive "near node" days. See `calcTrueNode` for
+// the periodic-correction series.
 function calcLunarNorthNode(jd: number): number {
-  // Mean Moon's ascending node — Rahu
-  const T = (jd - 2451545.0) / 36525.0;
-  const omega = 125.04452 - 1934.136261 * T + 0.0020708 * T * T + T * T * T / 450000;
-  return ((omega % 360) + 360) % 360;
+  return calcTrueNode(jd);
 }
 
 function calcLilithMean(jd: number): number {
@@ -595,11 +600,17 @@ export default function MoonPhasePage() {
   // Browser timezone offset in hours (Date.getTimezoneOffset returns minutes WEST of UTC)
   const tzHours = -today.getTimezoneOffset() / 60;
 
-  // Tool mode — Phase #2 ships only "today" and "event".
-  // "natal" is intentionally hidden until the natal-mode phase lands
-  // (see TODO(natal-mode) markers below).
-  type Mode = "today" | "event";
+  // Tool mode — Phase #3 added "natal" alongside "today" and "event".
+  // Natal data is persisted in localStorage; the natal tab is the place
+  // to enter/edit it. "Today" mode then surfaces the transit ↔ natal
+  // comparison + the next Lunar Return automatically when a profile exists.
+  type Mode = "today" | "event" | "natal";
   const [mode, setMode] = useState<Mode>("today");
+
+  // Persistent natal profile. Lazy-loaded on mount (avoids SSR mismatch),
+  // refreshed whenever NatalForm saves or clears it.
+  const [natalProfile, setNatalProfile] = useState<NatalProfile | null>(null);
+  useEffect(() => { setNatalProfile(loadNatal()); }, []);
 
   const [form, setForm] = useState({
     year:   today.getFullYear().toString(),
@@ -958,6 +969,8 @@ export default function MoonPhasePage() {
                     label: isRu ? "Сегодня" : isEn ? "Today" : "Сьогодні" },
                   { id: "event" as Mode, glyph: "📅",
                     label: isRu ? "Другая дата" : isEn ? "Other date" : "Інша дата" },
+                  { id: "natal" as Mode, glyph: natalProfile ? "★" : "☆",
+                    label: isRu ? "Натал" : isEn ? "Natal" : "Натал" },
                 ]).map(t => {
                   const active = mode === t.id;
                   return (
@@ -980,6 +993,13 @@ export default function MoonPhasePage() {
                 })}
               </div>
 
+              {mode === "natal" ? (
+                <NatalForm
+                  language={language}
+                  onSaved={(p) => setNatalProfile(p)}
+                />
+              ) : (
+              <>
               <h2
                 className="text-2xl text-[#1C1512] mb-2"
                 style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
@@ -1116,11 +1136,13 @@ export default function MoonPhasePage() {
                   <ArrowRight size={16} />
                 </button>
               </form>
+              </>
+              )}
             </div>
           </AnimatedSection>
 
           {/* ── Result ── */}
-          {result && (
+          {mode !== "natal" && result && (
             <AnimatedSection delay={0.1}>
               {/* Main moon card — scroll target for submit + calendar clicks */}
               <div ref={resultRef} className="card-luxury text-center mb-6">
@@ -1518,6 +1540,29 @@ export default function MoonPhasePage() {
                     />
                   )}
                 </div>
+              )}
+
+              {/* ── Natal-aware blocks (Phase #3 + #11) ──
+                  Only meaningful when "Today" is the active view AND a natal
+                  profile is saved. In "event" mode, the comparison would be
+                  for a date in the past/future relative to today, which is
+                  more confusing than useful — so we keep these blocks
+                  scoped to the live "today" reading. */}
+              {mode === "today" && natalProfile && (
+                <>
+                  <NatalCompareBlock
+                    language={language}
+                    transitMoonLon={result.moonSignIdx * 30 + result.moonDegree}
+                    transitSignIdx={result.moonSignIdx}
+                    natalProfile={natalProfile}
+                    signNames={signNames}
+                  />
+                  <LunarReturnBlock
+                    language={language}
+                    natalProfile={natalProfile}
+                    signNames={signNames}
+                  />
+                </>
               )}
 
               {/* ── AI personal message ── */}

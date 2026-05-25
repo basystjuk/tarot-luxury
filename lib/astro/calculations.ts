@@ -529,3 +529,95 @@ export function isDayChartByHour(hour: number): boolean {
   return hour >= 6 && hour < 18;
 }
 
+// ── True Lunar Node (Chapront-Touzé / Meeus Ch. 47) ───────────────────────
+//
+// The Moon's orbital plane crosses the ecliptic at two points — the nodes.
+// The **mean** node moves uniformly retrograde (~19° per year); the **true**
+// node is the mean node plus periodic perturbations from solar gravity,
+// reaching up to ~1.75° offset from mean. Astrologically the true node is
+// what eclipses and "Moon at the Node" events lock onto — using the mean
+// node introduces ~1° of slop, which is more than our eclipse tolerance.
+//
+// Formula from Jean Meeus, "Astronomical Algorithms" 2nd ed., Eq. 47.7,
+// using the standard lunar fundamental arguments. Accuracy: better than 1
+// arc-minute over the 1900–2100 range we care about. No external deps,
+// no GPL licensing.
+//
+// Returns: tropical ecliptic longitude in degrees, 0–360, of the **North**
+// (ascending) node. South node = (north + 180) % 360.
+
+/** True (apparent) North Lunar Node ecliptic longitude in degrees at jd. */
+export function calcTrueNode(jd: number): number {
+  const T = (jd - 2451545.0) / 36525.0;
+  const T2 = T * T;
+  const T3 = T2 * T;
+  const T4 = T3 * T;
+
+  // Mean longitude of the ascending node (Meeus Eq. 47.7)
+  const meanOmega =
+    125.0445479
+    - 1934.1362891 * T
+    + 0.0020754 * T2
+    + T3 / 467441
+    - T4 / 60616000;
+
+  // Lunar fundamental arguments (same as ELP2000 series)
+  const D  = 297.8501921 + 445267.1114034 * T - 0.0018819 * T2 + T3 / 545868 - T4 / 113065000;
+  const M  = 357.5291092 +  35999.0502909 * T - 0.0001536 * T2 + T3 / 24490000;
+  const Mp = 134.9633964 + 477198.8675055 * T + 0.0087414 * T2 + T3 / 69699   - T4 / 14712000;
+  const F  =  93.2720950 + 483202.0175233 * T - 0.0036539 * T2 - T3 / 3526000 + T4 / 863310000;
+
+  // Periodic corrections (Meeus Table 47.A "Periodic terms for nutation
+  // in longitude of the Moon's ascending node"). Coefficients in degrees.
+  const correction =
+    - 1.4979 * Math.sin(rad(2 * D - 2 * F))
+    - 0.1500 * Math.sin(rad(M))
+    - 0.1226 * Math.sin(rad(2 * D))
+    + 0.1176 * Math.sin(rad(2 * F))
+    - 0.0801 * Math.sin(rad(2 * Mp - 2 * F));
+
+  return norm360(meanOmega + correction);
+}
+
+// ── Lunar Return ──────────────────────────────────────────────────────────
+//
+// A Lunar Return is the moment the transiting Moon crosses the exact
+// ecliptic longitude it held at someone's birth. It happens roughly once
+// every 27.3 days (sidereal month) and is read as "your personal new
+// emotional month" — a 27-day forecast tailored to the natal Moon, not a
+// generic sun-sign horoscope.
+//
+// Algorithm: Newton-style iteration on the angular difference between the
+// current Moon and the natal Moon. Each iteration corrects by Δλ/speed.
+// Converges to ~1 second of arc in 3–4 iterations because the Moon's
+// motion is smooth on the day-timescale.
+
+/** Find the next time the Moon returns to natalMoonLon (in degrees) after fromJd. */
+export function findNextLunarReturn(natalMoonLon: number, fromJd: number): number {
+  let jd = fromJd;
+
+  // First-pass estimate: travel time at the Moon's mean motion (13.176°/day).
+  const lon0 = moonLongitudeFull(jd);
+  let diff = norm360(natalMoonLon - lon0);
+  // If we're already at or just past the natal point, push to the NEXT return.
+  if (diff < 0.5) diff += 360;
+  jd += diff / 13.176;
+
+  // Refine
+  for (let i = 0; i < 8; i++) {
+    const cur = moonLongitudeFull(jd);
+    let d = ((natalMoonLon - cur) % 360 + 360) % 360;
+    if (d > 180) d -= 360;
+    if (Math.abs(d) < 1 / 3600) break; // < 1 arc-second — done
+    const speed = calcMoonSpeed(jd);   // °/day, ~13
+    if (Math.abs(speed) < 0.1) break;  // safety
+    jd += d / speed;
+  }
+  return jd;
+}
+
+/** Convert a Julian Day to a JS Date (UTC). */
+export function jdToDate(jd: number): Date {
+  return new Date((jd - 2440587.5) * 86400_000);
+}
+
