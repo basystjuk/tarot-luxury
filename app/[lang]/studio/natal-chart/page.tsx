@@ -76,10 +76,10 @@ const ASPECT_COLOR: Record<AspectKey, string> = {
 
 const T = {
   uk: {
-    tag: "Натальна карта",
+    tag: "Астрологія",
     title: "Твоя натальна карта",
-    sub: "Повна карта народження з усіма планетами, домами Placidus та психологічним AI-портретом.",
-    section_input: "Дані народження",
+    sub: "Розрахуйте положення планет на момент вашого народження. Повна карта з домами Плацідус та психологічним AI-портретом.",
+    section_input: "Введіть дані народження",
     cabinet_filled: "Дані підтягнуті з кабінету",
     edit: "Редагувати",
     name: "Як до тебе звертатись",
@@ -93,7 +93,7 @@ const T = {
     compute: "Розрахувати карту",
     computing: "Розраховуємо…",
     section_wheel: "Чарт",
-    section_planets: "Планети + Дома (Placidus)",
+    section_planets: "Положення планет",
     section_aspects: "Натальні аспекти",
     section_portrait: "AI-портрет",
     portrait_cta: "Отримати психологічний портрет",
@@ -110,10 +110,10 @@ const T = {
     no_aspects: "У межах класичних орбіт натальних аспектів не знайдено.",
   },
   ru: {
-    tag: "Натальная карта",
+    tag: "Астрология",
     title: "Твоя натальная карта",
-    sub: "Полная карта рождения со всеми планетами, домами Placidus и психологическим AI-портретом.",
-    section_input: "Данные рождения",
+    sub: "Рассчитайте положение планет на момент вашего рождения. Полная карта с домами Плацидус и психологическим AI-портретом.",
+    section_input: "Введите данные рождения",
     cabinet_filled: "Данные подтянуты из кабинета",
     edit: "Редактировать",
     name: "Как к тебе обращаться",
@@ -127,7 +127,7 @@ const T = {
     compute: "Рассчитать карту",
     computing: "Рассчитываем…",
     section_wheel: "Чарт",
-    section_planets: "Планеты + Дома (Placidus)",
+    section_planets: "Положение планет",
     section_aspects: "Натальные аспекты",
     section_portrait: "AI-портрет",
     portrait_cta: "Получить психологический портрет",
@@ -144,10 +144,10 @@ const T = {
     no_aspects: "В пределах классических орбит натальных аспектов не найдено.",
   },
   en: {
-    tag: "Natal Chart",
+    tag: "Astrology",
     title: "Your natal chart",
-    sub: "A complete birth chart with all planets, Placidus houses and a psychological AI portrait.",
-    section_input: "Birth data",
+    sub: "Calculate the positions of the planets at the moment of your birth. A complete chart with Placidus houses and a psychological AI portrait.",
+    section_input: "Enter birth data",
     cabinet_filled: "Loaded from your account",
     edit: "Edit",
     name: "How should we address you",
@@ -161,7 +161,7 @@ const T = {
     compute: "Compute the chart",
     computing: "Computing…",
     section_wheel: "Chart",
-    section_planets: "Planets + Houses (Placidus)",
+    section_planets: "Planet Positions",
     section_aspects: "Natal aspects",
     section_portrait: "AI Portrait",
     portrait_cta: "Get the psychological portrait",
@@ -559,10 +559,10 @@ export default function NatalChartPage() {
                   better than 0.1° for Mercury-Saturn; Placidus proper). */}
               <p className="text-xs text-[#7A6A58] text-center max-w-2xl mx-auto leading-relaxed">
                 {lang === "ru"
-                  ? "Расчёты используют JPL J2000 элементы планет (точность ~0.1° для Меркурия-Сатурна, ~1° для Урана-Плутона) и алгоритм Placidus (Meeus). Для глубокого разбора обратись к Ellen."
+                  ? "Расчёты используют JPL J2000 элементы планет (точность ~0.1° для Меркурия-Сатурна, ~1° для Урана-Плутона) и алгоритм Плацидус (Meeus). Для глубокого разбора обратись к Ellen."
                   : lang === "en"
                   ? "Calculations use JPL J2000 planetary elements (~0.1° accuracy for Mercury-Saturn, ~1° for Uranus-Pluto) and the Placidus algorithm (Meeus). For a deep reading, book a session with Ellen."
-                  : "Розрахунки використовують JPL J2000 елементи планет (точність ~0.1° для Меркурія-Сатурна, ~1° для Урана-Плутона) і алгоритм Placidus (Meeus). Для глибокого розбору запиши консультацію з Ellen."}
+                  : "Розрахунки використовують JPL J2000 елементи планет (точність ~0.1° для Меркурія-Сатурна, ~1° для Урана-Плутона) і алгоритм Плацідус (Meeus). Для глибокого розбору запиши консультацію з Ellen."}
               </p>
             </>
           )}
@@ -678,12 +678,9 @@ function ChartWheel({ chart, lang, signNames }: {
         })()}
       </svg>
       <p className="text-[11px] text-[#9A8A78] italic text-center mt-2">
-        {lang === "ru" ? "Дома Placidus. AC слева, MC сверху."
+        {lang === "ru" ? "Дома Плацидус. AC слева, MC сверху."
           : lang === "en" ? "Placidus houses. AC on the left, MC on top."
-          : "Дома Placidus. AC ліворуч, MC згори."}
-      </p>
-      <p className="text-[10px] text-[#9A8A78] italic text-center">
-        {`Sign names: ${signNames.slice(0, 3).join(" · ")}…`}
+          : "Доми Плацідус. AC ліворуч, MC згори."}
       </p>
     </div>
   );
@@ -757,7 +754,7 @@ function HouseCusps({ cusps, lang }: { cusps: number[]; lang: "uk" | "ru" | "en"
   return (
     <div className="card-luxury">
       <h3 className="text-2xl text-[#1C1512] mb-5" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-        {lang === "ru" ? "Куспиды домов (Placidus)" : lang === "en" ? "House Cusps (Placidus)" : "Куспіди будинків (Placidus)"}
+        {lang === "ru" ? "Куспиды домов (Плацидус)" : lang === "en" ? "House Cusps (Placidus)" : "Куспіди будинків (Плацідус)"}
       </h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {cusps.map((cusp, i) => {
