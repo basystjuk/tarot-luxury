@@ -137,8 +137,23 @@ export function SpecialSignals(props: Props) {
   const hasAlert = signals.some(s => s.severity === "alert");
   const [open, setOpen] = useState(hasAlert);
 
+  // Quiet-day state: show the card with a calm "no signals" message
+  // so the user knows the feature IS here, just nothing fired today.
+  // Previously we returned null which made the block disappear entirely
+  // — confusing because the user couldn't tell if it was a bug or just
+  // a quiet day.
   if (signals.length === 0) {
-    return null; // empty state — don't even render the card on quiet days.
+    return (
+      <div className="mt-5 rounded-2xl bg-[rgba(122,170,108,0.08)] border border-[rgba(122,170,108,0.25)] px-4 py-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-lg">✓</span>
+          <span className="text-[#3F6A35] font-medium">{t.heading}</span>
+        </div>
+        <p className="text-xs text-[#5C4530] italic mt-1.5 pl-7 leading-relaxed">
+          {t.none}
+        </p>
+      </div>
+    );
   }
 
   return (
