@@ -13,7 +13,8 @@ export type ToolId =
   | "numerology"
   | "compatibility"
   | "moon-phase"
-  | "natal-chart";
+  | "natal-chart"
+  | "horoscope";
 
 export const ALL_TOOL_IDS: ToolId[] = [
   "daily-card",
@@ -21,6 +22,7 @@ export const ALL_TOOL_IDS: ToolId[] = [
   "compatibility",
   "moon-phase",
   "natal-chart",
+  "horoscope",
 ];
 
 /**
@@ -43,6 +45,9 @@ export const DEFAULT_TOOLS_ENABLED: Record<ToolId, boolean> = {
   compatibility: true,
   "moon-phase": true,
   "natal-chart": true,
+  // Phase H1 — personalised daily horoscope + Window of Luck.
+  // Deterministic core works for everyone; AI synthesis is auth-gated.
+  horoscope: true,
 };
 
 /** Human-readable labels for the admin toggles (uk/ru/en). */
@@ -52,6 +57,7 @@ export const TOOL_LABELS: Record<ToolId, { uk: string; ru: string; en: string }>
   compatibility:  { uk: "Карта сумісності",   ru: "Карта совместимости",  en: "Compatibility Map" },
   "moon-phase":   { uk: "Місячний провідник", ru: "Лунный проводник",     en: "Moon Guide" },
   "natal-chart":  { uk: "Натальна карта",     ru: "Натальная карта",      en: "Natal Chart" },
+  horoscope:      { uk: "Гороскоп дня",       ru: "Гороскоп дня",         en: "Daily Horoscope" },
 };
 
 export function isToolEnabled(

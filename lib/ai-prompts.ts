@@ -23,6 +23,7 @@ export type PromptToolId =
   | "numerology-synthesis"
   | "numerology-activation"
   | "natal-chart-portrait"
+  | "horoscope-portrait"
   | "moon-reading"
   | "moon-recommendations"
   | "compatibility-reading";
@@ -33,6 +34,7 @@ export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "numerology-synthesis",
   "numerology-activation",
   "natal-chart-portrait",
+  "horoscope-portrait",
   "moon-reading",
   "moon-recommendations",
   "compatibility-reading",
@@ -403,6 +405,66 @@ gifts — 3-4 sentences about natural gifts visible in the chart: helpful aspect
 work — 3-4 sentences about the growth edge: challenging aspects (squares, oppositions), tension points to integrate. End with one concrete suggestion for living this chart well.
 
 No greetings, no preamble, no headers in the text — let the three sections separated by "---" stand on their own.`,
+  },
+
+  "horoscope-portrait": {
+    label: "Гороскоп дня (синтез)",
+    description: "Поетичний персональний гороскоп, який синтезує сигнали астрології + нумерології + Місяця в один сфокусований нарис. Engine-comuted дані передаються в промт. 1 запит/добу/юзер. Тільки для зареєстрованих.",
+    variables: [
+      { name: "language_name", description: "Мова відповіді.", required: true },
+      { name: "name", description: "Імʼя людини (може бути порожнім).", required: false },
+      { name: "quality", description: "Якість дня: flowing / mixed / turbulent / quiet.", required: true },
+      { name: "theme", description: "Однорядкова тема дня з engine.", required: true },
+      { name: "topSignals", description: "Топ 3-5 конвергентних сигналів через перенос рядка.", required: true },
+      { name: "windowsOfLuck", description: "Перелік вікон удачі з годинами (або «—»).", required: false },
+      { name: "challenges", description: "Перелік зон тиску (або «—»).", required: false },
+      { name: "moonSign", description: "Знак Місяця сьогодні.", required: true },
+      { name: "moonPhase", description: "Фаза Місяця.", required: true },
+      { name: "personalDay", description: "Особистий день або «—».", required: false },
+    ],
+    defaultSystem: `You are a horoscope writer who refuses the standard sun-sign formula. You synthesise SIGNALS that have already converged — never invent astro/numerology facts that aren't in the input.
+
+Style rules:
+— Address the person by first name if given, naturally — not in every sentence.
+— Speak in concrete verbs and felt experience. Never "you might feel" — instead "do X" or "notice X".
+— Honour the quality bucket: flowing days lean forward, turbulent days counsel slowing, quiet days name the calm.
+— Reference the supplied signals; do not invent additional aspects, transits or numerology.
+— Mention Window of Luck and Challenge windows by their LITERAL time ranges from the input.
+— If the day is "quiet", say so honestly — don't manufacture drama.
+— No moralising. No "the universe is teaching you". Plain, warm, practical.
+
+${COMMON_LANG}
+
+Output structure: 3 sections separated by lines containing only three dashes "---".
+
+essence
+---
+windows
+---
+do
+`,
+    defaultUser: `Day input for {{name}}:
+- Quality: {{quality}}
+- Engine theme: {{theme}}
+- Moon: {{moonSign}}, phase {{moonPhase}}
+- Personal Day: {{personalDay}}
+
+Top convergent signals (don't add others):
+{{topSignals}}
+
+Windows of Luck (LITERAL times — reuse them):
+{{windowsOfLuck}}
+
+Challenge windows (LITERAL times — reuse them):
+{{challenges}}
+
+Write three sections in {{language_name}}, separated by lines containing only three dashes.
+
+essence — 3-4 sentences. The actual mood-shape of the day, anchored in the engine's signals (not invented). If quality is "quiet", say so plainly.
+---
+windows — 2-3 sentences naming the SPECIFIC time ranges. What to do during luck windows. What to retreat from during challenge windows. If the lists were "—", say "today doesn't have sharp time peaks — the energy is even".
+---
+do — 3 short verb-led lines, one per line, each ≤12 words. The most concrete actions for today.`,
   },
 
   "compatibility-reading": {
