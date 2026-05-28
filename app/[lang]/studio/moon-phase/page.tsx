@@ -17,6 +17,8 @@ import { NatalCompareBlock, LunarReturnBlock } from "./_natal-display";
 import { NatalChartBlock } from "./_natal-chart";
 import { SkyLivePreview } from "./_sky-live";
 import { SpecialSignals } from "./_special-signals";
+import { WeekAhead } from "./_week-ahead";
+import { LiminalMoments } from "./_liminal-moments";
 import type { ZodiacMode } from "@/lib/astro/natal-snapshot";
 import { useProfile } from "@/hooks/useProfile";
 import { track } from "@/lib/analytics/posthog";
@@ -1644,6 +1646,30 @@ export default function MoonPhasePage() {
                     onZodiacChange={setZodiac}
                   />
                 </>
+              )}
+
+              {/* Phase М13 — 7-day forecast grid. Available for everyone;
+                  natal data unlocks the per-day "top aspect" + Personal
+                  Day. Shows in Today mode only — in Event mode the date
+                  is fixed so a "week ahead" frame doesn't fit. */}
+              {mode === "today" && (
+                <WeekAhead
+                  language={isRu ? "ru" : isEn ? "en" : "uk"}
+                  signNames={signNames}
+                  profile={cloudProfile}
+                  natalMoonLon={natalProfile?.natalMoonLon ?? null}
+                />
+              )}
+
+              {/* Phase М16 — Liminal moments: next sign change, next New /
+                  Full Moon, and (if natal Moon known) the next Lunar
+                  Return. Sorted chronologically. */}
+              {mode === "today" && (
+                <LiminalMoments
+                  language={isRu ? "ru" : isEn ? "en" : "uk"}
+                  signNames={signNames}
+                  natalMoonLon={natalProfile?.natalMoonLon ?? null}
+                />
               )}
 
               {/* ── AI personal message ── */}
