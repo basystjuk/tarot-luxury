@@ -75,6 +75,19 @@ const T = {
     },
     no_natal_hint: "Збережи натальні дані у кабінеті — отримаєш персональні аспекти й вікна удачі.",
     cta_cabinet: "Заповнити натал →",
+    general_mode: "Загальний режим",
+    general_mode_note: "Без часу й місця народження показано лише загальну місячну погоду дня — однакову для всіх. Додай натал для персональних транзитів.",
+    why_support: "сприяють",
+    why_press: "тиснуть",
+    why: {
+      flowing:   "День потоковий, бо переважають підтримувальні аспекти",
+      mixed:     "День змішаний: підтримка й напруга врівноважені",
+      turbulent: "День турбулентний, бо переважають напружені аспекти",
+      quiet:     "День спокійний: активних аспектів сьогодні небагато",
+    } as Record<DayReading["quality"], string>,
+    astro_basis: "Астрологічна підоснова",
+    astro_basis_sub: "Конкретні транзити, на яких побудований день",
+    astro_basis_empty: "Без натальних даних аспекти до твоєї карти не рахуються — показано загальну місячну погоду. Заповни натал у кабінеті, щоб побачити персональні транзити (Місяць тригон твоя Венера тощо).",
     legend_signal: "Сигнал",
     legend_polarity: { supporting: "сприяє", challenging: "тисне", neutral: "нейтрально" },
     legend_system: { astro: "Астро", numerology: "Нумерологія", moon: "Місяць", tarot: "Tarot", "fixed-star": "Зірка" } as Record<SignalSystem, string>,
@@ -109,6 +122,19 @@ const T = {
     },
     no_natal_hint: "Сохрани натальные данные в кабинете — получишь персональные аспекты и окна удачи.",
     cta_cabinet: "Заполнить натал →",
+    general_mode: "Общий режим",
+    general_mode_note: "Без времени и места рождения показана только общая лунная погода дня — одинаковая для всех. Добавь натал для персональных транзитов.",
+    why_support: "поддерживают",
+    why_press: "давят",
+    why: {
+      flowing:   "День потоковый, потому что преобладают поддерживающие аспекты",
+      mixed:     "День смешанный: поддержка и напряжение уравновешены",
+      turbulent: "День турбулентный, потому что преобладают напряжённые аспекты",
+      quiet:     "День спокойный: активных аспектов сегодня немного",
+    } as Record<DayReading["quality"], string>,
+    astro_basis: "Астрологическая основа",
+    astro_basis_sub: "Конкретные транзиты, на которых построен день",
+    astro_basis_empty: "Без натальных данных аспекты к твоей карте не считаются — показана общая лунная погода. Заполни натал в кабинете, чтобы увидеть персональные транзиты (Луна тригон твоя Венера и т.д.).",
     legend_signal: "Сигнал",
     legend_polarity: { supporting: "поддерживает", challenging: "давит", neutral: "нейтрально" },
     legend_system: { astro: "Астро", numerology: "Нумерология", moon: "Луна", tarot: "Tarot", "fixed-star": "Звезда" } as Record<SignalSystem, string>,
@@ -143,6 +169,19 @@ const T = {
     },
     no_natal_hint: "Save your birth data in the cabinet — you'll get personal aspects + windows of luck.",
     cta_cabinet: "Fill in natal →",
+    general_mode: "General mode",
+    general_mode_note: "Without birth time and place, only the general lunar weather is shown — the same for everyone. Add your birth data for personal transits.",
+    why_support: "support",
+    why_press: "press",
+    why: {
+      flowing:   "A flowing day — supporting aspects dominate",
+      mixed:     "A mixed day: support and tension are balanced",
+      turbulent: "A turbulent day — tense aspects dominate",
+      quiet:     "A quiet day: few active aspects today",
+    } as Record<DayReading["quality"], string>,
+    astro_basis: "Astrological basis",
+    astro_basis_sub: "The concrete transits the day is built on",
+    astro_basis_empty: "Without birth data no aspects to your chart are computed — only the general lunar weather is shown. Fill in your natal in the cabinet to see personal transits (Moon trine your Venus, etc.).",
     legend_signal: "Signal",
     legend_polarity: { supporting: "supports", challenging: "presses", neutral: "neutral" },
     legend_system: { astro: "Astro", numerology: "Numerology", moon: "Moon", tarot: "Tarot", "fixed-star": "Star" } as Record<SignalSystem, string>,
@@ -167,6 +206,15 @@ function calcPersonalDay(birthDate: string, today: Date): number | null {
                    + reduce(String(cY).split("").reduce((a, c) => a + parseInt(c, 10), 0)));
   const pm = reduce(py + reduce(cM));
   return reduce(pm + reduce(cD));
+}
+
+function signalCounts(signals: ConvergenceSignal[]): { sup: number; chl: number } {
+  let sup = 0, chl = 0;
+  for (const s of signals) {
+    if (s.polarity === "supporting") sup++;
+    else if (s.polarity === "challenging") chl++;
+  }
+  return { sup, chl };
 }
 
 export default function HoroscopePage() {
@@ -283,6 +331,11 @@ export default function HoroscopePage() {
     quiet:     { bg: "rgba(196,169,122,0.08)", border: "rgba(196,169,122,0.25)", text: "#7A6A58" },
   }[reading.quality];
 
+  // Why the day is what it is + whether we're in personalised or general mode.
+  const { sup, chl } = signalCounts(reading.signals);
+  const hasAstroSignals = reading.signals.some(s => s.system === "astro");
+  const whyLine = `${t.why[reading.quality]} — ${sup} ${t.why_support} / ${chl} ${t.why_press}.`;
+
   return (
     <>
       <section className="pt-36 pb-12 bg-[#FDFBF7] relative overflow-hidden">
@@ -302,7 +355,7 @@ export default function HoroscopePage() {
       <GoldDivider />
 
       <section className="section-padding bg-[#FDFBF7]">
-        <div className="max-w-3xl mx-auto px-6 space-y-6">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-6 space-y-6">
           {/* ── Hero — quality-coloured theme ── */}
           <AnimatedSection>
             <div className="card-luxury" style={{ background: qualityColor.bg, borderColor: qualityColor.border }}>
@@ -310,13 +363,24 @@ export default function HoroscopePage() {
                 <span className="text-xs tracking-widest uppercase" style={{ color: qualityColor.text }}>
                   {todayLabel}
                 </span>
-                <span className="text-xs font-medium" style={{ color: qualityColor.text }}>
-                  {t.quality[reading.quality]}
-                </span>
+                <div className="flex items-center gap-2">
+                  {!hasAstroSignals && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(196,169,122,0.15)] text-[#7A6A58] border border-[rgba(196,169,122,0.3)] tracking-wide uppercase">
+                      {t.general_mode}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium" style={{ color: qualityColor.text }}>
+                    {t.quality[reading.quality]}
+                  </span>
+                </div>
               </div>
               <p className="text-xl text-[#1C1512] leading-relaxed"
                  style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
                 {reading.theme}
+              </p>
+              {/* Why this day — explain the quality from the signal balance */}
+              <p className="text-sm text-[#5C4530] leading-relaxed mt-2 italic">
+                {whyLine}
               </p>
               <div className="flex items-center gap-4 mt-4 text-sm text-[#5C4530] flex-wrap">
                 <span className="flex items-center gap-1.5">
@@ -375,6 +439,9 @@ export default function HoroscopePage() {
             emptyLabel={t.no_challenges}
             lang={lang}
           />
+
+          {/* ── Astrological basis (collapsible) — concrete transits ── */}
+          <AstroBasis signals={reading.signals} hasAstro={hasAstroSignals} t={t} />
 
           {/* ── Do / Avoid ── */}
           {(reading.doToday.length > 0 || reading.avoidToday.length > 0) && (
@@ -584,6 +651,56 @@ function WindowList({ title, windows, emptyLabel, polarity, lang }: {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function AstroBasis({ signals, hasAstro, t }: {
+  signals: ConvergenceSignal[];
+  hasAstro: boolean;
+  t: typeof T["uk"];
+}) {
+  const [open, setOpen] = useState(false);
+  const astro = signals.filter(s => s.system === "astro");
+  return (
+    <div className="card-luxury">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full gap-3 text-left"
+      >
+        <div>
+          <h3 className="text-xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+            {t.astro_basis}
+          </h3>
+          <p className="text-[11px] text-[#9A8A78] mt-0.5">{t.astro_basis_sub}</p>
+        </div>
+        <span className={`text-[#B8883A] transition-transform duration-200 inline-block shrink-0 ${open?"rotate-180":""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="mt-4">
+          {hasAstro && astro.length > 0 ? (
+            <ul className="space-y-2.5">
+              {astro.map((s, i) => {
+                const polColor = s.polarity === "supporting" ? "#3F6A35" : s.polarity === "challenging" ? "#7A3E18" : "#7A6A58";
+                return (
+                  <li key={i} className="p-3 rounded-xl border border-[rgba(196,169,122,0.15)] bg-[rgba(196,169,122,0.05)] flex items-start gap-3">
+                    <span className="text-base text-[#C4A97A] mt-0.5">♃</span>
+                    <div className="flex-1">
+                      <p className="text-sm text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
+                        {s.label}
+                      </p>
+                      <p className="text-[11px] text-[#7A6A58] italic mt-0.5">{s.reasoning}</p>
+                    </div>
+                    <span className="text-[10px]" style={{ color: polColor }}>{t.legend_polarity[s.polarity]}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-sm text-[#7A6A58] leading-relaxed italic">{t.astro_basis_empty}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
