@@ -6,6 +6,7 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { SIGNS_UA, SIGNS_EN, SIGN_GLYPHS, dateToJD, calcPlanetDeg } from "@/lib/astro/calculations";
+import { computeSynastry, type SynastryResult, type PlanetName, type AspectKind } from "@/lib/astro/synastry";
 
 // ── Zodiac data ───────────────────────────────────────────────────────────────
 const SIGNS_RU = [
@@ -199,6 +200,27 @@ const COMPAT_LABELS: Record<string, Record<CompatType, string>> = {
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+const PLANET_GLYPH: Record<PlanetName, string> = {
+  Sun: "☉", Moon: "☽", Mercury: "☿", Venus: "♀", Mars: "♂", Jupiter: "♃", Saturn: "♄",
+};
+const ASPECT_GLYPH: Record<AspectKind, string> = {
+  conjunction: "☌", sextile: "⚹", square: "□", trine: "△", opposition: "☍",
+};
+function planetName(p: PlanetName, lang: string): string {
+  const m: Record<PlanetName, [string, string, string]> = {
+    Sun: ["Сонце","Солнце","Sun"], Moon: ["Місяць","Луна","Moon"], Mercury: ["Меркурій","Меркурий","Mercury"],
+    Venus: ["Венера","Венера","Venus"], Mars: ["Марс","Марс","Mars"], Jupiter: ["Юпітер","Юпитер","Jupiter"], Saturn: ["Сатурн","Сатурн","Saturn"],
+  };
+  const v = m[p]; return lang === "ru" ? v[1] : lang === "en" ? v[2] : v[0];
+}
+function aspectName(k: AspectKind, lang: string): string {
+  const m: Record<AspectKind, [string, string, string]> = {
+    conjunction: ["з'єднання","соединение","conjunction"], sextile: ["секстиль","секстиль","sextile"],
+    square: ["квадрат","квадрат","square"], trine: ["тригон","тригон","trine"], opposition: ["опозиція","оппозиция","opposition"],
+  };
+  const v = m[k]; return lang === "ru" ? v[1] : lang === "en" ? v[2] : v[0];
+}
+
 function ScoreBar({ score }: { score: number }) {
   return (
     <div className="flex gap-1.5">
@@ -349,6 +371,8 @@ interface CompatResult {
   numScore: number;
   overallScore: number;
   overallPercent: number;
+  synastry: SynastryResult;
+  birthTimeExact: boolean;
   elemLabel: string;
   modalityLabel: string;
   modality1: string;
@@ -411,10 +435,6 @@ export default function CompatibilityPage() {
     const zodiacCompat = getZodiacCompat(zi1, zi2, relType);
     const numScore = getNumCompat(lp1, lp2);
     const elemScore = getElemScore(zi1, zi2);
-    const overallScore = Math.round((zodiacCompat.score + numScore + elemScore) / 3);
-    // Finer 0-100% from the raw average (not the rounded 1-5) — for the
-    // beginner-mode headline number.
-    const overallPercent = Math.round(((zodiacCompat.score + numScore + elemScore) / 3) / 5 * 100);
     const elemLabel = getElemLabel(zi1, zi2, language);
     const modalityLabel = getModalityLabel(zi1, zi2, language);
     const modalityNames = MODALITY_NAMES[language] ?? MODALITY_NAMES.uk;
@@ -439,6 +459,25 @@ export default function CompatibilityPage() {
     const venus2Lon = calcPlanetDeg(3, jd2);
     const mars1Lon  = calcPlanetDeg(4, jd1);
     const mars2Lon  = calcPlanetDeg(4, jd2);
+
+    // ── Full synastry: cross-aspect grid of all 7 planets ─────────────────
+    // Mercury/Jupiter/Saturn fill out the grid (Sun/Moon/Venus/Mars above).
+    // Without exact birth time the Moon is noon-based (less precise), but all
+    // other planets move slowly enough that the grid stays meaningful.
+    const planetsA: Partial<Record<PlanetName, number>> = {
+      Sun: sun1Lon, Moon: moon1Lon, Mercury: calcPlanetDeg(2, jd1),
+      Venus: venus1Lon, Mars: mars1Lon, Jupiter: calcPlanetDeg(5, jd1), Saturn: calcPlanetDeg(6, jd1),
+    };
+    const planetsB: Partial<Record<PlanetName, number>> = {
+      Sun: sun2Lon, Moon: moon2Lon, Mercury: calcPlanetDeg(2, jd2),
+      Venus: venus2Lon, Mars: mars2Lon, Jupiter: calcPlanetDeg(5, jd2), Saturn: calcPlanetDeg(6, jd2),
+    };
+    const synastry = computeSynastry(planetsA, planetsB);
+
+    // Overall blends the THREE meaningful dimensions: full synastry (astro
+    // depth — replaces the old crude Sun-sign score), numerology, elements.
+    const overallScore = Math.round((synastry.score1to5 + numScore + elemScore) / 3);
+    const overallPercent = Math.round((synastry.percent + (numScore / 5) * 100 + (elemScore / 5) * 100) / 3);
 
     const moonSignIdx1 = useExactTime ? signFromLon(moon1Lon) : null;
     const moonSignIdx2 = useExactTime ? signFromLon(moon2Lon) : null;
@@ -555,6 +594,7 @@ export default function CompatibilityPage() {
       destiny1:dest1, destiny2:dest2,
       soul1, soul2,
       zodiacCompat, elemScore, numScore, overallScore, overallPercent,
+      synastry, birthTimeExact: useExactTime,
       elemLabel, modalityLabel,
       modality1, modality2,
       birthDate1, birthDate2,
@@ -861,6 +901,29 @@ export default function CompatibilityPage() {
 
                   <div className="h-px bg-[rgba(196,169,122,0.15)]" />
 
+                  {/* Synastry — full cross-aspect grid score */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-xs text-[#C4A97A] tracking-widest uppercase mb-0.5">
+                          {t("Синастрія","Синастрия","Synastry")}
+                        </p>
+                        <p className="text-base text-[#1C1512]" style={{ fontFamily:"var(--font-cormorant)", fontWeight:500 }}>
+                          {result.synastry.harmoniousCount} {t("гармонійних","гармоничных","harmonious")} · {result.synastry.tenseCount} {t("напружених","напряжённых","tense")}
+                        </p>
+                      </div>
+                      <span className="text-xs text-[#9A8A78]">{result.synastry.percent}%</span>
+                    </div>
+                    <ScoreBar score={result.synastry.score1to5} />
+                    {!result.birthTimeExact && (
+                      <p className="text-[10px] text-[#C4A97A] italic mt-2">
+                        {t("Точніше з часом народження (Місяць).","Точнее со временем рождения (Луна).","More precise with birth time (Moon).")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="h-px bg-[rgba(196,169,122,0.15)]" />
+
                   {/* Elements */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -929,6 +992,49 @@ export default function CompatibilityPage() {
                       <strong className="text-[#7A6A58]">{term}</strong> — {def}
                     </p>
                   ))}
+                </div>
+
+                {/* Full synastry aspect grid */}
+                <div className="card-luxury space-y-3">
+                  <div>
+                    <p className="text-xs text-[#C4A97A] tracking-widest uppercase">
+                      {t("Синастрія · сітка аспектів","Синастрия · сетка аспектов","Synastry · aspect grid")}
+                    </p>
+                    <p className="text-[11px] text-[#9A8A78] mt-0.5">
+                      {t(
+                        "Усі мажорні аспекти між планетами двох карт. Зелені — гармонійні, теракотові — напружені.",
+                        "Все мажорные аспекты между планетами двух карт. Зелёные — гармоничные, терракотовые — напряжённые.",
+                        "All major aspects between the two charts' planets. Green = harmonious, terracotta = tense."
+                      )}
+                    </p>
+                  </div>
+                  {result.synastry.aspects.length === 0 ? (
+                    <p className="text-sm text-[#7A6A58] italic">
+                      {t("Тісних мажорних аспектів немає — зв'язок будується радше через стихії та числа.",
+                        "Тесных мажорных аспектов нет — связь строится скорее через стихии и числа.",
+                        "No tight major aspects — the bond leans on elements and numbers.")}
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {result.synastry.aspects.slice(0, 12).map((a, i) => {
+                        const color = a.polarity === "harmonious" ? "#3F6A35" : a.polarity === "tense" ? "#9A6E28" : "#7A6A58";
+                        const bg = a.polarity === "harmonious" ? "rgba(122,170,108,0.08)" : a.polarity === "tense" ? "rgba(154,110,40,0.08)" : "rgba(196,169,122,0.06)";
+                        return (
+                          <li key={i} className="flex items-center gap-2 p-2 rounded-lg text-sm" style={{ background: bg }}>
+                            <span className="text-[#B8883A]">{PLANET_GLYPH[a.a]}</span>
+                            <span className="text-[10px] text-[#9A8A78]">{p1.name.split(" ")[0]}</span>
+                            <span style={{ color }} className="font-medium">{ASPECT_GLYPH[a.kind]}</span>
+                            <span className="text-[#B8883A]">{PLANET_GLYPH[a.b]}</span>
+                            <span className="text-[10px] text-[#9A8A78]">{p2.name.split(" ")[0]}</span>
+                            <span className="text-xs text-[#5C4530] ml-1">
+                              {planetName(a.a, language)} {aspectName(a.kind, language)} {planetName(a.b, language)}
+                            </span>
+                            <span className="text-[10px] text-[#9A8A78] ml-auto tabular-nums">±{a.orb.toFixed(1)}°</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
 
                 {/* Venus / Mars / Moon row */}
