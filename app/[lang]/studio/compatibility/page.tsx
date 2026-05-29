@@ -348,6 +348,7 @@ interface CompatResult {
   elemScore: number;
   numScore: number;
   overallScore: number;
+  overallPercent: number;
   elemLabel: string;
   modalityLabel: string;
   modality1: string;
@@ -389,6 +390,8 @@ export default function CompatibilityPage() {
   const [aiError, setAiError] = useState(false);
   const [relType, setRelType] = useState<RelType>("romantic");
   const [showMethod, setShowMethod] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);  // beginner mode: advanced blocks collapsed by default
+  const [aiErrorMsg, setAiErrorMsg] = useState<string | null>(null);  // tailored 401/429 message
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -409,6 +412,9 @@ export default function CompatibilityPage() {
     const numScore = getNumCompat(lp1, lp2);
     const elemScore = getElemScore(zi1, zi2);
     const overallScore = Math.round((zodiacCompat.score + numScore + elemScore) / 3);
+    // Finer 0-100% from the raw average (not the rounded 1-5) — for the
+    // beginner-mode headline number.
+    const overallPercent = Math.round(((zodiacCompat.score + numScore + elemScore) / 3) / 5 * 100);
     const elemLabel = getElemLabel(zi1, zi2, language);
     const modalityLabel = getModalityLabel(zi1, zi2, language);
     const modalityNames = MODALITY_NAMES[language] ?? MODALITY_NAMES.uk;
@@ -548,7 +554,7 @@ export default function CompatibilityPage() {
       lifePath1:lp1, lifePath2:lp2,
       destiny1:dest1, destiny2:dest2,
       soul1, soul2,
-      zodiacCompat, elemScore, numScore, overallScore,
+      zodiacCompat, elemScore, numScore, overallScore, overallPercent,
       elemLabel, modalityLabel,
       modality1, modality2,
       birthDate1, birthDate2,
@@ -567,6 +573,7 @@ export default function CompatibilityPage() {
     if (!result) return;
     setLoadingAi(true);
     setAiError(false);
+    setAiErrorMsg(null);
     try {
       const lpKw = LP_KEYWORDS[language] ?? LP_KEYWORDS.uk;
       const dKw  = DEST_KEYWORDS[language] ?? DEST_KEYWORDS.uk;
@@ -606,6 +613,25 @@ export default function CompatibilityPage() {
           loShuPair: result.loShuPair,
         }),
       });
+      if (res.status === 401) {
+        setAiErrorMsg(t(
+          "Увійдіть, щоб отримати AI-аналіз пари. Безкоштовна оцінка сумісності вище — завжди доступна.",
+          "Войдите, чтобы получить AI-анализ пары. Бесплатная оценка совместимости выше — всегда доступна.",
+          "Sign in to get the AI couple analysis. The free compatibility score above is always available."
+        ));
+        setAiError(true);
+        return;
+      }
+      if (res.status === 429) {
+        const j = await res.json().catch(() => null);
+        setAiErrorMsg(j?.message ?? t(
+          "1 AI-аналіз пари на добу. Повертайся завтра ✨",
+          "1 AI-анализ пары в сутки. Возвращайся завтра ✨",
+          "1 AI couple analysis per day. Come back tomorrow ✨"
+        ));
+        setAiError(true);
+        return;
+      }
       const d = await res.json();
       if (d.analysis) setAnalysis(d.analysis);
       else setAiError(true);
@@ -614,6 +640,33 @@ export default function CompatibilityPage() {
     } finally {
       setLoadingAi(false);
     }
+  };
+
+  // Deterministic plain-language summary (no AI, instant) — 3 sentences keyed
+  // off the overall band + element + numerology, for beginner mode.
+  const simpleSummary = (r: CompatResult): string => {
+    const pct = r.overallPercent;
+    const n1 = p1.name.split(" ")[0] || t("Перший","Первый","First");
+    const n2 = p2.name.split(" ")[0] || t("Друга","Второй","Second");
+    const band = pct >= 80
+      ? t("дуже висока — вас тягне одне до одного природно","очень высокая — вас тянет друг к другу естественно","very high — you're naturally drawn to each other")
+      : pct >= 60
+      ? t("хороша — у вас міцна основа й приємна хімія","хорошая — у вас крепкая основа и приятная химия","good — you have a solid base and pleasant chemistry")
+      : pct >= 40
+      ? t("середня — є і притягання, і теми для роботи","средняя — есть и притяжение, и темы для работы","mixed — both attraction and things to work on")
+      : t("складна — союз можливий, але потребує усвідомленості","сложная — союз возможен, но требует осознанности","challenging — possible, but it asks for awareness");
+    const s1 = t(
+      `Загальна сумісність ${n1} і ${n2} — ${pct}%: ${band}.`,
+      `Общая совместимость ${n1} и ${n2} — ${pct}%: ${band}.`,
+      `Overall compatibility of ${n1} and ${n2} is ${pct}%: ${band}.`
+    );
+    const s2 = `${r.elemLabel} ${r.modalityLabel ? "· " + r.modalityLabel : ""}`.trim() + ".";
+    const s3 = r.numScore >= 4
+      ? t("Числа долі резонують — ви легко розумієте цілі одне одного.","Числа судьбы резонируют — вы легко понимаете цели друг друга.","Your destiny numbers resonate — you grasp each other's goals easily.")
+      : r.numScore >= 3
+      ? t("Нумерологія нейтральна — головне домовлятися про ритм життя.","Нумерология нейтральна — важно договариваться о ритме жизни.","Numerology is neutral — agree on a shared life rhythm.")
+      : t("Числа різні — це джерело росту, якщо поважати відмінності.","Числа разные — это источник роста, если уважать различия.","Different numbers — a source of growth if you respect the differences.");
+    return `${s1} ${s2} ${s3}`;
   };
 
   const scoreLabel = (s: number) => {
@@ -655,7 +708,7 @@ export default function CompatibilityPage() {
       <GoldDivider />
 
       <section className="section-padding bg-[#FDFBF7]">
-        <div className="max-w-2xl mx-auto px-6">
+        <div className="max-w-2xl lg:max-w-3xl mx-auto px-6">
           <AnimatedSection>
             <div className="card-luxury mb-8">
               {/* Relationship type tabs */}
@@ -762,15 +815,23 @@ export default function CompatibilityPage() {
 
                 {/* Scores */}
                 <div className="card-luxury space-y-5">
-                  {/* Overall */}
+                  {/* Overall — beginner-friendly headline: big % + plain summary */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-end justify-between mb-2">
                       <p className="text-sm text-[#7A6A58]">
                         {t("Загальна сумісність","Общая совместимость","Overall compatibility")}
                       </p>
-                      <span className="text-[#B8883A] font-medium text-sm">{scoreLabel(result.overallScore)}</span>
+                      <div className="text-right leading-none">
+                        <span className="text-3xl text-[#B8883A]" style={{ fontFamily:"var(--font-cormorant)", fontWeight:600 }}>
+                          {result.overallPercent}%
+                        </span>
+                        <span className="block text-[11px] text-[#9A8A78] mt-0.5">{scoreLabel(result.overallScore)}</span>
+                      </div>
                     </div>
                     <ScoreBar score={result.overallScore} />
+                    <p className="text-sm text-[#5C4530] leading-relaxed mt-3" style={{ fontFamily:"var(--font-cormorant)", fontSize:"1.05rem" }}>
+                      {simpleSummary(result)}
+                    </p>
                   </div>
 
                   <div className="h-px bg-[rgba(196,169,122,0.15)]" />
@@ -834,6 +895,40 @@ export default function CompatibilityPage() {
                     </div>
                     <ScoreBar score={result.numScore} />
                   </div>
+                </div>
+
+                {/* Beginner mode: advanced astrology collapsed by default */}
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-[rgba(196,169,122,0.3)] text-sm text-[#9A8A78] hover:text-[#B8883A] hover:border-[rgba(196,169,122,0.5)] transition-colors"
+                >
+                  <span style={{fontFamily:"var(--font-cormorant)"}}>
+                    {showDetails
+                      ? t("Сховати астрологічні деталі","Скрыть астрологические детали","Hide astrological details")
+                      : t("Показати астрологічні деталі","Показать астрологические детали","Show astrological details")}
+                  </span>
+                  <span className={`transition-transform duration-200 inline-block ${showDetails?"rotate-180":""}`}>▾</span>
+                </button>
+
+                {showDetails && (<>
+                {/* Glossary — plain explanations of the terms below */}
+                <div className="card-luxury bg-[rgba(196,169,122,0.04)] space-y-2.5">
+                  <p className="text-xs text-[#C4A97A] tracking-widest uppercase">
+                    {t("Що означають терміни","Что означают термины","What the terms mean")}
+                  </p>
+                  {[
+                    ["☽ " + t("Місяць","Луна","Moon"), t("як людина відчуває й чого потребує емоційно.","как человек чувствует и в чём нуждается эмоционально.","how a person feels and what they need emotionally.")],
+                    ["♀ " + t("Венера","Венера","Venus"), t("стиль любові: як проявляє ніжність і що цінує в стосунках.","стиль любви: как проявляет нежность и что ценит в отношениях.","love style: how they show affection and what they value.")],
+                    ["♂ " + t("Марс","Марс","Mars"), t("як людина діє, бажає й відстоює своє.","как человек действует, желает и отстаивает своё.","how a person acts, desires and asserts themselves.")],
+                    ["⊕ " + t("Композит","Композит","Composite"), t("карта пари як єдиної сутності — характер самих стосунків.","карта пары как единой сущности — характер самих отношений.","the chart of the pair as one entity — the character of the bond itself.")],
+                    ["✦ Soul Mate", t("особливі аспекти між картами, що дають відчуття «рідної душі».","особые аспекты между картами, дающие чувство «родной души».","special aspects that create a 'soulmate' resonance.")],
+                    ["♾ " + t("Карматичний матч","Кармический матч","Karmic match"), t("уроки й борги, які душі прийшли пройти разом.","уроки и долги, которые души пришли пройти вместе.","lessons and debts the souls came to work through together.")],
+                    ["▦ " + t("Ло Шу","Ло Шу","Lo Shu"), t("китайський квадрат пари: сильні й слабкі зони союзу за числами.","китайский квадрат пары: сильные и слабые зоны союза по числам.","the Chinese couple square: strong and weak zones by numbers.")],
+                  ].map(([term, def], i) => (
+                    <p key={i} className="text-xs text-[#5C4530] leading-relaxed">
+                      <strong className="text-[#7A6A58]">{term}</strong> — {def}
+                    </p>
+                  ))}
                 </div>
 
                 {/* Venus / Mars / Moon row */}
@@ -924,6 +1019,7 @@ export default function CompatibilityPage() {
                     <p className="text-sm text-[#5C4530] leading-relaxed">{result.loShuPair}</p>
                   </div>
                 </div>
+                </>)}
 
                 {/* AI analysis */}
                 <div className="card-luxury border-[rgba(212,168,83,0.3)]">
@@ -965,11 +1061,13 @@ export default function CompatibilityPage() {
                   {aiError && (
                     <div className="space-y-3">
                       <p className="text-sm text-[#9A8A78]">
-                        {t("Не вдалось отримати аналіз. Спробуйте ще раз.","Не удалось получить анализ. Попробуйте снова.","Could not get analysis. Please try again.")}
+                        {aiErrorMsg ?? t("Не вдалось отримати аналіз. Спробуйте ще раз.","Не удалось получить анализ. Попробуйте снова.","Could not get analysis. Please try again.")}
                       </p>
-                      <button onClick={handleAi} className="btn-outline text-sm px-4 py-2">
-                        {t("Повторити","Повторить","Retry")}
-                      </button>
+                      {!aiErrorMsg && (
+                        <button onClick={handleAi} className="btn-outline text-sm px-4 py-2">
+                          {t("Повторити","Повторить","Retry")}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
