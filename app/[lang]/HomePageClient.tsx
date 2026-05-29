@@ -86,6 +86,30 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       subtitle: "Луна · Астрология",
       desc: "Точная фаза, знак и градус Луны на любую дату. Тёмная Луна, Void of Course, узлы, Лилит — личное лунное послание.",
     },
+    {
+      href: `/${language}/studio/natal-chart`,
+      glyph: "✺",
+      accent: "from-[#9A6E28] to-[#5A3E18]",
+      title: "Натальная карта",
+      subtitle: "Астрология",
+      desc: "Полный астрологический портрет: планеты, дома, аспекты — ваш космический паспорт с колесом карты.",
+    },
+    {
+      href: `/${language}/studio/horoscope`,
+      glyph: "☉",
+      accent: "from-[#E8C98A] to-[#9A6E28]",
+      title: "Гороскоп дня",
+      subtitle: "Астрология + Нумерология",
+      desc: "Персональный гороскоп на сегодня: конвергенция транзитов, окна удачи с точностью до минуты.",
+    },
+    {
+      href: `/${language}/studio/year-forecast`,
+      glyph: "❂",
+      accent: "from-[#D4A853] to-[#9A6E28]",
+      title: "Прогноз года",
+      subtitle: "Соляр · Прогрессии",
+      desc: "Прогноз на год: соляр задаёт тему, прогрессивная Луна — вашу эмоциональную пору. С колесом солнечного возвращения.",
+    },
   ] : isEn ? [
     {
       href: `/${language}/studio/daily-card`,
@@ -119,6 +143,30 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       subtitle: "Moon · Astrology",
       desc: "The precise Moon phase, sign and degree for any date. Dark Moon, Void of Course, nodes, Lilith — a personal lunar message.",
     },
+    {
+      href: `/${language}/studio/natal-chart`,
+      glyph: "✺",
+      accent: "from-[#9A6E28] to-[#5A3E18]",
+      title: "Natal Chart",
+      subtitle: "Astrology",
+      desc: "A full astrological portrait: planets, houses, aspects — your cosmic passport with a chart wheel.",
+    },
+    {
+      href: `/${language}/studio/horoscope`,
+      glyph: "☉",
+      accent: "from-[#E8C98A] to-[#9A6E28]",
+      title: "Daily Horoscope",
+      subtitle: "Astrology + Numerology",
+      desc: "Your personal horoscope for today: transit convergence, windows of luck down to the minute.",
+    },
+    {
+      href: `/${language}/studio/year-forecast`,
+      glyph: "❂",
+      accent: "from-[#D4A853] to-[#9A6E28]",
+      title: "Year Forecast",
+      subtitle: "Solar Return · Progressions",
+      desc: "Your year ahead: the Solar Return sets the theme, the progressed Moon your emotional season. With a solar-return wheel.",
+    },
   ] : [
     {
       href: `/${language}/studio/daily-card`,
@@ -151,6 +199,30 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       title: "Місячний провідник",
       subtitle: "Місяць · Астрологія",
       desc: "Точна фаза, знак і градус Місяця на будь-яку дату. Темний Місяць, Void of Course, вузли, Ліліт — особисте місячне послання.",
+    },
+    {
+      href: `/${language}/studio/natal-chart`,
+      glyph: "✺",
+      accent: "from-[#9A6E28] to-[#5A3E18]",
+      title: "Натальна карта",
+      subtitle: "Астрологія",
+      desc: "Повний астрологічний портрет: планети, доми, аспекти — твій космічний паспорт з колесом карти.",
+    },
+    {
+      href: `/${language}/studio/horoscope`,
+      glyph: "☉",
+      accent: "from-[#E8C98A] to-[#9A6E28]",
+      title: "Гороскоп дня",
+      subtitle: "Астрологія + Нумерологія",
+      desc: "Персональний гороскоп на сьогодні: конвергенція транзитів, вікна удачі з точністю до хвилини.",
+    },
+    {
+      href: `/${language}/studio/year-forecast`,
+      glyph: "❂",
+      accent: "from-[#D4A853] to-[#9A6E28]",
+      title: "Прогноз року",
+      subtitle: "Соляр · Прогресії",
+      desc: "Прогноз на рік: соляр задає тему, прогресивний Місяць — твою емоційну пору. З колесом сонячного повернення.",
     },
   ];
 
