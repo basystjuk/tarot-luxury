@@ -26,7 +26,8 @@ export type PromptToolId =
   | "horoscope-portrait"
   | "moon-reading"
   | "moon-recommendations"
-  | "compatibility-reading";
+  | "compatibility-reading"
+  | "year-forecast-portrait";
 
 export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "tarot-reading",
@@ -38,6 +39,7 @@ export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "moon-reading",
   "moon-recommendations",
   "compatibility-reading",
+  "year-forecast-portrait",
 ];
 
 export interface PromptDefinition {
@@ -465,6 +467,58 @@ essence — 3-4 sentences. The actual mood-shape of the day, anchored in the eng
 windows — 2-3 sentences naming the SPECIFIC time ranges. What to do during luck windows. What to retreat from during challenge windows. If the lists were "—", say "today doesn't have sharp time peaks — the energy is even".
 ---
 do — 3 short verb-led lines, one per line, each ≤12 words. The most concrete actions for today.`,
+  },
+
+  "year-forecast-portrait": {
+    label: "Прогноз року (синтез)",
+    description: "Прогноз на рік: синтез Соляра (тема року, дім Сонця, Асцендент) + вторинних прогресій (прогрес-Місяць, прогрес-аспекти). Engine-computed дані передаються в промт. 1 запит/добу/юзер. Тільки для зареєстрованих.",
+    variables: [
+      { name: "language_name", description: "Мова відповіді.", required: true },
+      { name: "name", description: "Імʼя людини (може бути порожнім).", required: false },
+      { name: "age", description: "Поточний вік у роках.", required: true },
+      { name: "srAscSign", description: "Знак Асцендента соляра.", required: false },
+      { name: "srSunHouse", description: "Дім, у який потрапляє Сонце соляра (1-12).", required: false },
+      { name: "progSunSign", description: "Знак прогресивного Сонця.", required: true },
+      { name: "progMoonSign", description: "Знак прогресивного Місяця.", required: true },
+      { name: "progMoonChange", description: "Коли прогрес-Місяць змінить знак (або «—»).", required: false },
+      { name: "progAspects", description: "Прогресивні аспекти до натальної карти.", required: false },
+    ],
+    defaultSystem: `You are an astrologer specialising in PREDICTIVE work — Solar Returns and secondary progressions. You never recompute astrology; you interpret the engine-supplied points. You separate the year's outer theme (Solar Return) from the inner emotional season (progressed Moon).
+
+Style rules:
+— Address the person by first name if given, naturally.
+— Concrete and forward-looking: this is a forecast, name what the year is FOR.
+— The Solar Return Sun house = where the year's energy concentrates. The SR Ascendant = the year's overall posture.
+— The progressed Moon sign = the current emotional season (it changes ~every 2.5 years). Name its mood.
+— Reference only the supplied points; invent no extra transits.
+— Warm, practical, no fatalism, no "the universe is testing you".
+
+${COMMON_LANG}
+
+Output structure: 3 sections separated by lines containing only three dashes "---".
+
+theme
+---
+season
+---
+focus
+`,
+    defaultUser: `Forecast input for {{name}} (age {{age}}):
+- Solar Return Ascendant sign: {{srAscSign}}
+- Solar Return Sun house: {{srSunHouse}}
+- Progressed Sun sign: {{progSunSign}}
+- Progressed Moon sign (current emotional season): {{progMoonSign}}
+- Progressed Moon next sign change: {{progMoonChange}}
+- Progressed→natal aspects (don't add others):
+{{progAspects}}
+
+Write three sections in {{language_name}}, separated by lines containing only three dashes.
+
+theme — 3-4 sentences. The MAIN theme of this solar year, anchored in the SR Sun house and SR Ascendant. What is this year FOR.
+---
+season — 2-3 sentences on the current emotional season from the progressed Moon sign; if a sign change is coming, name what shifts and roughly when.
+---
+focus — 3 short verb-led lines, one per line, each ≤12 words — the year's most concrete priorities.`,
   },
 
   "compatibility-reading": {
