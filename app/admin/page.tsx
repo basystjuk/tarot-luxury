@@ -350,7 +350,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "prompts">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "prompts" | "notifications">("testimonials");
 
   // Gallery state
   interface GalleryItem { url: string; pathname: string; position?: "top" | "center" | "bottom"; }
@@ -863,7 +863,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "prompts"] as const).map((tab) => (
+          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "prompts", "notifications"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -884,7 +884,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : tab === "about" ? "👤 Про мене"
                 : tab === "studio" ? "🔮 Студія"
                 : tab === "access" ? "🎛 Доступ"
-                : "🧠 Промти"}
+                : tab === "prompts" ? "🧠 Промти"
+                : "🔔 Сповіщення"}
             </button>
           ))}
         </div>
@@ -1964,6 +1965,58 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           );
         })()}
+
+        {/* ── Notifications catalog Tab ── */}
+        {activeTab === "notifications" && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Сповіщення</h2>
+              <p className="text-white/40 text-sm">
+                Усі повідомлення в Telegram та Web Push, що шле крон щоранку о 06:00 (Київ).
+                Кожен тип користувач може вимкнути в кабінеті. Дублі захищені журналом <code className="text-[#C4A97A]">notification_log</code>.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                { icon: "🔮", title: "Карта дня",            key: "daily_card",         freq: "Щодня · 06:00",                 desc: "Персональна карта дня з коротким тлумаченням." },
+                { icon: "🃏", title: "Карта тижня",          key: "weekly_card",        freq: "Щопонеділка · 06:00",           desc: "Енергія та фокус на найближчий тиждень." },
+                { icon: "✨", title: "Гороскоп дня",         key: "daily_horoscope",    freq: "Лише у визначні дні",           desc: "Шлеться тільки коли день явно сприятливий (flowing) або турбулентний — щоб не спамити. Містить вікна удачі." },
+                { icon: "🌑", title: "Затемнення",           key: "eclipse",            freq: "У дні затемнень · ~4/рік",      desc: "Сонячне або місячне затемнення (Сонце-Місяць-Вузол). Потужні точки трансформації." },
+                { icon: "🌕", title: "Пік фази Місяця",      key: "moon_phase_peak",    freq: "Новолуння та повня · ~2/міс",   desc: "Пікові фази Місяця — час намірів (новолуння) і завершень (повня)." },
+                { icon: "🌙", title: "Місячне повернення",   key: "lunar_return",       freq: "~раз на місяць",                desc: "Місяць повертається до натального положення — особистий емоційний рестарт." },
+                { icon: "☀️", title: "Соляр (астро-ДН)",     key: "solar_return",       freq: "Раз на рік · день народження",  desc: "Сонце повертається до натального градуса — астрологічний день народження, старт нового циклу." },
+                { icon: "☿",  title: "Меркурій ретроградний", key: "mercury_retrograde", freq: "~3–4 рази/рік",                 desc: "Станції Меркурія (ретро / директ). Час перегляду, а не нових стартів у комунікації й угодах." },
+                { icon: "📢", title: "Новини Ellen",         key: "ellen_news",         freq: "Вручну",                        desc: "Анонси, акції, нові інструменти — розсилка за бажанням власника." },
+              ].map((n) => (
+                <div key={n.key} className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl leading-none">{n.icon}</span>
+                      <h3 className="text-[15px] text-white/90">{n.title}</h3>
+                    </div>
+                    <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-[rgba(212,168,83,0.12)] text-[#D4A853] border border-[rgba(212,168,83,0.25)] whitespace-nowrap">
+                      {n.freq}
+                    </span>
+                  </div>
+                  <p className="text-white/50 text-[13px] leading-relaxed mt-2">{n.desc}</p>
+                  <div className="flex items-center gap-2 mt-3 text-[11px] text-white/30">
+                    <span className="px-1.5 py-0.5 rounded bg-white/5">Telegram</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/5">Web Push</span>
+                    <code className="ml-auto text-white/25">{n.key}</code>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-white/30 text-xs leading-relaxed border-t border-white/10 pt-4">
+              Канал: усі типи йдуть одночасно в Telegram і Web Push (якщо користувач увімкнув push).
+              Налаштування каналів — у кабінеті користувача (<code className="text-[#C4A97A]">/account</code>).
+              Технічно крон визначає глобальні події (затемнення, фаза, станція Меркурія) один раз,
+              далі персоналізує під кожного підписника за натальними даними.
+            </p>
+          </div>
+        )}
 
       </div>
     </div>
