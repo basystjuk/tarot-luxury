@@ -888,6 +888,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : "🔔 Сповіщення"}
             </button>
           ))}
+          {/* Users panel lives on its own route (its own data fetching);
+              surface it as a tab-styled link so it's discoverable here. */}
+          <a
+            href="/admin/users"
+            className="px-5 py-3 text-sm border-b-2 border-transparent text-white/40 hover:text-[#D4A853] transition-colors whitespace-nowrap"
+          >
+            👥 Користувачі
+          </a>
         </div>
       </div>
 

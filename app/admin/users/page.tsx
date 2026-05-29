@@ -178,6 +178,26 @@ function AdminUsersContent() {
     }
   }, [q, offset, limit]);
 
+  // Ensure the preview cookie is set before the first load. Needed when the
+  // owner arrived here from the main /admin page (which sets sessionStorage
+  // auth but not necessarily the preview cookie the /api/admin/users/* routes
+  // require) — otherwise the list would 401 and look empty. Idempotent.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await fetch("/api/admin/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-password": ADMIN_PASSWORD },
+          body: JSON.stringify({ enabled: true }),
+        });
+      } catch { /* */ }
+      if (!cancelled) load();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => { load(); }, [load]);
 
   async function openDetail(id: string) {
