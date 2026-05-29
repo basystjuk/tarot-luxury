@@ -360,6 +360,24 @@ export function calcSubconsciousSelfSchool(name: string, school: NumerologySchoo
   return Math.max(1, range - (range - distinct)); // = distinct, but clamp
 }
 
+// ─── Karmic Lessons ─────────────────────────────────────────────────────────
+// The digit values (1..9, or 1..8 in Chaldean) that are ABSENT from the full
+// name. Each missing value is a "lesson" the soul came to learn. School-aware
+// so the answer matches the active letter map (and transliteration) instead of
+// the legacy merged Cyrillic+Latin table.
+
+export function calcKarmicLessonsSchool(name: string, school: NumerologySchool): number[] {
+  const canon = canonicaliseName(name, school);
+  const present = new Set<number>();
+  for (const ch of canon) {
+    const v = letterValue(ch, school);
+    if (v > 0) present.add(v);
+  }
+  const range = school === "chaldean" ? 8 : 9;
+  const all = Array.from({ length: range }, (_, i) => i + 1);
+  return all.filter((n) => !present.has(n));
+}
+
 // ─── Balance Number ─────────────────────────────────────────────────────────
 // Sum the initials of every name token, reduce to a single digit.
 // Used to describe how the person regains balance under stress.

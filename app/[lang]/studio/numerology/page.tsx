@@ -34,6 +34,7 @@ import {
   calcHiddenPassionSchool,
   calcSubconsciousSelfSchool,
   calcBalanceSchool,
+  calcKarmicLessonsSchool,
   calcBridges,
   type Pinnacle,
   type Challenge,
@@ -111,44 +112,15 @@ function writePortraitCache(key: string, value: { intro: string; portrait: strin
   } catch {}
 }
 
-// ── Letter values (Pythagorean, adapted) ─────────────────────────────────────
-// ь та ъ НЕ рахуються — вони не несуть звуку
-const LETTER_VALUES: Record<string, number> = {
-  // Ukrainian
-  а:1, б:2, в:3, г:4, ґ:5, д:6, е:7, є:8, ж:9,
-  з:1, и:2, і:3, ї:4, й:5, к:6, л:7, м:8, н:9,
-  о:1, п:2, р:3, с:4, т:5, у:6, ф:7, х:8, ц:9,
-  ч:1, ш:2, щ:3, ю:5, я:6,
-  // Russian extras
-  ё:7, ы:2, э:5,
-  // Latin
-  a:1, b:2, c:3, d:4, e:5, f:6, g:7, h:8, i:9,
-  j:1, k:2, l:3, m:4, n:5, o:6, p:7, q:8, r:9,
-  s:1, t:2, u:3, v:4, w:5, x:6, y:7, z:8,
-};
-
-const VOWELS = new Set([
-  "а","е","є","и","і","ї","о","у","ю","я","ё","ы","э",
-  "a","e","i","o","u",
-]);
-
 // ── Core calculations ─────────────────────────────────────────────────────────
+// NOTE: all NAME-based numbers (Destiny, Soul, Personality, Hidden Passion,
+// Balance, Karmic Lessons) route through @/lib/numerology/calculators, which is
+// school-aware (Slavic / Western / Chaldean) and never mixes Cyrillic with
+// Latin in one table. The date-based helpers below stay local.
 function reduceNum(n: number): number {
   if (n === 11 || n === 22 || n === 33) return n;
   if (n < 10) return n;
   return reduceNum(String(n).split("").reduce((a, d) => a + parseInt(d), 0));
-}
-
-function calcSoul(name: string): number {
-  const val = name.toLowerCase().split("").reduce((s, c) =>
-    VOWELS.has(c) && LETTER_VALUES[c] ? s + LETTER_VALUES[c] : s, 0);
-  return reduceNum(val || 0);
-}
-
-function calcPersonality(name: string): number {
-  const val = name.toLowerCase().split("").reduce((s, c) =>
-    !VOWELS.has(c) && LETTER_VALUES[c] ? s + LETTER_VALUES[c] : s, 0);
-  return reduceNum(val || 0);
 }
 
 function calcBirthday(day: number): number {
@@ -178,36 +150,8 @@ function calcLifePathEx(day: number, month: number, year: number): {num:number; 
   return { num: reduceNum(raw), karmic: findKarmic(raw) };
 }
 
-function calcDestinyEx(name: string): {num:number; karmic:number|null} {
-  const raw = name.toLowerCase().split("").reduce((s,c) => s + (LETTER_VALUES[c] ?? 0), 0);
-  return { num: reduceNum(raw), karmic: findKarmic(raw) };
-}
-
 function calcMaturity(lifePath: number, destiny: number): number {
   return reduceNum(lifePath + destiny);
-}
-
-function calcKarmicLessons(name: string): number[] {
-  const present = new Set<number>();
-  name.toLowerCase().split("").forEach(c => {
-    const v = LETTER_VALUES[c];
-    if (v) present.add(v);
-  });
-  return [1,2,3,4,5,6,7,8,9].filter(n => !present.has(n));
-}
-
-function calcHiddenPassion(name: string): number {
-  const counts: Record<number, number> = {};
-  name.toLowerCase().split("").forEach(c => {
-    const v = LETTER_VALUES[c];
-    if (v) counts[v] = (counts[v] || 0) + 1;
-  });
-  let maxCount = 0;
-  let maxNum = 1;
-  for (const [n, c] of Object.entries(counts)) {
-    if (c > maxCount) { maxCount = c; maxNum = parseInt(n); }
-  }
-  return maxNum;
 }
 
 const HIDDEN_PASSION_KEYWORDS: Record<string, Record<number, string>> = {
@@ -251,15 +195,6 @@ const HIDDEN_PASSION_MEANING: Record<string, Record<number, string>> = {
     9: "Born humanitarian: the gift of generosity, seeing the big picture, service.",
   },
 };
-
-function calcBalance(name: string): number {
-  const words = name.trim().split(/\s+/);
-  const sum = words.reduce((s, w) => {
-    const first = w[0]?.toLowerCase() ?? "";
-    return s + (LETTER_VALUES[first] ?? 0);
-  }, 0);
-  return reduceNum(sum || 1);
-}
 
 // ── Static meanings ───────────────────────────────────────────────────────────
 const DATA_UK: NumberData = {
@@ -1565,7 +1500,7 @@ export default function NumerologyPage() {
       birthday: calcBirthday(d),
       personalYear: calcPersonalYear(d, m),
       maturity: calcMaturity(lpEx.num, destEx.num),
-      karmicLessons: calcKarmicLessons(fullName),
+      karmicLessons: calcKarmicLessonsSchool(fullName, school),
       balance: balanceN,
       hiddenPassion: hpResult.numbers[0] ?? 1,
     });
