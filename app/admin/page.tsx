@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X, ChevronDown, ChevronUp, GripVertical, Users } from "lucide-react";
 import type { Testimonial } from "@/lib/data/testimonials";
 import {
   DEFAULT_SERVICES,
@@ -842,13 +842,22 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </span>
           )}
         </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm"
-        >
-          <LogOut size={16} />
-          Вийти
-        </button>
+        <div className="flex items-center gap-5">
+          <a
+            href="/admin/users"
+            className="flex items-center gap-2 text-[#C4A97A] hover:text-[#D4A853] transition-colors text-sm"
+          >
+            <Users size={16} />
+            Юзери
+          </a>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm"
+          >
+            <LogOut size={16} />
+            Вийти
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

@@ -33,6 +33,9 @@ interface NotifPrefs {
   lunar_return: boolean;
   moon_phase_peaks: boolean;
   ellen_news: boolean;
+  solar_return: boolean;
+  mercury_retrograde: boolean;
+  daily_horoscope: boolean;
 }
 
 const ELLEN_CHANNEL_URL = "https://t.me/ellen_rouge";
@@ -77,6 +80,12 @@ const T = {
     prefs_peaks_hint: "Кульмінаційні моменти циклу.",
     prefs_daily: "Карта дня",
     prefs_daily_hint: "Щоденне нагадування витягти карту.",
+    prefs_horoscope: "Гороскоп дня",
+    prefs_horoscope_hint: "Ранковий ping лише у виразні дні (потоковий / турбулентний).",
+    prefs_solar: "Соляне повернення",
+    prefs_solar_hint: "Твій астрологічний день народження раз на рік.",
+    prefs_mercury: "Меркурій ретроградний",
+    prefs_mercury_hint: "Коли Меркурій змінює напрям руху.",
     prefs_news: "Повідомлення від Ellen",
     prefs_news_hint: "Промо, новини, особисті розсилки (рідко).",
     prefs_saving: "Зберігаю…",
@@ -117,6 +126,12 @@ const T = {
     prefs_peaks_hint: "Кульминационные моменты цикла.",
     prefs_daily: "Карта дня",
     prefs_daily_hint: "Ежедневное напоминание вытянуть карту.",
+    prefs_horoscope: "Гороскоп дня",
+    prefs_horoscope_hint: "Утренний ping только в выразительные дни (потоковый / турбулентный).",
+    prefs_solar: "Солнечное возвращение",
+    prefs_solar_hint: "Твой астрологический день рождения раз в год.",
+    prefs_mercury: "Меркурий ретроградный",
+    prefs_mercury_hint: "Когда Меркурий меняет направление движения.",
     prefs_news: "Сообщения от Ellen",
     prefs_news_hint: "Промо, новости, личные рассылки (редко).",
     prefs_saving: "Сохраняю…",
@@ -157,6 +172,12 @@ const T = {
     prefs_peaks_hint: "The cycle's culmination moments.",
     prefs_daily: "Card of the Day",
     prefs_daily_hint: "Daily reminder to pull a card.",
+    prefs_horoscope: "Daily Horoscope",
+    prefs_horoscope_hint: "Morning ping only on standout days (flowing / turbulent).",
+    prefs_solar: "Solar Return",
+    prefs_solar_hint: "Your astrological birthday, once a year.",
+    prefs_mercury: "Mercury retrograde",
+    prefs_mercury_hint: "When Mercury changes direction.",
     prefs_news: "Messages from Ellen",
     prefs_news_hint: "Promos, news, personal broadcasts (rare).",
     prefs_saving: "Saving…",
@@ -261,6 +282,7 @@ export function TelegramSection({ language, initialChatId, initialUsername, init
           else setPrefs({
             daily_card: false, weekly_card: true, eclipse_alerts: true,
             lunar_return: true, moon_phase_peaks: false, ellen_news: true,
+            solar_return: true, mercury_retrograde: true, daily_horoscope: false,
           });
         }
       } catch { /* */ }
@@ -418,6 +440,15 @@ export function TelegramSection({ language, initialChatId, initialUsername, init
             <Toggle id="pref-daily" checked={prefs.daily_card}
                     onChange={() => togglePref("daily_card")}
                     label={t.prefs_daily} hint={t.prefs_daily_hint} />
+            <Toggle id="pref-horoscope" checked={!!prefs.daily_horoscope}
+                    onChange={() => togglePref("daily_horoscope")}
+                    label={t.prefs_horoscope} hint={t.prefs_horoscope_hint} />
+            <Toggle id="pref-solar" checked={prefs.solar_return !== false}
+                    onChange={() => togglePref("solar_return")}
+                    label={t.prefs_solar} hint={t.prefs_solar_hint} />
+            <Toggle id="pref-mercury" checked={prefs.mercury_retrograde !== false}
+                    onChange={() => togglePref("mercury_retrograde")}
+                    label={t.prefs_mercury} hint={t.prefs_mercury_hint} />
             <Toggle id="pref-news" checked={prefs.ellen_news}
                     onChange={() => togglePref("ellen_news")}
                     label={t.prefs_news} hint={t.prefs_news_hint} />

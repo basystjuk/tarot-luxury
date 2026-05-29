@@ -28,6 +28,9 @@ import {
   dateToJD, calcPlanetDeg, findNextLunarReturn, jdToDate,
   SIGNS_UA, SIGN_GLYPHS,
 } from "@/lib/astro/calculations";
+import { computeNatalSnapshot } from "@/lib/astro/natal-snapshot";
+import { buildDayReading, formatHM } from "@/lib/astro/horoscope";
+import { ianaToOffsetHours } from "@/app/[lang]/studio/moon-phase/_natal";
 
 export const maxDuration = 60; // up to a minute — many small Telegram calls
 
@@ -108,6 +111,59 @@ function findUpcomingPhasePeak(fromJd: number): { type: "new" | "full"; date: Da
   return null;
 }
 
+/**
+ * Detect a planetary "station" — the moment a planet's apparent motion
+ * changes direction (direct→retrograde or retrograde→direct) — within the
+ * next `hours`. We sample the geocentric longitude at 6-hour steps and
+ * watch for the daily-motion sign to flip. Returns the first flip found.
+ *
+ * Signed daily motion is estimated by central difference. A sign change
+ * between consecutive samples brackets a station.
+ */
+function findPlanetStation(
+  planetIdx: number, fromJd: number, hours: number,
+): { kind: "retrograde" | "direct"; date: Date; hoursAhead: number } | null {
+  const step = 6 / 24;                       // 6-hour sampling
+  const dh   = 0.5;                           // half-day for the derivative
+  function motion(jd: number): number {
+    let d = calcPlanetDeg(planetIdx, jd + dh) - calcPlanetDeg(planetIdx, jd - dh);
+    // Unwrap the 0/360 seam so a forward planet near 360→0 isn't read as huge negative.
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return d;
+  }
+  let prev = motion(fromJd);
+  for (let h = step * 24; h <= hours; h += step * 24) {
+    const jd = fromJd + h / 24;
+    const cur = motion(jd);
+    if (prev === 0) { prev = cur; continue; }
+    if ((prev > 0 && cur < 0) || (prev < 0 && cur > 0)) {
+      return {
+        kind: cur < 0 ? "retrograde" : "direct",
+        date: jdToDate(jd),
+        hoursAhead: Math.round(h),
+      };
+    }
+    prev = cur;
+  }
+  return null;
+}
+
+/** Is `birthDate` (YYYY-MM-DD) the user's birthday today, in Kyiv? */
+function isBirthdayKyiv(birthDate: string | null, now: Date): boolean {
+  if (!birthDate) return false;
+  const [, mo, d] = birthDate.split("-");
+  const todayMd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kiev", month: "2-digit", day: "2-digit",
+  }).format(now); // "MM-DD"
+  return todayMd === `${mo}-${d}`;
+}
+
+/** Kyiv local UTC-offset (hours) for a given instant — handles DST. */
+function kyivOffsetHours(now: Date): number {
+  return ianaToOffsetHours(now, "Europe/Kiev");
+}
+
 // ── Message templates ──────────────────────────────────────────────────────
 
 function fmtKyiv(d: Date): string {
@@ -149,6 +205,38 @@ function phasePeakMessage(p: { type: "new" | "full"; date: Date }, moonSignIdx: 
     `\n\n<a href="https://ellen-soul.com/uk/studio/moon-phase">Повне послання →</a>`;
 }
 
+function solarReturnMessage(name: string | null): string {
+  const greet = name ? `, ${name}` : "";
+  return `<b>☀️ Твоє Соляне повернення</b>\n\n` +
+    `З Днем народження${greet}! Сьогодні Сонце повертається у точку, де воно сяяло у мить твого народження — ` +
+    `починається твій новий особистий рік.\n\n` +
+    `Загадай напрям на 12 місяців уперед. ` +
+    `<a href="https://ellen-soul.com/uk/studio/natal-chart">Подивитись свою натальну карту →</a>`;
+}
+
+function mercuryRetroMessage(s: { kind: "retrograde" | "direct"; date: Date }): string {
+  if (s.kind === "retrograde") {
+    return `<b>☿℞ Меркурій ретроградний</b>\n\n` +
+      `З ${fmtKyiv(s.date)} Меркурій починає зворотний рух.\n\n` +
+      `Найближчі тижні — час перепродумати, передомовити, переробити, а не запускати нове. ` +
+      `Двічі перечитуй листи, зберігай бекапи, май запас часу в дорозі.`;
+  }
+  return `<b>☿ Меркурій прямий</b>\n\n` +
+    `З ${fmtKyiv(s.date)} Меркурій знову рухається вперед.\n\n` +
+    `Туман розсіюється — можна підписувати, запускати, рушати з місця те, що зависло.`;
+}
+
+function dailyHoroscopeMessage(name: string | null, theme: string, quality: string, topWindow: string | null): string {
+  const greet = name ? ` ${name}` : "";
+  const head = quality === "flowing" ? "🌿 Сьогодні — потоковий день"
+             : quality === "turbulent" ? "⚡ Сьогодні — турбулентний день"
+             : "✨ Гороскоп дня";
+  let body = `<b>${head}</b>\n\nДоброго ранку${greet}! ${theme}`;
+  if (topWindow) body += `\n\n🍀 Вікно удачі: <b>${topWindow}</b>`;
+  body += `\n\n<a href="https://ellen-soul.com/uk/studio/horoscope">Повний гороскоп на сьогодні →</a>`;
+  return body;
+}
+
 // ── Send + log ─────────────────────────────────────────────────────────────
 
 type ProfileRow = {
@@ -156,6 +244,12 @@ type ProfileRow = {
   telegram_chat_id: number | null;
   natal_moon_lon: number | null;
   display_name: string | null;
+  full_name: string | null;
+  birth_date: string | null;
+  birth_time: string | null;
+  birth_lat: number | null;
+  birth_lon: number | null;
+  birth_tz: string | null;
 };
 type PrefsRow = {
   user_id: string;
@@ -166,18 +260,28 @@ type PrefsRow = {
   moon_phase_peaks: boolean;
   ellen_news: boolean;
   daily_horoscope?: boolean;
+  solar_return?: boolean;
+  mercury_retrograde?: boolean;
   push_enabled?: boolean;
 };
+
+const PROFILE_COLS =
+  "id, telegram_chat_id, natal_moon_lon, display_name, full_name, birth_date, birth_time, birth_lat, birth_lon, birth_tz";
 
 // ── Web Push helpers ──────────────────────────────────────────────────────
 // Telegram messages use Telegram-flavoured HTML; the OS notification needs
 // a flat plain-text body. We re-derive the short form here per kind.
 
-function pushFor(kind: "eclipse" | "lunar_return" | "weekly_card" | "moon_phase_peak", opts: {
+function pushFor(kind: "eclipse" | "lunar_return" | "weekly_card" | "moon_phase_peak" | "solar_return" | "mercury_retrograde" | "daily_horoscope", opts: {
   eclipse?: EclipseFinding;
   lunarReturnDate?: Date;
   phase?: { type: "new" | "full"; date: Date };
   moonSignIdx?: number;
+  station?: { kind: "retrograde" | "direct"; date: Date };
+  name?: string | null;
+  theme?: string;
+  quality?: string;
+  topWindow?: string | null;
 }): PushPayload {
   switch (kind) {
     case "eclipse": {
@@ -214,7 +318,66 @@ function pushFor(kind: "eclipse" | "lunar_return" | "weekly_card" | "moon_phase_
         tag:   `phase-${p.type}-${p.date.toISOString().slice(0,10)}`,
       };
     }
+    case "solar_return":
+      return {
+        title: "☀️ Твоє Соляне повернення",
+        body:  `${opts.name ? opts.name + ", з" : "З"} Днем народження! Починається твій новий особистий рік.`,
+        url:   "/uk/studio/natal-chart",
+        tag:   "solar-return",
+      };
+    case "mercury_retrograde": {
+      const s = opts.station!;
+      return {
+        title: s.kind === "retrograde" ? "☿℞ Меркурій ретроградний" : "☿ Меркурій прямий",
+        body:  s.kind === "retrograde"
+          ? `З ${fmtKyiv(s.date)} — час передумати й переробити, а не запускати нове.`
+          : `З ${fmtKyiv(s.date)} — туман розсіюється, можна рушати застрягле.`,
+        url:   "/uk/studio/horoscope",
+        tag:   `mercury-${s.kind}-${s.date.toISOString().slice(0,10)}`,
+      };
+    }
+    case "daily_horoscope":
+      return {
+        title: opts.quality === "flowing" ? "🌿 Потоковий день"
+             : opts.quality === "turbulent" ? "⚡ Турбулентний день"
+             : "✨ Гороскоп дня",
+        body:  (opts.theme ?? "") + (opts.topWindow ? ` · 🍀 ${opts.topWindow}` : ""),
+        url:   "/uk/studio/horoscope",
+        tag:   "daily-horoscope",
+      };
   }
+}
+
+/**
+ * Build today's DayReading for a profile, if we have enough natal data.
+ * Prefers a full natal snapshot (birth time + place); falls back to just
+ * the stored natal Moon longitude so users who only gave a birth date
+ * still get the lunar weather.
+ */
+function readingForProfile(profile: ProfileRow, now: Date, tzOffset: number) {
+  const snap = computeNatalSnapshot({
+    birth_date: profile.birth_date ?? undefined,
+    birth_time: profile.birth_time ?? undefined,
+    birth_lat:  profile.birth_lat ?? undefined,
+    birth_lon:  profile.birth_lon ?? undefined,
+    birth_tz:   profile.birth_tz ?? undefined,
+  });
+  const natal = snap
+    ? { sun: snap.sun, moon: snap.moon, mercury: snap.mercury, venus: snap.venus,
+        mars: snap.mars, jupiter: snap.jupiter, saturn: snap.saturn, asc: snap.asc, mc: snap.mc }
+    : (profile.natal_moon_lon != null ? { moon: profile.natal_moon_lon } : undefined);
+  if (!natal) return null;
+
+  // Local midnight today (Kyiv) as the day anchor.
+  const midnight = new Date(now);
+  midnight.setUTCHours(0, 0, 0, 0);
+  return buildDayReading({
+    date: midnight,
+    tzOffsetHours: tzOffset,
+    language: "uk",
+    natal,
+    firstName: profile.display_name ?? undefined,
+  });
 }
 
 async function alreadySent(
@@ -258,7 +421,7 @@ export async function GET(req: NextRequest) {
   // browser push subscription. We over-fetch and filter per-user below.
   const { data: tgProfiles } = await admin
     .from("profiles")
-    .select("id, telegram_chat_id, natal_moon_lon, display_name")
+    .select(PROFILE_COLS)
     .not("telegram_chat_id", "is", null);
   const { data: pushedUsers } = await admin
     .from("push_subscriptions")
@@ -273,7 +436,7 @@ export async function GET(req: NextRequest) {
   if (pushOnlyIds.length > 0) {
     const { data: extra } = await admin
       .from("profiles")
-      .select("id, telegram_chat_id, natal_moon_lon, display_name")
+      .select(PROFILE_COLS)
       .in("id", pushOnlyIds);
     profiles = [...tgList, ...((extra as ProfileRow[] | null) ?? [])];
   }
@@ -300,6 +463,8 @@ export async function GET(req: NextRequest) {
   const eclipse = findUpcomingEclipse(nowJd);
   const phasePeak = findUpcomingPhasePeak(nowJd);
   const isMonday = isMondayKyiv(now);
+  const mercuryStation = findPlanetStation(2, nowJd, 36); // idx 2 = Mercury
+  const tzOffset = kyivOffsetHours(now);
 
   let sentCount = 0;
   let pushCount = 0;
@@ -382,6 +547,40 @@ export async function GET(req: NextRequest) {
           () => phasePeakMessage(phasePeak, signIdx),
           () => pushFor("moon_phase_peak", { phase: phasePeak, moonSignIdx: signIdx }),
           { type: phasePeak.type, signIdx });
+      }
+
+      // ── Solar Return (birthday) ──────────────────────────────────────
+      if (prefs.solar_return !== false && isBirthdayKyiv(profile.birth_date, now)) {
+        const year = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kiev", year: "numeric" }).format(now);
+        const key = `solar:${year}`;
+        await dispatch(profile.id, chatId, pushAllowed, "solar_return", key,
+          () => solarReturnMessage(profile.display_name),
+          () => pushFor("solar_return", { name: profile.display_name }),
+          { year });
+      }
+
+      // ── Mercury retrograde / direct station ──────────────────────────
+      if (mercuryStation && prefs.mercury_retrograde !== false) {
+        const key = `mercury_${mercuryStation.kind}:${mercuryStation.date.toISOString().slice(0, 10)}`;
+        await dispatch(profile.id, chatId, pushAllowed, "mercury_retrograde", key,
+          () => mercuryRetroMessage(mercuryStation),
+          () => pushFor("mercury_retrograde", { station: mercuryStation }),
+          { kind: mercuryStation.kind });
+      }
+
+      // ── Daily Horoscope (standout days only) ─────────────────────────
+      if (prefs.daily_horoscope !== false) {
+        const reading = readingForProfile(profile, now, tzOffset);
+        // Only ping when the day clearly stands out — never on ordinary days.
+        if (reading && (reading.quality === "flowing" || reading.quality === "turbulent")) {
+          const top = reading.windowsOfLuck[0];
+          const topWindow = top ? `${formatHM(top.startMinutes)}–${formatHM(top.endMinutes)}` : null;
+          const key = `horoscope:${reading.isoDate}`;
+          await dispatch(profile.id, chatId, pushAllowed, "daily_horoscope", key,
+            () => dailyHoroscopeMessage(profile.display_name, reading.theme, reading.quality, topWindow),
+            () => pushFor("daily_horoscope", { name: profile.display_name, theme: reading.theme, quality: reading.quality, topWindow }),
+            { quality: reading.quality });
+        }
       }
 
     } catch (e) {

@@ -16,11 +16,16 @@ type Prefs = {
   lunar_return?: boolean;
   moon_phase_peaks?: boolean;
   ellen_news?: boolean;
+  solar_return?: boolean;
+  mercury_retrograde?: boolean;
+  daily_horoscope?: boolean;
+  push_enabled?: boolean;
 };
 
 const KEYS = new Set<keyof Prefs>([
   "daily_card", "weekly_card", "eclipse_alerts", "lunar_return",
   "moon_phase_peaks", "ellen_news",
+  "solar_return", "mercury_retrograde", "daily_horoscope", "push_enabled",
 ]);
 
 export async function GET() {
