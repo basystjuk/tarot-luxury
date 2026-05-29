@@ -487,6 +487,6 @@ ${COMMON_LANG}`,
 
 {{relDirective}}
 
-Write a compatibility analysis in {{language_name}} (6–7 sentences). Show how their elements, modalities, numbers and (if present) Moons / Venuses / Marses interact. What strengthens the attraction, what creates tension, what is their strength as a pair. Address them directly. Give a unified portrait — do NOT list data back at the reader.`,
+Write a compatibility analysis in {{language_name}} (6–7 sentences). Show how their elements, modalities, numbers and (if present) Moons / Venuses / Marses interact. If concrete synastry aspects are given, ground your reasoning in them — name 1–2 of the strongest (e.g. a harmonious Venus contact that fuels attraction, or a tense Mars/Saturn contact that creates friction) rather than speaking in generalities. What strengthens the attraction, what creates tension, what is their strength as a pair. Address them directly. Give a unified portrait — do NOT list data back at the reader.`,
   },
 };

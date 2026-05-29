@@ -651,6 +651,10 @@ export default function CompatibilityPage() {
           soulMateAspects: result.soulMateAspects,
           karmicMatch: result.karmicMatchText,
           loShuPair: result.loShuPair,
+          synastryPercent: result.synastry.percent,
+          synastryAspects: result.synastry.aspects.slice(0, 8).map(a =>
+            `${planetName(a.a, language)} ${aspectName(a.kind, language)} ${planetName(a.b, language)} (±${a.orb.toFixed(1)}°, ${a.polarity})`
+          ).join("; "),
         }),
       });
       if (res.status === 401) {

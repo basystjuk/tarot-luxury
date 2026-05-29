@@ -43,6 +43,9 @@ interface CompatibilityRequest {
   karmicMatch?: string;
   // Lo Shu
   loShuPair?: string;
+  // Full synastry (cross-aspect grid)
+  synastryPercent?: number;
+  synastryAspects?: string;  // preformatted "Sun trine Moon (±2.3°, harmonious); ..."
 }
 
 /**
@@ -95,6 +98,14 @@ function buildPromptVars(d: CompatibilityRequest): { dataBlock: string; relDirec
   const loShuBlockRu = d.loShuPair ? `\nКитайская Ло Шу (квадрат пары): ${d.loShuPair}` : "";
   const loShuBlockEn = d.loShuPair ? `\nChinese Lo Shu (couple square): ${d.loShuPair}` : "";
 
+  // Full synastry: the concrete cross-aspect grid + harmony %. This is the
+  // richest astro input — naming specific aspects lets the model reason about
+  // exactly which contacts drive attraction vs tension.
+  const synLine = d.synastryAspects && d.synastryAspects.trim().length > 0;
+  const synastryBlockUk = synLine ? `\nСинастрія (гармонія ${d.synastryPercent ?? "?"}%) — головні аспекти між їхніми планетами: ${d.synastryAspects}` : "";
+  const synastryBlockRu = synLine ? `\nСинастрия (гармония ${d.synastryPercent ?? "?"}%) — главные аспекты между их планетами: ${d.synastryAspects}` : "";
+  const synastryBlockEn = synLine ? `\nSynastry (harmony ${d.synastryPercent ?? "?"}%) — main aspects between their planets: ${d.synastryAspects}` : "";
+
   // Rel-type specific directives
   const relDirectiveUk = d.relType === "romantic"
     ? "ОБОВ'ЯЗКОВО згадай динаміку Венери та Марса в термінах «вона дає — він приймає» або навпаки, хто ініціатор, хто магнетизує."
@@ -116,7 +127,7 @@ function buildPromptVars(d: CompatibilityRequest): { dataBlock: string; relDirec
     ? `${d.name1} (д.р. ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Жизненный путь ${d.lifePath1} (${d.lpKeyword1}), Душа ${d.soul1} (${d.soulKeyword1})
 ${d.name2} (д.р. ${d.birthDate2}): ${d.sign2} (${d.element2}, ${d.modality2}), Жизненный путь ${d.lifePath2} (${d.lpKeyword2}), Душа ${d.soul2} (${d.soulKeyword2})
 
-${destCompareRu}${moonBlockRu}${venusBlockRu}${marsBlockRu}${compositeBlockRu}${soulMateBlockRu}${karmicBlockRu}${loShuBlockRu}
+${destCompareRu}${moonBlockRu}${venusBlockRu}${marsBlockRu}${compositeBlockRu}${synastryBlockRu}${soulMateBlockRu}${karmicBlockRu}${loShuBlockRu}
 
 Астрологический аспект Солнц: ${d.zodiacAspect} (оценка ${d.zodiacScore}/5)
 Взаимодействие стихий: ${d.elemInteraction}
@@ -126,7 +137,7 @@ ${destCompareRu}${moonBlockRu}${venusBlockRu}${marsBlockRu}${compositeBlockRu}${
     ? `${d.name1} (born ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Life Path ${d.lifePath1} (${d.lpKeyword1}), Soul ${d.soul1} (${d.soulKeyword1})
 ${d.name2} (born ${d.birthDate2}): ${d.sign2} (${d.element2}, ${d.modality2}), Life Path ${d.lifePath2} (${d.lpKeyword2}), Soul ${d.soul2} (${d.soulKeyword2})
 
-${destCompareEn}${moonBlockEn}${venusBlockEn}${marsBlockEn}${compositeBlockEn}${soulMateBlockEn}${karmicBlockEn}${loShuBlockEn}
+${destCompareEn}${moonBlockEn}${venusBlockEn}${marsBlockEn}${compositeBlockEn}${synastryBlockEn}${soulMateBlockEn}${karmicBlockEn}${loShuBlockEn}
 
 Sun aspect: ${d.zodiacAspect} (score ${d.zodiacScore}/5)
 Elemental interaction: ${d.elemInteraction}
@@ -135,7 +146,7 @@ Type of connection: ${relTypeEn}`
     : `${d.name1} (н.д. ${d.birthDate1}): ${d.sign1} (${d.element1}, ${d.modality1}), Шлях ${d.lifePath1} (${d.lpKeyword1}), Душа ${d.soul1} (${d.soulKeyword1})
 ${d.name2} (н.д. ${d.birthDate2}): ${d.sign2} (${d.element2}, ${d.modality2}), Шлях ${d.lifePath2} (${d.lpKeyword2}), Душа ${d.soul2} (${d.soulKeyword2})
 
-${destCompareUk}${moonBlockUk}${venusBlockUk}${marsBlockUk}${compositeBlockUk}${soulMateBlockUk}${karmicBlockUk}${loShuBlockUk}
+${destCompareUk}${moonBlockUk}${venusBlockUk}${marsBlockUk}${compositeBlockUk}${synastryBlockUk}${soulMateBlockUk}${karmicBlockUk}${loShuBlockUk}
 
 Астрологічний аспект Сонць: ${d.zodiacAspect} (оцінка ${d.zodiacScore}/5)
 Взаємодія стихій: ${d.elemInteraction}
