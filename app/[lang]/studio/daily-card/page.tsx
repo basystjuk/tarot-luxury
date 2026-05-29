@@ -331,21 +331,27 @@ export default function DailyCardPage() {
 
   /** Per-history-entry download — used by HistoryView. */
   const handleHistoryDownload = useCallback(async (entry: HistoryEntry) => {
+    // Escape any value that flows into innerHTML below. The frame is appended
+    // to the DOM (for html2canvas), so an `<img onerror>` in a stored question
+    // or AI reading would otherwise execute. Self-only, but cheap to close.
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     // Render a temporary off-screen capture frame for the chosen entry.
     const card = TAROT_CARDS[entry.cardIndex];
     const frame = document.createElement("div");
     frame.style.cssText = "position:fixed; left:-9999px; top:0; width:480px; padding:32px; background:#FDFBF7; font-family:var(--font-cormorant), serif; color:#1C1512;";
     frame.innerHTML = `
       <div style="text-align:center">
-        <p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#C4A97A">${entry.day}</p>
-        <h2 style="font-size:28px;margin:8px 0 16px;color:#1C1512;font-weight:500">${getCardName(card, language)}${entry.reversed ? ` <span style='font-size:14px;color:#7A6A58;font-style:italic'>(${t("reversedTag")})</span>` : ""}</h2>
-        ${entry.question ? `<p style="font-style:italic;color:#7A6A58;font-size:14px;margin-bottom:12px">"${entry.question}"</p>` : ""}
+        <p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#C4A97A">${esc(entry.day)}</p>
+        <h2 style="font-size:28px;margin:8px 0 16px;color:#1C1512;font-weight:500">${esc(getCardName(card, language))}${entry.reversed ? ` <span style='font-size:14px;color:#7A6A58;font-style:italic'>(${esc(t("reversedTag"))})</span>` : ""}</h2>
+        ${entry.question ? `<p style="font-style:italic;color:#7A6A58;font-size:14px;margin-bottom:12px">"${esc(entry.question)}"</p>` : ""}
       </div>
       ${entry.reading ? `
         <div style="margin-top:16px;padding:16px;border:1px solid rgba(196,169,122,0.3);border-radius:12px;background:rgba(196,169,122,0.06)">
-          <p style="color:#5C4530;font-size:14px;line-height:1.6;font-family:system-ui,sans-serif">${entry.reading.meaning}</p>
-          ${entry.reading.advice ? `<p style="color:#5C4530;font-size:14px;line-height:1.6;margin-top:12px;font-family:system-ui,sans-serif">${entry.reading.advice}</p>` : ""}
-          ${entry.reading.affirmation ? `<p style="color:#B8883A;font-size:16px;line-height:1.6;margin-top:14px;font-style:italic">"${entry.reading.affirmation}"</p>` : ""}
+          <p style="color:#5C4530;font-size:14px;line-height:1.6;font-family:system-ui,sans-serif">${esc(entry.reading.meaning)}</p>
+          ${entry.reading.advice ? `<p style="color:#5C4530;font-size:14px;line-height:1.6;margin-top:12px;font-family:system-ui,sans-serif">${esc(entry.reading.advice)}</p>` : ""}
+          ${entry.reading.affirmation ? `<p style="color:#B8883A;font-size:16px;line-height:1.6;margin-top:14px;font-style:italic">"${esc(entry.reading.affirmation)}"</p>` : ""}
         </div>
       ` : ""}
       <p style="text-align:center;margin-top:18px;color:#C4A97A;font-size:10px;letter-spacing:0.2em;text-transform:uppercase">Ellen Soul · ellen-soul.com</p>
