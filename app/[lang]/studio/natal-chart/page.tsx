@@ -87,6 +87,8 @@ const T = {
     date: "Дата народження",
     time: "Час народження",
     time_hint: "Якщо точно не знаєш — постав 12:00 (ASC і будинки будуть приблизні).",
+    time_unknown: "Я не знаю час народження",
+    time_unknown_banner: "Час народження невідомий — карту розраховано на полудень (12:00). Положення Сонця, Місяця та планет за знаками точні, але Асцендент, MC і доми залежать від часу, тому приблизні й приховані.",
     place: "Місце народження",
     place_ph: "Почни вводити — Київ, Львів, …",
     tz: "Таймзона",
@@ -121,6 +123,8 @@ const T = {
     date: "Дата рождения",
     time: "Время рождения",
     time_hint: "Если точно не знаешь — поставь 12:00 (АСЦ и дома будут приблизительными).",
+    time_unknown: "Я не знаю время рождения",
+    time_unknown_banner: "Время рождения неизвестно — карта рассчитана на полдень (12:00). Положения Солнца, Луны и планет по знакам точны, но Асцендент, MC и дома зависят от времени, поэтому приблизительны и скрыты.",
     place: "Место рождения",
     place_ph: "Начни вводить — Киев, Львов, …",
     tz: "Таймзона",
@@ -155,6 +159,8 @@ const T = {
     date: "Birth date",
     time: "Birth time",
     time_hint: "If you don't know exactly — use 12:00 (ASC and houses will be approximate).",
+    time_unknown: "I don't know my birth time",
+    time_unknown_banner: "Birth time unknown — chart computed for noon (12:00). Sun, Moon and planet signs are accurate, but the Ascendant, MC and houses depend on time, so they're approximate and hidden.",
     place: "Birth place",
     place_ph: "Start typing — Kyiv, London, …",
     tz: "Timezone",
@@ -213,9 +219,12 @@ interface NatalChartData {
   mc: number;
   cusps: number[];
   jd: number;
+  /** False when the user didn't know their birth time (computed for noon).
+   *  ASC/MC/houses are then unreliable and hidden in the UI. */
+  timeKnown: boolean;
 }
 
-function computeChart(birthDate: string, birthTime: string, lat: number, lon: number, tz: string): NatalChartData | null {
+function computeChart(birthDate: string, birthTime: string, lat: number, lon: number, tz: string, timeKnown = true): NatalChartData | null {
   const [y, mo, d] = birthDate.split("-").map(n => parseInt(n, 10));
   const [h, mi] = birthTime.split(":").map(n => parseInt(n, 10));
   if (![y, mo, d, h, mi].every(Number.isFinite)) return null;
@@ -242,7 +251,7 @@ function computeChart(birthDate: string, birthTime: string, lat: number, lon: nu
   const mc  = calcMC(lst, e);
   const cusps = calcPlacidusHouses(lst, lat, e);
 
-  return { planets, asc, mc, cusps, jd };
+  return { planets, asc, mc, cusps, jd, timeKnown };
 }
 
 export default function NatalChartPage() {
@@ -256,6 +265,7 @@ export default function NatalChartPage() {
   const [name, setName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [birthTime, setBirthTime] = useState("12:00");
+  const [timeKnown, setTimeKnown] = useState(true);
   const [placeQuery, setPlaceQuery] = useState("");
   const [picked, setPicked] = useState<GeoCandidate | null>(null);
   const [tz, setTz] = useState("");
@@ -326,10 +336,12 @@ export default function NatalChartPage() {
   const [computing, setComputing] = useState(false);
 
   function handleCompute() {
-    if (!birthDate || !birthTime || !picked || !tz) return;
+    if (!birthDate || !picked || !tz) return;
+    const effectiveTime = timeKnown ? birthTime : "12:00";
+    if (!effectiveTime) return;
     setComputing(true);
     setTimeout(() => {
-      const c = computeChart(birthDate, birthTime, picked.lat, picked.lon, tz);
+      const c = computeChart(birthDate, effectiveTime, picked.lat, picked.lon, tz, timeKnown);
       setChart(c);
       setPortrait(null);
       setComputing(false);
@@ -362,8 +374,13 @@ export default function NatalChartPage() {
         houseCount[h] = houseCount[h] ?? [];
         houseCount[h].push(pkey);
       }
-      const stellia = Object.entries(houseCount).filter(([, ps]) => ps.length >= 3)
-        .map(([h, ps]) => `${h}: ${ps.join(", ")}`).join("; ") || "—";
+      // Houses (and thus stellia / ASC / MC) are only meaningful with a known
+      // birth time. Otherwise we omit them so the AI doesn't invent
+      // house-based claims on a noon-default chart.
+      const stellia = chart.timeKnown
+        ? (Object.entries(houseCount).filter(([, ps]) => ps.length >= 3)
+            .map(([h, ps]) => `${h}: ${ps.join(", ")}`).join("; ") || "—")
+        : "—";
 
       // Aspect summary
       const aspectList = detectNatalAspects(chart.planets);
@@ -379,8 +396,8 @@ export default function NatalChartPage() {
           name: name || "—",
           sunSign:  signNames[sunIdx],
           moonSign: signNames[moonIdx],
-          ascSign:  signNames[ascIdx],
-          mcSign:   signNames[mcIdx],
+          ascSign:  chart.timeKnown ? signNames[ascIdx] : "",
+          mcSign:   chart.timeKnown ? signNames[mcIdx] : "",
           venusSign: signNames[venusIdx],
           marsSign:  signNames[marsIdx],
           stelliums: stellia,
@@ -401,7 +418,7 @@ export default function NatalChartPage() {
   }
 
   // ── Derived display values ──────────────────────────────────────────────
-  const canCompute = Boolean(birthDate && birthTime && picked && tz);
+  const canCompute = Boolean(birthDate && (timeKnown ? birthTime : true) && picked && tz);
   const cabinetComplete = Boolean(profile?.birth_date && profile?.birth_time && profile?.birth_place
                                   && profile?.birth_lat != null && profile?.birth_lon != null && profile?.birth_tz);
 
@@ -427,7 +444,7 @@ export default function NatalChartPage() {
       <GoldDivider />
 
       <section className="section-padding bg-[#FDFBF7]">
-        <div className="max-w-3xl mx-auto px-6 space-y-6">
+        <div className="max-w-3xl lg:max-w-5xl mx-auto px-6 space-y-6">
           {/* ── Input form ── */}
           <AnimatedSection>
             <div className="card-luxury space-y-5">
@@ -469,10 +486,17 @@ export default function NatalChartPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-[#B8883A] tracking-widest uppercase mb-2">{t.time}</label>
-                      <input type="time" value={birthTime}
+                      <input type="time" value={timeKnown ? birthTime : "12:00"}
                              onChange={e => setBirthTime(e.target.value)}
-                             className="input-luxury w-full" />
-                      <p className="text-[11px] text-[#9A8A78] italic mt-1.5 leading-snug">{t.time_hint}</p>
+                             disabled={!timeKnown}
+                             className="input-luxury w-full disabled:opacity-50" />
+                      <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                        <input type="checkbox" checked={!timeKnown}
+                               onChange={e => setTimeKnown(!e.target.checked)}
+                               className="accent-[#B8883A]" />
+                        <span className="text-[12px] text-[#7A6A58]">{t.time_unknown}</span>
+                      </label>
+                      {timeKnown && <p className="text-[11px] text-[#9A8A78] italic mt-1.5 leading-snug">{t.time_hint}</p>}
                     </div>
                   </div>
                   <div ref={containerRef}>
@@ -523,6 +547,13 @@ export default function NatalChartPage() {
           {/* ── Chart result ── */}
           {chart && (
             <>
+              {/* No-birth-time fallback banner */}
+              {!chart.timeKnown && (
+                <div className="card-luxury bg-[rgba(212,168,83,0.10)] border-[rgba(212,168,83,0.35)]">
+                  <p className="text-sm text-[#7A3E18] leading-relaxed">🕛 {t.time_unknown_banner}</p>
+                </div>
+              )}
+
               {/* Wheel + Key Placements (side-by-side on desktop, stacked on mobile).
                   The Key Placements card surfaces the chart's "spine" (Sun/Moon/ASC/MC)
                   so a first-time visitor doesn't need to scan the full planet table to
@@ -539,7 +570,7 @@ export default function NatalChartPage() {
                   degrees (mirrors the prior tool's "Куспіди будинків (Плацідус)"
                   card). The planet table already shows the house each planet
                   occupies; this block shows the cusp LONGITUDES themselves. */}
-              <HouseCusps cusps={chart.cusps} lang={lang} />
+              {chart.timeKnown && <HouseCusps cusps={chart.cusps} lang={lang} />}
 
               {/* Aspects between natal planets */}
               <AspectsList aspects={aspects} lang={lang} />
@@ -579,12 +610,12 @@ function ChartWheel({ chart, lang, signNames }: {
   const cx = 200, cy = 200;
   const rOuter = 195, rSignInner = 165, rHouseInner = 145, rPlanet = 115;
 
-  // Astrology charts use the convention: 0° Aries at the LEFT (east horizon
-  // = Ascendant), increasing CCW. We map our longitudes so that the
-  // Ascendant always sits at the 9-o'clock (left) point of the wheel.
+  // Orientation reference: with a known birth time we put the Ascendant at the
+  // 9-o'clock (left) point, the classic chart convention. Without a time the
+  // ASC is meaningless, so we anchor 0° Aries at the left instead.
+  const ref = chart.timeKnown ? chart.asc : 0;
   function toXY(deg: number, r: number): { x: number; y: number } {
-    // Place ASC at 180° (left). Rotate by -asc + 180° in screen coords.
-    const adj = ((deg - chart.asc + 180) % 360 + 360) % 360;
+    const adj = ((deg - ref + 180) % 360 + 360) % 360;
     const rad = (adj * Math.PI) / 180;
     return { x: cx - r * Math.cos(rad), y: cy + r * Math.sin(rad) };
   }
@@ -606,7 +637,7 @@ function ChartWheel({ chart, lang, signNames }: {
           // The sign at this slot — depends on where ASC's sign starts.
           // signIdx at this position = (floor((adj + asc) / 30)) % 12
           const adj = deg;
-          const lonAtSlot = (chart.asc + adj) % 360;
+          const lonAtSlot = (ref + adj) % 360;
           const sIdx = Math.floor(((lonAtSlot % 360) + 360) % 360 / 30);
           return (
             <g key={`sign-${i}`}>
@@ -619,8 +650,8 @@ function ChartWheel({ chart, lang, signNames }: {
           );
         })}
 
-        {/* House cusps (Placidus) */}
-        {chart.cusps.map((cusp, i) => {
+        {/* House cusps (Placidus) — only when birth time is known */}
+        {chart.timeKnown && chart.cusps.map((cusp, i) => {
           const inner = toXY(cusp, 25);
           const outer = toXY(cusp, rHouseInner);
           // Special styling for 1st, 4th, 7th, 10th — the angular houses.
@@ -638,6 +669,24 @@ function ChartWheel({ chart, lang, signNames }: {
                 {i + 1}
               </text>
             </g>
+          );
+        })}
+
+        {/* Aspect lines — the chart's centrepiece. Harmonious aspects in
+            green/gold, tense in terracotta. Drawn under the planet markers. */}
+        {detectNatalAspects(chart.planets).map((asp, i) => {
+          const a = toXY(chart.planets[asp.a], rHouseInner);
+          const b = toXY(chart.planets[asp.b], rHouseInner);
+          const harmonious = asp.kind === "trine" || asp.kind === "sextile";
+          const tense = asp.kind === "square" || asp.kind === "opposition";
+          const color = harmonious ? "rgba(122,170,108,0.55)"
+            : tense ? "rgba(184,90,58,0.5)"
+            : "rgba(196,169,122,0.5)"; // conjunction = neutral gold
+          const dash = asp.kind === "sextile" ? "3 3" : "";
+          return (
+            <line key={`asp-${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  stroke={color} strokeWidth={harmonious || tense ? 0.9 : 0.7}
+                  strokeDasharray={dash} />
           );
         })}
 
@@ -663,8 +712,8 @@ function ChartWheel({ chart, lang, signNames }: {
           );
         })}
 
-        {/* ASC and MC labels */}
-        {(() => {
+        {/* ASC and MC labels — only when birth time is known */}
+        {chart.timeKnown && (() => {
           const ascPt = toXY(chart.asc, rOuter + 8);
           const mcPt  = toXY(chart.mc,  rOuter + 8);
           return (
@@ -678,9 +727,13 @@ function ChartWheel({ chart, lang, signNames }: {
         })()}
       </svg>
       <p className="text-[11px] text-[#9A8A78] italic text-center mt-2">
-        {lang === "ru" ? "Дома Плацидус. AC слева, MC сверху."
-          : lang === "en" ? "Placidus houses. AC on the left, MC on top."
-          : "Доми Плацідус. AC ліворуч, MC згори."}
+        {chart.timeKnown
+          ? (lang === "ru" ? "Дома Плацидус. AC слева, MC сверху."
+            : lang === "en" ? "Placidus houses. AC on the left, MC on top."
+            : "Доми Плацідус. AC ліворуч, MC згори.")
+          : (lang === "ru" ? "Без времени: 0° Овна слева, дома не показаны."
+            : lang === "en" ? "No time: 0° Aries on the left, houses hidden."
+            : "Без часу: 0° Овна ліворуч, доми не показані.")}
       </p>
     </div>
   );
@@ -710,7 +763,7 @@ function KeyPlacements({ chart, lang, signNames }: {
     { key: "MC",   lon: chart.mc,
       label: lang === "ru" ? "МС (Зенит)" : lang === "en" ? "MC (Midheaven)" : "МС (Зеніт)",
       meaningFn: meaningMc },
-  ];
+  ].filter(r => chart.timeKnown || (r.key !== "ASC" && r.key !== "MC"));
   return (
     <div className="card-luxury">
       <h3 className="text-2xl text-[#1C1512] mb-5" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>

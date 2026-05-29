@@ -1036,7 +1036,7 @@ export default function MoonPhasePage() {
       <GoldDivider />
 
       <section className="section-padding bg-[#FDFBF7]">
-        <div className="max-w-2xl mx-auto px-6">
+        <div className="max-w-2xl lg:max-w-3xl mx-auto px-6">
 
           {/* ── Mode tabs + date form ──
               Phase #2 of the Moon Guide overhaul: two explicit modes.
