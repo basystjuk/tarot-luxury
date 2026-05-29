@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
+import { isPreviewFromRequest } from "@/lib/preview";
+import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
 
 export const maxDuration = 30;
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+// Per-user, per-Kyiv-day quota (one synastry reading/day/user).
+const userMap = new Map<string, { day: string }>();
 
 interface CompatibilityRequest {
   language: "uk" | "ru" | "en";
@@ -142,6 +147,20 @@ ${destCompareUk}${moonBlockUk}${venusBlockUk}${marsBlockUk}${compositeBlockUk}${
 }
 
 export async function POST(req: NextRequest) {
+  if (!isPreviewFromRequest(req)) {
+    const gate = await requireAiAuth();
+    if (gate.deny) return gate.deny;
+    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+      return NextResponse.json(
+        { error: "rate_limit", message: "1 розбір сумісності на добу. Повертайся завтра ✨" },
+        { status: 429 }
+      );
+    }
+  }
+
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "not_configured" }, { status: 500 });
+
   try {
     const data = (await req.json()) as CompatibilityRequest;
 
@@ -161,7 +180,7 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
