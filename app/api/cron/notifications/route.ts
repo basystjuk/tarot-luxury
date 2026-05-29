@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendMessage, isTelegramConfigured } from "@/lib/telegram/bot";
+import { sendPushToUser, isPushConfigured, type PushPayload } from "@/lib/push/send";
 import {
   dateToJD, calcPlanetDeg, findNextLunarReturn, jdToDate,
   SIGNS_UA, SIGN_GLYPHS,
@@ -164,7 +165,57 @@ type PrefsRow = {
   lunar_return: boolean;
   moon_phase_peaks: boolean;
   ellen_news: boolean;
+  daily_horoscope?: boolean;
+  push_enabled?: boolean;
 };
+
+// ── Web Push helpers ──────────────────────────────────────────────────────
+// Telegram messages use Telegram-flavoured HTML; the OS notification needs
+// a flat plain-text body. We re-derive the short form here per kind.
+
+function pushFor(kind: "eclipse" | "lunar_return" | "weekly_card" | "moon_phase_peak", opts: {
+  eclipse?: EclipseFinding;
+  lunarReturnDate?: Date;
+  phase?: { type: "new" | "full"; date: Date };
+  moonSignIdx?: number;
+}): PushPayload {
+  switch (kind) {
+    case "eclipse": {
+      const e = opts.eclipse!;
+      const label = e.type === "solar" ? "Сонячне затемнення" : "Місячне затемнення";
+      return {
+        title: `🌒 ${label}`,
+        body:  `Через ${e.hoursAhead} год — ${fmtKyiv(e.date)}. День не для нових починань.`,
+        url:   "/uk/studio/moon-phase",
+        tag:   `eclipse-${e.date.toISOString().slice(0,10)}`,
+      };
+    }
+    case "lunar_return":
+      return {
+        title: "🌑 Місячне повернення",
+        body:  `Твій 27-денний цикл починається ${fmtKyiv(opts.lunarReturnDate!)}.`,
+        url:   "/uk/studio/moon-phase",
+        tag:   `lunar-${opts.lunarReturnDate!.toISOString().slice(0,10)}`,
+      };
+    case "weekly_card":
+      return {
+        title: "🃏 Карта тижня готова",
+        body:  "Понеділок — час витягти карту тижня.",
+        url:   "/uk/studio/daily-card",
+        tag:   "weekly-card",
+      };
+    case "moon_phase_peak": {
+      const p = opts.phase!;
+      const sign = `${SIGN_GLYPHS[opts.moonSignIdx!]} ${SIGNS_UA[opts.moonSignIdx!]}`;
+      return {
+        title: p.type === "new" ? "🌑 Новий Місяць" : "🌕 Повний Місяць",
+        body:  `${fmtKyiv(p.date)} — у знаку ${sign}.`,
+        url:   "/uk/studio/moon-phase",
+        tag:   `phase-${p.type}-${p.date.toISOString().slice(0,10)}`,
+      };
+    }
+  }
+}
 
 async function alreadySent(
   admin: ReturnType<typeof getSupabaseAdmin>,
@@ -195,22 +246,42 @@ export async function GET(req: NextRequest) {
   if (!isAuthorised(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!isTelegramConfigured()) {
-    return NextResponse.json({ skipped: "no_telegram_token" });
+  const telegramOn = isTelegramConfigured();
+  const pushOn     = isPushConfigured();
+  if (!telegramOn && !pushOn) {
+    return NextResponse.json({ skipped: "no_channels_configured" });
   }
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "no_supabase_admin" }, { status: 500 });
 
-  // Fetch all users with a linked Telegram chat + their prefs.
-  const { data: profiles } = await admin
+  // Users with any reachable channel — either Telegram or at least one
+  // browser push subscription. We over-fetch and filter per-user below.
+  const { data: tgProfiles } = await admin
     .from("profiles")
     .select("id, telegram_chat_id, natal_moon_lon, display_name")
     .not("telegram_chat_id", "is", null);
-  if (!profiles || profiles.length === 0) {
+  const { data: pushedUsers } = await admin
+    .from("push_subscriptions")
+    .select("user_id");
+  const pushUserIds = new Set((pushedUsers as { user_id: string }[] | null)?.map(p => p.user_id) ?? []);
+
+  // Merge: TG profiles + any user with push but without TG.
+  const tgList = (tgProfiles as ProfileRow[] | null) ?? [];
+  const tgIds = new Set(tgList.map(p => p.id));
+  const pushOnlyIds = [...pushUserIds].filter(id => !tgIds.has(id));
+  let profiles: ProfileRow[] = tgList;
+  if (pushOnlyIds.length > 0) {
+    const { data: extra } = await admin
+      .from("profiles")
+      .select("id, telegram_chat_id, natal_moon_lon, display_name")
+      .in("id", pushOnlyIds);
+    profiles = [...tgList, ...((extra as ProfileRow[] | null) ?? [])];
+  }
+  if (profiles.length === 0) {
     return NextResponse.json({ ok: true, sent: 0, eligible: 0 });
   }
 
-  const userIds = (profiles as ProfileRow[]).map(p => p.id);
+  const userIds = profiles.map(p => p.id);
   const { data: prefsRows } = await admin
     .from("notification_prefs")
     .select("*")
@@ -231,52 +302,71 @@ export async function GET(req: NextRequest) {
   const isMonday = isMondayKyiv(now);
 
   let sentCount = 0;
+  let pushCount = 0;
 
-  for (const profile of profiles as ProfileRow[]) {
-    if (!profile.telegram_chat_id) continue;
+  /**
+   * Per-kind dispatch: try Telegram (if linked + token configured),
+   * fall back / fan-out to web push (if subscribed + push configured).
+   * The notification_log is keyed by (user_id, kind, key) — one row
+   * across both channels — so we don't double-ping someone tomorrow.
+   * The `tag` on the push payload prevents duplicate-channel rendering
+   * within a single browser. */
+  async function dispatch(
+    userId: string, chatId: number | null, pushAllowed: boolean,
+    kind: string, key: string,
+    tg: () => string, push: () => PushPayload,
+    payloadMeta: unknown,
+  ): Promise<void> {
+    if (await alreadySent(admin, userId, kind, key)) return;
+    let anyOk = false;
+    if (telegramOn && chatId) {
+      const ok = await sendMessage(chatId, tg());
+      if (ok) { sentCount++; anyOk = true; }
+    }
+    if (pushOn && pushAllowed) {
+      const delivered = await sendPushToUser(userId, push());
+      if (delivered > 0) { pushCount += delivered; anyOk = true; }
+    }
+    if (anyOk) await logSent(admin, userId, kind, key, payloadMeta);
+  }
+
+  for (const profile of profiles) {
     const prefs = prefsMap.get(profile.id);
     if (!prefs) continue;
+    const pushAllowed = prefs.push_enabled !== false;
+    const chatId = profile.telegram_chat_id ?? null;
 
     try {
       // ── Eclipse alert ─────────────────────────────────────────────────
       if (eclipse && prefs.eclipse_alerts) {
         const key = `eclipse:${eclipse.date.toISOString().slice(0, 10)}`;
-        if (!(await alreadySent(admin, profile.id, "eclipse", key))) {
-          const ok = await sendMessage(profile.telegram_chat_id, eclipseMessage(eclipse));
-          if (ok) {
-            await logSent(admin, profile.id, "eclipse", key, { type: eclipse.type });
-            sentCount++;
-          }
-        }
+        await dispatch(profile.id, chatId, pushAllowed, "eclipse", key,
+          () => eclipseMessage(eclipse),
+          () => pushFor("eclipse", { eclipse }),
+          { type: eclipse.type });
       }
 
-      // ── Lunar Return (per-user, depends on natal Moon) ───────────────
+      // ── Lunar Return ─────────────────────────────────────────────────
       if (prefs.lunar_return && profile.natal_moon_lon != null) {
         const returnJd = findNextLunarReturn(profile.natal_moon_lon, nowJd);
         const hoursAhead = (returnJd - nowJd) * 24;
         if (hoursAhead >= 0 && hoursAhead <= 36) {
           const when = jdToDate(returnJd);
           const key = `lunar_return:${when.toISOString().slice(0, 10)}`;
-          if (!(await alreadySent(admin, profile.id, "lunar_return", key))) {
-            const ok = await sendMessage(profile.telegram_chat_id, lunarReturnMessage(when));
-            if (ok) {
-              await logSent(admin, profile.id, "lunar_return", key, { when: when.toISOString() });
-              sentCount++;
-            }
-          }
+          await dispatch(profile.id, chatId, pushAllowed, "lunar_return", key,
+            () => lunarReturnMessage(when),
+            () => pushFor("lunar_return", { lunarReturnDate: when }),
+            { when: when.toISOString() });
         }
       }
 
       // ── Weekly card (Mondays) ────────────────────────────────────────
       if (isMonday && prefs.weekly_card) {
         const key = `weekly:${now.toISOString().slice(0, 10)}`;
-        if (!(await alreadySent(admin, profile.id, "weekly_card", key))) {
-          const ok = await sendMessage(profile.telegram_chat_id, weeklyCardMessage());
-          if (ok) {
-            await logSent(admin, profile.id, "weekly_card", key, {});
-            sentCount++;
-          }
-        }
+        await dispatch(profile.id, chatId, pushAllowed, "weekly_card", key,
+          () => weeklyCardMessage(),
+          () => pushFor("weekly_card", {}),
+          {});
       }
 
       // ── New / Full Moon peaks ────────────────────────────────────────
@@ -288,16 +378,13 @@ export async function GET(req: NextRequest) {
         ));
         const signIdx = Math.floor(((moonLonAt % 360) + 360) % 360 / 30);
         const key = `phase_${phasePeak.type}:${phasePeak.date.toISOString().slice(0, 10)}`;
-        if (!(await alreadySent(admin, profile.id, "moon_phase_peak", key))) {
-          const ok = await sendMessage(profile.telegram_chat_id, phasePeakMessage(phasePeak, signIdx));
-          if (ok) {
-            await logSent(admin, profile.id, "moon_phase_peak", key, { type: phasePeak.type, signIdx });
-            sentCount++;
-          }
-        }
+        await dispatch(profile.id, chatId, pushAllowed, "moon_phase_peak", key,
+          () => phasePeakMessage(phasePeak, signIdx),
+          () => pushFor("moon_phase_peak", { phase: phasePeak, moonSignIdx: signIdx }),
+          { type: phasePeak.type, signIdx });
       }
+
     } catch (e) {
-      // Per-user errors must not abort the batch.
       console.error("cron user error", profile.id, e);
     }
   }
@@ -305,7 +392,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     eligible: profiles.length,
-    sent: sentCount,
+    sent_telegram: sentCount,
+    sent_push: pushCount,
     eclipse_today: !!eclipse,
     phase_peak_today: !!phasePeak,
     is_monday: isMonday,

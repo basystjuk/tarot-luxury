@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Mail, MapPin, Loader2, Check, LogOut } from "lucide-react";
 import { TelegramSection } from "./_telegram-section";
+import { PushSection } from "./_push-section";
 import { MigrationModal } from "./_migration-modal";
 import { useRouter } from "next/navigation";
 import AnimatedSection from "@/components/ui/AnimatedSection";
@@ -366,6 +367,9 @@ export function CabinetClient({ initialProfile, email, lang: langProp }: Props) 
               initialUsername={initialProfile?.telegram_username ?? null}
               initialSubscribed={initialProfile?.subscribed_to_channel ?? false}
             />
+
+            {/* ── Browser push (Phase M12) — independent of Telegram ── */}
+            <PushSection language={language} />
 
             {/* ── Save bar ── */}
             <div className="flex items-center gap-3 flex-wrap">
