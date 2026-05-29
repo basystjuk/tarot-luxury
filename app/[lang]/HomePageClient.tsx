@@ -8,6 +8,7 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { TodayWidget } from "./_today-widget";
+import ToolsCarousel from "@/components/home/ToolsCarousel";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useLanguage } from '@/hooks/useLanguage';
 import { isToolEnabled, type ToolId } from "@/lib/tools-config";
@@ -398,45 +399,13 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
             </p>
           </AnimatedSection>
 
-          {/* Horizontal carousel on every breakpoint — 4 cards visible on
-              desktop with a sliver of the next as a scroll affordance. */}
-          <div className="-mx-6 lg:mx-0">
-            <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory px-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {studioTools
-                .filter((tool) => {
-                  const id = tool.href.split('/').pop() as ToolId;
-                  return previewMode || isToolEnabled(id, toolsEnabled);
-                })
-                .map((tool, i) => (
-                <AnimatedSection key={tool.href} delay={i * 0.1} className="snap-start flex-shrink-0 w-[78vw] sm:w-[44vw] lg:w-[calc(25%-1rem)]">
-                  <Link href={tool.href} className="group block h-full">
-                    <div className="h-full flex flex-col p-7 rounded-2xl border border-[rgba(196,169,122,0.2)] bg-white/60 hover:bg-white/90 hover:border-[rgba(196,169,122,0.4)] transition-all duration-300 shadow-sm">
-                      <div
-                        className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${tool.accent} flex items-center justify-center text-white text-2xl mb-5 transition-transform duration-300 group-hover:scale-110`}
-                        style={{ fontFamily: "var(--font-cormorant)" }}
-                      >
-                        {tool.glyph}
-                      </div>
-                      <span className="text-xs text-[#C4A97A] tracking-[0.15em] uppercase mb-2" style={{ fontFamily: "var(--font-jost)" }}>
-                        {tool.subtitle}
-                      </span>
-                      <h3
-                        className="text-2xl text-[#1C1512] mb-3 group-hover:text-[#B8883A] transition-colors"
-                        style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}
-                      >
-                        {tool.title}
-                      </h3>
-                      <p className="text-[#7A6A58] text-sm leading-relaxed flex-1 mb-5">{tool.desc}</p>
-                      <div className="flex items-center gap-2 text-[#C4A97A] text-sm mt-auto">
-                        {isRu ? "Открыть" : isEn ? "Open" : "Відкрити"}
-                        <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  </Link>
-                </AnimatedSection>
-              ))}
-            </div>
-          </div>
+          <ToolsCarousel
+            openLabel={isRu ? "Открыть" : isEn ? "Open" : "Відкрити"}
+            tools={studioTools.filter((tool) => {
+              const id = tool.href.split('/').pop() as ToolId;
+              return previewMode || isToolEnabled(id, toolsEnabled);
+            })}
+          />
 
           <AnimatedSection delay={0.35} className="text-center mt-10">
             <Link
