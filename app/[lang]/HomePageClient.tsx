@@ -398,16 +398,17 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
             </p>
           </AnimatedSection>
 
-          {/* Mobile: horizontal scroll carousel / Desktop: 4-column grid */}
+          {/* Horizontal carousel on every breakpoint — 4 cards visible on
+              desktop with a sliver of the next as a scroll affordance. */}
           <div className="-mx-6 lg:mx-0">
-            <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory px-6 pb-4 lg:grid lg:grid-cols-4 lg:gap-6 lg:overflow-visible lg:pb-0" style={{ scrollbarWidth: "none" }}>
+            <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory px-6 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {studioTools
                 .filter((tool) => {
                   const id = tool.href.split('/').pop() as ToolId;
                   return previewMode || isToolEnabled(id, toolsEnabled);
                 })
                 .map((tool, i) => (
-                <AnimatedSection key={tool.href} delay={i * 0.1} className="snap-start flex-shrink-0 w-[78vw] sm:w-[56vw] lg:w-auto">
+                <AnimatedSection key={tool.href} delay={i * 0.1} className="snap-start flex-shrink-0 w-[78vw] sm:w-[44vw] lg:w-[calc(25%-1rem)]">
                   <Link href={tool.href} className="group block h-full">
                     <div className="h-full flex flex-col p-7 rounded-2xl border border-[rgba(196,169,122,0.2)] bg-white/60 hover:bg-white/90 hover:border-[rgba(196,169,122,0.4)] transition-all duration-300 shadow-sm">
                       <div
