@@ -8,7 +8,7 @@
     },
     {
       "path": "/api/cron/youtube-sync",
-      "schedule": "0 * * * *"
+      "schedule": "30 1 * * *"
     }
   ]
 }
