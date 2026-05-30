@@ -1,5 +1,18 @@
 import ToolGate from "@/components/tools/ToolGate";
+import ToolSchema from "@/components/seo/ToolSchema";
 
-export default function MoonPhaseLayout({ children }: { children: React.ReactNode }) {
-  return <ToolGate id="moon-phase">{children}</ToolGate>;
+export default async function ToolLayout({
+  children, params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
+  const l = lang === "ru" ? "ru" : lang === "en" ? "en" : "uk";
+  return (
+    <>
+      <ToolSchema id="moon-phase" lang={l} />
+      <ToolGate id="moon-phase">{children}</ToolGate>
+    </>
+  );
 }

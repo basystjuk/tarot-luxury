@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { syncChannel } from "@/lib/youtube/sync";
+import { indexNowSubmit, journalUrls } from "@/lib/seo/indexnow";
 
 export const maxDuration = 30;
 
@@ -39,7 +40,10 @@ export async function GET(req: NextRequest) {
     // 30 latest covers ~10 days at 2-3 uploads/day — plenty to keep the
     // journal current without burning quota.
     const result = await syncChannel(supa as never, channelId, apiKey, 30);
-    return NextResponse.json({ ok: true, ...result });
+    // Best-effort IndexNow ping so Bing/Yandex see new videos within minutes
+    // rather than waiting for their own crawl cycle.
+    const ping = await indexNowSubmit(journalUrls());
+    return NextResponse.json({ ok: true, ...result, indexnow: ping });
   } catch (e) {
     console.error("youtube-sync error:", e);
     return NextResponse.json({ error: "sync_failed", detail: String(e) }, { status: 500 });

@@ -8,6 +8,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ModalProvider } from '@/contexts/ModalContext';
 import { PostHogProvider } from '@/components/PostHogProvider';
 import BookingModal from '@/components/ui/BookingModal';
+import GlobalSchema from '@/components/seo/GlobalSchema';
 import QuickContactModal from '@/components/ui/QuickContactModal';
 // Vercel Analytics disabled — PostHog (Phase Б) is our product analytics
 // and Hobby plan's Vercel Analytics has a 1500-event/month cap that's
@@ -99,6 +100,7 @@ export default function RootLayout({
             server-side via the Next.js image optimiser (same-origin to browser). */}
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+        <GlobalSchema />
       </head>
       <body className="min-h-full flex flex-col bg-[#FDFBF7] text-[#1C1512]">
         <PostHogProvider>

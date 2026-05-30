@@ -1,3 +1,28 @@
+# Ellen Soul — robots policy
+# Last revised: 2026-05-30
+
 User-agent: *
 Allow: /
-Sitemap: https://tarot-olena.com/sitemap.xml
+
+# Keep crawlers out of admin, account internals, and AI / cron API surfaces.
+Disallow: /admin
+Disallow: /api/admin
+Disallow: /api/cron
+Disallow: /api/auth
+Disallow: /api/push
+Disallow: /api/account
+Disallow: /uk/account
+Disallow: /ru/account
+Disallow: /en/account
+
+# Don't index sign-in / preview routes
+Disallow: /*/account/sign-in
+Disallow: /*/account/sign-out
+
+# Sitemaps
+Sitemap: https://ellen-soul.com/sitemap.xml
+Sitemap: https://ellen-soul.com/sitemap-videos.xml
+
+# Polite crawl rate for aggressive bots (Yandex respects this)
+User-agent: Yandex
+Crawl-delay: 1

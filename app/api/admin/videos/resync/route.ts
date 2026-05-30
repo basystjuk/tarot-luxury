@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { syncChannel } from "@/lib/youtube/sync";
+import { indexNowSubmit, journalUrls } from "@/lib/seo/indexnow";
 
 export const maxDuration = 30;
 
@@ -33,7 +34,8 @@ export async function POST(req: NextRequest) {
   if (!supa) return NextResponse.json({ error: "no_admin_client" }, { status: 503 });
   try {
     const result = await syncChannel(supa as never, channelId, apiKey, 30);
-    return NextResponse.json({ ok: true, ...result });
+    const ping = await indexNowSubmit(journalUrls());
+    return NextResponse.json({ ok: true, ...result, indexnow: ping });
   } catch (e) {
     return NextResponse.json({ error: "sync_failed", detail: String(e) }, { status: 500 });
   }

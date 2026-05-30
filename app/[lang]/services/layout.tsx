@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { type Language, getTranslation } from '@/lib/i18n/translations';
+import ServiceSchema from '@/components/seo/ServiceSchema';
+import { DEFAULT_SERVICES } from '@/lib/data/services';
+import Breadcrumbs from '@/components/seo/Breadcrumbs';
 
 const VALID_LANGS = ['uk', 'ru', 'en'] as const;
 const SITE_URL = 'https://ellen-soul.com';
@@ -32,6 +35,24 @@ export async function generateMetadata({
   };
 }
 
-export default function ServicesLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+export default async function ServicesLayout({
+  children, params,
+}: {
+  children: ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang: rawLang } = await params;
+  const lang = (VALID_LANGS.includes(rawLang as Language) ? rawLang : 'uk') as 'uk' | 'ru' | 'en';
+  const home = lang === 'ru' ? 'Главная' : lang === 'en' ? 'Home' : 'Головна';
+  const services = lang === 'ru' ? 'Услуги' : lang === 'en' ? 'Services' : 'Послуги';
+  return (
+    <>
+      <ServiceSchema services={DEFAULT_SERVICES} lang={lang} />
+      <Breadcrumbs items={[
+        { name: home, url: `${SITE_URL}/${lang}` },
+        { name: services, url: `${SITE_URL}/${lang}/services` },
+      ]} />
+      {children}
+    </>
+  );
 }

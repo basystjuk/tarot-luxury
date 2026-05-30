@@ -1,5 +1,18 @@
 import ToolGate from "@/components/tools/ToolGate";
+import ToolSchema from "@/components/seo/ToolSchema";
 
-export default function CompatibilityLayout({ children }: { children: React.ReactNode }) {
-  return <ToolGate id="compatibility">{children}</ToolGate>;
+export default async function CompatibilityLayout({
+  children, params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
+  const l = lang === "ru" ? "ru" : lang === "en" ? "en" : "uk";
+  return (
+    <>
+      <ToolSchema id="compatibility" lang={l} />
+      <ToolGate id="compatibility">{children}</ToolGate>
+    </>
+  );
 }

@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { type Language, getTranslation } from '@/lib/i18n/translations';
+import FaqSchema from '@/components/seo/FaqSchema';
+import { faqFor } from '@/lib/data/faq';
+import Breadcrumbs from '@/components/seo/Breadcrumbs';
 
 const VALID_LANGS = ['uk', 'ru', 'en'] as const;
 const SITE_URL = 'https://ellen-soul.com';
@@ -32,6 +35,24 @@ export async function generateMetadata({
   };
 }
 
-export default function FaqLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+export default async function FaqLayout({
+  children, params,
+}: {
+  children: ReactNode;
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang: rawLang } = await params;
+  const lang = (VALID_LANGS.includes(rawLang as Language) ? rawLang : 'uk') as 'uk' | 'ru' | 'en';
+  const home = lang === 'ru' ? 'Главная' : lang === 'en' ? 'Home' : 'Головна';
+  const faq = lang === 'ru' ? 'Вопросы и ответы' : lang === 'en' ? 'FAQ' : 'Питання та відповіді';
+  return (
+    <>
+      <FaqSchema faqs={faqFor(lang)} />
+      <Breadcrumbs items={[
+        { name: home, url: `${SITE_URL}/${lang}` },
+        { name: faq, url: `${SITE_URL}/${lang}/faq` },
+      ]} />
+      {children}
+    </>
+  );
 }
