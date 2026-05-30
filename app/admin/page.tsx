@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { Plus, Trash2, Eye, EyeOff, Save, LogOut, Copy, Check, Star, Upload, X, ChevronDown, ChevronUp, GripVertical, Users } from "lucide-react";
+import VideosTab from "./_videos-tab";
 import type { Testimonial } from "@/lib/data/testimonials";
 import {
   DEFAULT_SERVICES,
@@ -350,7 +351,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "prompts" | "notifications">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "prompts" | "notifications" | "videos">("testimonials");
 
   // Gallery state
   interface GalleryItem { url: string; pathname: string; position?: "top" | "center" | "bottom"; }
@@ -863,7 +864,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "prompts", "notifications"] as const).map((tab) => (
+          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "prompts", "notifications", "videos"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -885,7 +886,8 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : tab === "studio" ? "🔮 Студія"
                 : tab === "access" ? "🎛 Доступ"
                 : tab === "prompts" ? "🧠 Промти"
-                : "🔔 Сповіщення"}
+                : tab === "notifications" ? "🔔 Сповіщення"
+                : "🎬 Відео"}
             </button>
           ))}
           {/* Users panel lives on its own route (its own data fetching);
@@ -2025,6 +2027,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </p>
           </div>
         )}
+
+        {/* ── Videos (YouTube journal) Tab ── */}
+        {activeTab === "videos" && <VideosTab />}
 
       </div>
     </div>
