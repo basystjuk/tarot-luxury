@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import Script from "next/script";
+import { headers } from "next/headers";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -83,14 +84,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Locale comes from middleware (x-locale request header) so /ru and /en
+  // render <html lang="ru|en"> instead of always "uk". Defaults to uk for
+  // routes without a locale prefix (e.g. /admin).
+  const hdrs = await headers();
+  const xLocale = hdrs.get("x-locale");
+  const lang = xLocale === "ru" || xLocale === "en" ? xLocale : "uk";
   return (
     <html
-      lang="uk"
+      lang={lang}
       className={`${cormorant.variable} ${jost.variable} h-full antialiased`}
     >
       <head>

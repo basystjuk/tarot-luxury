@@ -31,7 +31,20 @@ export async function middleware(req: NextRequest) {
 
   // Pass through: already has lang prefix, admin, api, _next, static files
   const hasLangPrefix = LOCALES.some(l => pathname.startsWith(`/${l}/`) || pathname === `/${l}`);
-  if (hasLangPrefix) return supaResponse;
+  if (hasLangPrefix) {
+    // Expose the active locale to the root layout (via a request header) so
+    // it can render the correct <html lang="..">. Without this the root
+    // layout hard-codes lang="uk" for /ru and /en too, which confuses
+    // Google's language clustering → "duplicate, Google chose a different
+    // canonical" in Search Console.
+    const prefixLocale = LOCALES.find(l => pathname === `/${l}` || pathname.startsWith(`/${l}/`)) as Locale;
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-locale', prefixLocale);
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    // Preserve any session cookies Supabase refreshed above.
+    for (const c of supaResponse.cookies.getAll()) res.cookies.set(c.name, c.value);
+    return res;
+  }
   if (pathname.startsWith('/admin') || pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname.includes('.')) return supaResponse;
 
   const locale = detectLocale(req);
