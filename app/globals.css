@@ -297,6 +297,13 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   animation: dailyCardBreath 3s ease-in-out infinite;
 }
+
+/* ─── Journal lightbox enter ─────────────────────────────────────────── */
+@keyframes ellenFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in { animation: ellenFadeIn 0.2s ease-out; }
 .daily-card-breath-orb-glyph {
   color: #FFF8E7;
   font-size: 26px;

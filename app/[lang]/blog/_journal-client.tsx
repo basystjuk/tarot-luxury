@@ -8,12 +8,13 @@
  * first paint is non-empty and crawlers see the content immediately.
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import FeaturedHero from "@/components/journal/FeaturedHero";
 import VideoCard from "@/components/journal/VideoCard";
 import TagFilter from "@/components/journal/TagFilter";
+import VideoLightbox from "@/components/journal/VideoLightbox";
 import type { JournalVideo } from "@/app/api/journal/videos/route";
 import type { ThemeTag } from "@/lib/youtube/tags";
 
@@ -24,6 +25,29 @@ export default function JournalClient({
 }: { videos: JournalVideo[]; lang: "uk" | "ru" | "en" }) {
   const [active, setActive] = useState<ThemeTag | null>(null);
   const [shown, setShown] = useState(PAGE_SIZE);
+  const [openVideo, setOpenVideo] = useState<JournalVideo | null>(null);
+
+  const handleOpen = useCallback((v: JournalVideo) => setOpenVideo(v), []);
+  const handleClose = useCallback(() => setOpenVideo(null), []);
+
+  // Deep-link support: /uk/blog#<youtube_id> (from Google video sitemap)
+  // scrolls to the matching card AND auto-opens the lightbox. The card's
+  // `id={video.id}` anchor takes care of the scroll; we listen for the
+  // hash to summon the player.
+  useEffect(() => {
+    const hashId = window.location.hash.slice(1);
+    if (!hashId) return;
+    const match = videos.find((v) => v.id === hashId);
+    if (match) {
+      setOpenVideo(match);
+      // Scroll AFTER a tick so the layout has settled.
+      requestAnimationFrame(() => {
+        document.getElementById(hashId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+    // Intentionally one-shot on mount; subsequent hash changes are user-driven.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Tag inventory from current data (frequency-sorted).
   const tagOrder = useMemo<ThemeTag[]>(() => {
@@ -77,7 +101,7 @@ export default function JournalClient({
         {/* Featured hero */}
         {featured && (
           <AnimatedSection delay={0.05}>
-            <FeaturedHero video={featured} lang={lang} />
+            <FeaturedHero video={featured} lang={lang} onOpen={handleOpen} />
           </AnimatedSection>
         )}
 
@@ -94,7 +118,7 @@ export default function JournalClient({
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {visibleRest.map((v, i) => (
                   <AnimatedSection key={v.id} delay={i * 0.04}>
-                    <VideoCard video={v} lang={lang} />
+                    <VideoCard video={v} lang={lang} onOpen={handleOpen} />
                   </AnimatedSection>
                 ))}
               </div>
@@ -113,6 +137,15 @@ export default function JournalClient({
           </>
         )}
       </div>
+
+      {/* Fullscreen video lightbox (portaled to body, mounted only when open). */}
+      {openVideo && (
+        <VideoLightbox
+          videoId={openVideo.id}
+          title={openVideo.title}
+          onClose={handleClose}
+        />
+      )}
     </section>
   );
 }
