@@ -9,6 +9,7 @@
  */
 
 import type { JournalVideo } from "@/app/api/journal/videos/route";
+import { describeVideo } from "@/lib/youtube/format";
 
 const SITE = "https://ellen-soul.com";
 
@@ -20,11 +21,11 @@ function isoDuration(seconds: number | null | undefined): string | undefined {
   return `PT${h ? `${h}H` : ""}${m ? `${m}M` : ""}${s}S`;
 }
 
-function videoObject(v: JournalVideo) {
+function videoObject(v: JournalVideo, lang: "uk" | "ru" | "en") {
   return {
     "@type": "VideoObject",
     name: v.title,
-    description: (v.description ?? v.title).slice(0, 500),
+    description: describeVideo(v, { lang, max: 500 }),
     thumbnailUrl: [v.thumb_url],
     uploadDate: v.published_at,
     duration: isoDuration(v.duration_seconds),
@@ -54,7 +55,7 @@ export default function VideoSchema({ videos, lang }: { videos: JournalVideo[]; 
     itemListElement: videos.map((v, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      item: videoObject(v),
+      item: videoObject(v, lang),
     })),
   };
   return (

@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { describeVideo } from "@/lib/youtube/format";
 
 export const revalidate = 3600; // refresh hourly at edge
 
@@ -52,7 +53,7 @@ export async function GET() {
     const loc = `${SITE}/uk/blog#${v.id}`;
     const player = `https://www.youtube.com/embed/${v.id}`;
     const watch  = `https://www.youtube.com/watch?v=${v.id}`;
-    const desc = xmlEscape(((v.description ?? v.title) || "").slice(0, 2048));
+    const desc = xmlEscape(describeVideo(v, { lang: "uk", max: 2048 }));
     return `
   <url>
     <loc>${xmlEscape(loc)}</loc>
