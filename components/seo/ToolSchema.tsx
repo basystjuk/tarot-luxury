@@ -64,6 +64,11 @@ const DESCRIPTIONS: Record<ToolId, { uk: string; ru: string; en: string }> = {
     ru: "Прогноз года: Соляр (тема года, дом Солнца, Асцендент) + вторичные прогрессии (прогрессивная Луна, аспекты). С колесом солнечного возвращения.",
     en: "Year forecast: Solar Return (year's theme, Sun house, Ascendant) + secondary progressions (progressed Moon, aspects). With a solar-return wheel.",
   },
+  dreams: {
+    uk: "Сонник: AI-аналіз сновидінь. Знаходить символи сну, дає глибоке психологічне й духовне трактування, послання підсвідомості, архетипи, афірмацію та питання для саморефлексії. Враховує фазу Місяця.",
+    ru: "Сонник: AI-анализ сновидений. Находит символы сна, даёт глубокое психологическое и духовное толкование, послание подсознания, архетипы, аффирмацию и вопросы для саморефлексии. Учитывает фазу Луны.",
+    en: "Dream interpreter: AI dream analysis. Detects the dream's symbols, gives a deep psychological and spiritual reading, a message from the subconscious, archetypes, an affirmation and self-reflection questions. Factors in the Moon phase.",
+  },
 };
 
 export default function ToolSchema({ id, lang }: { id: ToolId; lang: "uk" | "ru" | "en" }) {

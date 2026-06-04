@@ -27,7 +27,8 @@ export type PromptToolId =
   | "moon-reading"
   | "moon-recommendations"
   | "compatibility-reading"
-  | "year-forecast-portrait";
+  | "year-forecast-portrait"
+  | "dream-reading";
 
 export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "tarot-reading",
@@ -40,6 +41,7 @@ export const ALL_PROMPT_TOOL_IDS: PromptToolId[] = [
   "moon-recommendations",
   "compatibility-reading",
   "year-forecast-portrait",
+  "dream-reading",
 ];
 
 export interface PromptDefinition {
@@ -467,6 +469,50 @@ essence — 3-4 sentences. The actual mood-shape of the day, anchored in the eng
 windows — 2-3 sentences naming the SPECIFIC time ranges. What to do during luck windows. What to retreat from during challenge windows. If the lists were "—", say "today doesn't have sharp time peaks — the energy is even".
 ---
 do — 3 short verb-led lines, one per line, each ≤12 words. The most concrete actions for today.`,
+  },
+
+  "dream-reading": {
+    label: "Сонник (аналіз сну)",
+    description: "Глибокий психологічно-духовний аналіз сну. Символи детектуються детерміновано і передаються в промт; AI пише трактування, послання підсвідомості, архетипи, афірмацію та питання для саморефлексії. Враховує фазу Місяця. 1 запит/добу/юзер. Тільки для зареєстрованих.",
+    variables: [
+      { name: "language_name", description: "Мова відповіді.", required: true },
+      { name: "name", description: "Імʼя людини (може бути порожнім).", required: false },
+      { name: "dreamText", description: "Текст сну, який ввів користувач.", required: true },
+      { name: "symbols", description: "Детектовані символи (через кому) з короткими значеннями.", required: false },
+      { name: "tone", description: "Емоційний тон: anxious / neutral / inspiring.", required: false },
+      { name: "moonContext", description: "Контекст Місяця сьогодні (фаза + чи 'віщі' сни).", required: false },
+    ],
+    defaultSystem: `You are a wise, warm dream analyst combining depth psychology (Jung), symbolism and a gentle spiritual lens. You interpret dreams as messages from the subconscious — never as literal predictions, never with fear or fatalism.
+
+Rules:
+— Address the dreamer by first name if given, naturally.
+— Never say "this will happen". Speak in terms of "this may reflect", "your psyche might be processing".
+— Be specific to THIS dream and the detected symbols, not generic.
+— Warm, insightful, premium tone. No clichés, no horoscope-filler.
+— If a moon context is provided, weave it in subtly (e.g. a full moon amplifies vividness/intuition).
+— Output STRICT JSON only, no markdown, no commentary outside the JSON.
+
+${COMMON_LANG}
+
+Output JSON shape (all strings in {{language_name}}):
+{
+  "interpretation": "2-4 paragraphs of deep analysis",
+  "emotionalMessage": "1-2 sentences — the core emotional meaning",
+  "subconsciousMessage": "1-2 sentences — what the subconscious is trying to say",
+  "affirmation": "one first-person affirmation",
+  "reflectionQuestions": ["q1", "q2", "q3"]
+}`,
+    defaultUser: `Dreamer: {{name}}
+Moon context: {{moonContext}}
+Detected symbols: {{symbols}}
+Overall tone: {{tone}}
+
+The dream:
+"""
+{{dreamText}}
+"""
+
+Analyse this dream. Return ONLY the JSON object described in the system prompt, written in {{language_name}}. The interpretation must reference the actual symbols and imagery of THIS dream.`,
   },
 
   "year-forecast-portrait": {

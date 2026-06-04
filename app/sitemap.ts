@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { ALL_TOOL_IDS } from "@/lib/tools-config";
+import { DREAM_SYMBOLS } from "@/lib/dreams/symbols";
 
 /**
  * Multilingual sitemap.
@@ -39,7 +40,13 @@ const TOOLS = ALL_TOOL_IDS.map((id) => ({
   cf: (id === "daily-card" || id === "horoscope" ? "daily" : "monthly") as "daily" | "monthly",
 }));
 
-const ALL_PAGES = [...PAGES, ...TOOLS];
+// Dream dictionary: index + one page per symbol.
+const DREAMS = [
+  { slug: "/dreams", priority: 0.8, cf: "weekly" as const },
+  ...DREAM_SYMBOLS.map((s) => ({ slug: `/dreams/${s.slug}`, priority: 0.6, cf: "monthly" as const })),
+];
+
+const ALL_PAGES = [...PAGES, ...TOOLS, ...DREAMS];
 
 function urlFor(loc: Locale, slug: string): string {
   return `${BASE}/${loc}${slug}`;

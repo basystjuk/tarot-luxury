@@ -21,6 +21,7 @@ const GLYPH: Record<ToolId, string> = {
   "natal-chart": "✺",
   horoscope: "☉",
   "year-forecast": "❂",
+  dreams: "🌙",
 };
 
 const SUBTITLE: Record<ToolId, { uk: string; ru: string; en: string }> = {
@@ -31,6 +32,7 @@ const SUBTITLE: Record<ToolId, { uk: string; ru: string; en: string }> = {
   "natal-chart":  { uk: "Натальна карта",              ru: "Натальная карта",             en: "Natal Chart" },
   horoscope:      { uk: "Гороскоп дня",                ru: "Гороскоп дня",                en: "Daily Horoscope" },
   "year-forecast":{ uk: "Прогноз року · Соляр",        ru: "Прогноз года · Соляр",        en: "Year Forecast · Solar Return" },
+  dreams:         { uk: "Сонник · Аналіз снів",        ru: "Сонник · Анализ снов",        en: "Dream Interpreter" },
 };
 
 export async function renderToolOg(id: ToolId, langRaw: string) {

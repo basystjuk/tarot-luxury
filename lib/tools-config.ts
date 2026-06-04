@@ -15,7 +15,8 @@ export type ToolId =
   | "moon-phase"
   | "natal-chart"
   | "horoscope"
-  | "year-forecast";
+  | "year-forecast"
+  | "dreams";
 
 export const ALL_TOOL_IDS: ToolId[] = [
   "daily-card",
@@ -25,6 +26,7 @@ export const ALL_TOOL_IDS: ToolId[] = [
   "natal-chart",
   "horoscope",
   "year-forecast",
+  "dreams",
 ];
 
 /**
@@ -53,6 +55,9 @@ export const DEFAULT_TOOLS_ENABLED: Record<ToolId, boolean> = {
   // Phase H2 — Year forecast: Solar Return + Secondary Progressions.
   // Deterministic engine + reused natal wheel; AI synthesis auth-gated.
   "year-forecast": true,
+  // Phase D1 — Сонник: deterministic symbol detection (free) + AI dream
+  // analysis (auth-gated) + SEO dream dictionary.
+  dreams: true,
 };
 
 /** Human-readable labels for the admin toggles (uk/ru/en). */
@@ -64,6 +69,7 @@ export const TOOL_LABELS: Record<ToolId, { uk: string; ru: string; en: string }>
   "natal-chart":  { uk: "Натальна карта",     ru: "Натальная карта",      en: "Natal Chart" },
   horoscope:      { uk: "Гороскоп дня",       ru: "Гороскоп дня",         en: "Daily Horoscope" },
   "year-forecast":{ uk: "Прогноз року",       ru: "Прогноз года",         en: "Year Forecast" },
+  dreams:         { uk: "Сонник",             ru: "Сонник",               en: "Dream Interpreter" },
 };
 
 export function isToolEnabled(

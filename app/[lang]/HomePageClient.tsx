@@ -111,6 +111,14 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       subtitle: "Соляр · Прогрессии",
       desc: "Прогноз на год: соляр задаёт тему, прогрессивная Луна — вашу эмоциональную пору. С колесом солнечного возвращения.",
     },
+    {
+      href: `/${language}/studio/dreams`,
+      glyph: "🌙",
+      accent: "from-[#7E6AC8] to-[#3B2E6E]",
+      title: "Сонник",
+      subtitle: "AI-анализ снов",
+      desc: "Опишите свой сон — AI найдёт символы, даст глубокое толкование, послание подсознания и аффирмацию.",
+    },
   ] : isEn ? [
     {
       href: `/${language}/studio/daily-card`,
@@ -168,6 +176,14 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       subtitle: "Solar Return · Progressions",
       desc: "Your year ahead: the Solar Return sets the theme, the progressed Moon your emotional season. With a solar-return wheel.",
     },
+    {
+      href: `/${language}/studio/dreams`,
+      glyph: "🌙",
+      accent: "from-[#7E6AC8] to-[#3B2E6E]",
+      title: "Dream Interpreter",
+      subtitle: "AI dream analysis",
+      desc: "Describe your dream — AI detects the symbols, gives a deep reading, a message from the subconscious and an affirmation.",
+    },
   ] : [
     {
       href: `/${language}/studio/daily-card`,
@@ -224,6 +240,14 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       title: "Прогноз року",
       subtitle: "Соляр · Прогресії",
       desc: "Прогноз на рік: соляр задає тему, прогресивний Місяць — твою емоційну пору. З колесом сонячного повернення.",
+    },
+    {
+      href: `/${language}/studio/dreams`,
+      glyph: "🌙",
+      accent: "from-[#7E6AC8] to-[#3B2E6E]",
+      title: "Сонник",
+      subtitle: "AI-аналіз снів",
+      desc: "Опишіть свій сон — AI знайде символи, дасть глибоке трактування, послання підсвідомості та афірмацію.",
     },
   ];
 
