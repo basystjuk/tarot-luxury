@@ -1,6 +1,7 @@
 'use client';
 
 import { useLanguage } from '@/hooks/useLanguage';
+import FooterScene from '@/components/celebration/FooterScene';
 
 function InstagramIcon() {
   return (
@@ -34,14 +35,16 @@ export default function Footer() {
   const isEn = language === 'en';
 
   return (
-    <footer className="bg-[#1C1512] text-white/90">
-      <div className="h-px bg-gradient-to-r from-transparent via-[#C4A97A] to-transparent" />
+    <footer className="relative overflow-hidden bg-[#1C1512] text-white/90">
+      <FooterScene />
+      <div className="relative z-10 h-px bg-gradient-to-r from-transparent via-[#C4A97A] to-transparent" />
 
-      <div className="max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-10">
         <div className="flex flex-col items-center text-center mb-14">
           {/* Brand */}
           <div className="mb-4">
             <span
+              data-birthday-glow
               className="text-3xl text-white tracking-wide block mb-1"
               style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 300 }}
             >

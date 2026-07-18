@@ -1,170 +1,111 @@
 /**
- * Celebration animation engine — pure browser code (no React), so the overlay
- * component stays thin and this can be tuned in isolation.
+ * Birthday intro — a cinematic celestial sequence (theme "birthday_cancer").
  *
- * Theme "birthday_cancer" — a curated, luxury sequence:
- *   1. golden dust drifts in from the dark and spirals toward the centre
- *   2. a breathing sphere of light forms and radiates warm gold
- *   3. the dust reassembles into the Cancer glyph ♋, holds ~1.2s
- *   4. the glyph dissolves outward into a slow starfield
- *   5. one final golden pulse expands, everything fades to transparent
+ * Not a banner: a short "expensive fantasy movie" opening. Deep cosmic sky,
+ * a luminous moon, a parallax starfield, drifting nebula and golden dust that
+ * gathers into a sphere of light; a Tree of Life grows from it; the dust then
+ * assembles into a LARGE, bright, long-held Cancer glyph ♋ (with a crisp gold
+ * line-art stroke over the particles + the Cancer constellation as context) so
+ * it is impossible to miss; butterflies of light drift; a final golden pulse
+ * expands and the scene fades, returning the site.
  *
- * Palette is Ellen Soul's real brand: warm gold + moon-silver on a warm-black
- * veil (a whisper of cosmic violet in the vignette). No text, numbers, logos.
- *
- * Canvas draws with additive blending over a transparent surface; the dark,
- * page-blurring veil is a CSS layer on the container element (see overlay).
+ * Composed entirely from the shared celestial toolkit so it matches the living
+ * atmosphere and footer scene. Canvas 2D + rAF, no deps. ~12s.
  */
 
 import type { CelebrationTheme } from "@/lib/celebration";
+import {
+  clamp01,
+  lerp,
+  smooth,
+  easeInOut,
+  easeOut,
+  seg,
+  rand,
+  makeStar,
+  makeMote,
+  paintSky,
+  makeNebula,
+  drawNebula,
+  drawMoon,
+  traceCancer,
+  sampleCancer,
+  drawTree,
+  buildTree,
+  drawButterfly,
+  CANCER_STARS,
+  CANCER_EDGES,
+  type NebulaBlob,
+  type Pt,
+  type Branch,
+} from "./celestial";
 
 export interface RunOptions {
   reducedMotion: boolean;
   onDone: () => void;
-  /** Debug: freeze the timeline at this ms and hold (never completes). */
   freezeMs?: number | null;
 }
 
 export interface RunHandle {
-  /** Gracefully fast-forward to the finale (tap-to-skip). */
   skip: () => void;
-  /** Hard teardown (unmount) — cancels the loop, no onDone. */
   destroy: () => void;
 }
 
-// ── Small math helpers ──────────────────────────────────────────────────────
-const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
-/** Normalised, clamped progress of t across [a, b]. */
-const seg = (t: number, a: number, b: number) => clamp01((t - a) / (b - a));
-const smooth = (x: number) => x * x * (3 - 2 * x); // smoothstep
-const easeInOut = (x: number) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
-const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
-const lerp = (a: number, b: number, x: number) => a + (b - a) * x;
-
 // ── Timeline (ms) ───────────────────────────────────────────────────────────
 const T = {
-  fadeIn: 900, // container veil 0 → 1
-  dustFrom: 300, // dust starts drifting
-  dustTo: 3600, // dust settled into the central cloud
-  sphereIn: 2400, // sphere glow begins
-  spherePeak: 4600, // sphere at its fullest
-  glyphFrom: 4700, // dust → glyph target points
-  glyphFormed: 5800,
-  glyphHold: 7000, // holds until here
-  disperseTo: 8800, // glyph → outward starfield
-  pulseFrom: 7500,
-  pulseTo: 9100,
-  fadeOutFrom: 8500,
-  end: 9500,
+  fadeIn: 900,
+  starsIn: [400, 2800] as const,
+  moonIn: [800, 3200] as const,
+  dustIn: [1600, 4400] as const, // dust gathers into sphere
+  spherePeak: 4400,
+  treeGrow: [3000, 6200] as const,
+  shootingStar: 3400,
+  glyphForm: [5200, 6900] as const, // particles → glyph
+  strokeIn: [6200, 7200] as const, // crisp line-art over particles
+  constellationIn: [6000, 7400] as const,
+  holdUntil: 9700, // glyph held bright (spotlight)
+  disperse: [9700, 11300] as const,
+  pulse: [10500, 12000] as const,
+  fadeOut: [10900, 12200] as const,
+  end: 12200,
 };
-const REDUCED_END = 2800;
+const REDUCED_END = 3200;
 
-// ── Cancer glyph geometry ───────────────────────────────────────────────────
-/**
- * Draws the astrological Cancer glyph ♋ — two mirrored curls ("69" laid on its
- * side) — centred at (0,0) in white, for alpha-sampling into particle targets.
- * Hand-drawn (not Unicode) so it renders identically on every device and never
- * falls back to a colour-emoji crab.
- */
-function drawCancerGlyph(o: CanvasRenderingContext2D, R: number) {
-  o.strokeStyle = "#fff";
-  o.fillStyle = "#fff";
-  o.lineCap = "round";
-  o.lineJoin = "round";
-  o.lineWidth = R * 0.09;
-
-  const rr = R * 0.34; // curl loop radius
-  const ox = R * 0.32; // loop centre horizontal offset
-  const oy = R * 0.24; // loop centre vertical offset
-  const headR = R * 0.1; // filled "head" bead radius
-  const gap = 0.95; // radians of the loop left open (tail mouth)
-
-  // Two near-full loops placed diagonally (point-symmetric through the centre),
-  // each with its mouth + bead facing the centre — reads as a sideways "69".
-  for (const s of [1, -1] as const) {
-    const lx = s * ox;
-    const ly = s * oy;
-    const gapAng = Math.atan2(-ly, -lx); // toward the centre
-    const a0 = gapAng + gap / 2;
-    const a1 = gapAng - gap / 2 + Math.PI * 2;
-    o.beginPath();
-    o.arc(lx, ly, rr, a0, a1, false);
-    o.stroke();
-    // Bead at the mouth tip (nearest the centre).
-    o.beginPath();
-    o.arc(lx + rr * Math.cos(a0), ly + rr * Math.sin(a0), headR, 0, Math.PI * 2);
-    o.fill();
-  }
-}
-
-interface Pt {
+interface Star {
   x: number;
   y: number;
-}
-
-/** Sample the glyph into a shuffled point cloud (relative to centre). */
-function sampleGlyphPoints(R: number): Pt[] {
-  const pad = Math.ceil(R * 0.6);
-  const size = Math.max(16, Math.ceil(R * 2 + pad * 2));
-  const off = document.createElement("canvas");
-  off.width = size;
-  off.height = size;
-  const o = off.getContext("2d");
-  if (!o) return [];
-  o.translate(size / 2, size / 2);
-  drawCancerGlyph(o, R);
-  let data: Uint8ClampedArray;
-  try {
-    data = o.getImageData(0, 0, size, size).data;
-  } catch {
-    return [];
-  }
-  const pts: Pt[] = [];
-  const step = Math.max(2, Math.round(R / 44)); // sampling density
-  for (let y = 0; y < size; y += step) {
-    for (let x = 0; x < size; x += step) {
-      if (data[(y * size + x) * 4 + 3] > 110) {
-        pts.push({ x: x - size / 2, y: y - size / 2 });
-      }
-    }
-  }
-  // Fisher–Yates shuffle so particle→point assignment is spatially even.
-  for (let i = pts.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pts[i], pts[j]] = [pts[j], pts[i]];
-  }
-  return pts;
-}
-
-// ── Soft glow sprite (cheap additive dots) ──────────────────────────────────
-function makeGlow(inner: string, outer: string): HTMLCanvasElement {
-  const s = 64;
-  const c = document.createElement("canvas");
-  c.width = c.height = s;
-  const g = c.getContext("2d")!;
-  const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  grad.addColorStop(0, inner);
-  grad.addColorStop(0.28, outer);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, s, s);
-  return c;
+  layer: number; // 0 far … 2 near
+  size: number;
+  warm: boolean;
+  tw: number;
+  base: number;
 }
 
 interface Particle {
-  sx: number; // scatter start
+  sx: number;
   sy: number;
-  camAng: number; // central-cloud polar angle
-  camR: number; // central-cloud radius
-  swirl: number; // extra rotation applied while converging
-  gx: number; // glyph target (relative to centre)
+  camAng: number;
+  camR: number;
+  swirl: number;
+  gx: number;
   gy: number;
-  dispAng: number; // dispersal direction
-  dispDist: number; // dispersal distance factor
-  r: number; // base size
+  dispAng: number;
+  dispDist: number;
+  r: number;
   silver: boolean;
-  tw: number; // twinkle phase
+  tw: number;
   seed: number;
+}
+
+interface Fly {
+  bornAt: number;
+  life: number;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  size: number;
+  freq: number;
 }
 
 export function runCelebration(
@@ -179,23 +120,30 @@ export function runCelebration(
     return { skip: () => {}, destroy: () => {} };
   }
 
-  let dpr = Math.min(2, window.devicePixelRatio || 1);
+  let dpr = 1;
   let W = 0;
   let H = 0;
   let cx = 0;
   let cy = 0;
-  let R = 0; // glyph half-size
+  let R = 0;
   let isMobile = false;
+  let moonX = 0;
+  let moonY = 0;
+  let moonR = 0;
 
-  const gold = makeGlow("rgba(255,244,214,1)", "rgba(226,178,92,0.85)");
-  const silver = makeGlow("rgba(245,248,255,1)", "rgba(180,196,224,0.8)");
+  const starWarm = makeStar(96, true);
+  const starCool = makeStar(96, false);
+  const moteGold = makeMote("255,236,190");
+  const moteSilver = makeMote("224,232,255");
 
+  let stars: Star[] = [];
   let particles: Particle[] = [];
+  let nebula: NebulaBlob[] = [];
+  let tree: Branch[] = [];
+  let flies: Fly[] = [];
   let glyphPts: Pt[] = [];
 
   function layout() {
-    // Guard against transient 0-size viewports (mid-resize, detached tab, …) —
-    // a zero here cascades into R=0 and a getImageData crash.
     W = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 360);
     H = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 640);
     isMobile = W < 640;
@@ -206,43 +154,77 @@ export function runCelebration(
     canvas.style.height = `${H}px`;
     ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     cx = W / 2;
-    cy = H / 2;
-    R = Math.max(48, Math.min(W, H) * (isMobile ? 0.26 : 0.2));
+    cy = H * 0.48;
+    R = Math.max(70, Math.min(W, H) * (isMobile ? 0.3 : 0.24));
+    moonR = Math.min(W, H) * (isMobile ? 0.07 : 0.06);
+    moonX = W * 0.8;
+    moonY = H * 0.26;
   }
 
   function build() {
-    glyphPts = sampleGlyphPoints(R);
-    const N = isMobile ? 190 : 320;
+    // Starfield — three parallax layers.
+    const starCount = isMobile ? 90 : 150;
+    stars = new Array(starCount).fill(0).map(() => {
+      const layer = (Math.random() * 3) | 0;
+      return {
+        x: Math.random() * W,
+        y: Math.random() * H,
+        layer,
+        size: lerp(1.2, 4.2, Math.random()) * (0.6 + layer * 0.3),
+        warm: Math.random() < 0.35,
+        tw: Math.random() * Math.PI * 2,
+        base: lerp(0.25, 0.9, Math.random()),
+      };
+    });
+
+    nebula = makeNebula(W, H, isMobile ? 4 : 6);
+    tree = buildTree(1, isMobile ? 7 : 8);
+
+    glyphPts = sampleCancer(R);
+    const N = isMobile ? 190 : 300;
     const maxDim = Math.hypot(W, H);
     particles = new Array(N).fill(0).map((_, i) => {
       const g = glyphPts.length ? glyphPts[i % glyphPts.length] : { x: 0, y: 0 };
       const jit = R * 0.02;
       const gx = g.x + (Math.random() - 0.5) * jit;
       const gy = g.y + (Math.random() - 0.5) * jit;
-      // Scatter start: anywhere on screen, biased toward the edges.
       const edgeAng = Math.random() * Math.PI * 2;
-      const edgeR = lerp(maxDim * 0.25, maxDim * 0.62, Math.random());
+      const edgeR = lerp(maxDim * 0.28, maxDim * 0.6, Math.random());
       return {
-        sx: cx + Math.cos(edgeAng) * edgeR + (Math.random() - 0.5) * 120,
-        sy: cy + Math.sin(edgeAng) * edgeR + (Math.random() - 0.5) * 120,
+        sx: cx + Math.cos(edgeAng) * edgeR,
+        sy: cy + Math.sin(edgeAng) * edgeR,
         camAng: Math.random() * Math.PI * 2,
-        camR: lerp(R * 0.06, R * 0.34, Math.random()),
-        swirl: lerp(0.6, 2.4, Math.random()) * (Math.random() < 0.5 ? 1 : -1),
+        camR: lerp(R * 0.06, R * 0.32, Math.random()),
+        swirl: lerp(0.7, 2.6, Math.random()) * (Math.random() < 0.5 ? 1 : -1),
         gx,
         gy,
-        dispAng: Math.atan2(gy, gx) + (Math.random() - 0.5) * 0.9,
+        dispAng: Math.atan2(gy, gx) + (Math.random() - 0.5) * 0.8,
         dispDist: lerp(0.5, 1.4, Math.random()),
         r: lerp(1.1, isMobile ? 2.6 : 3.2, Math.random()),
-        silver: Math.random() < 0.16,
+        silver: Math.random() < 0.18,
         tw: Math.random() * Math.PI * 2,
         seed: Math.random() * 1000,
+      };
+    });
+
+    // Two butterflies of light with staggered, randomised paths.
+    flies = new Array(2).fill(0).map((_, i) => {
+      const side = i === 0 ? -1 : 1;
+      return {
+        bornAt: rand(7000, 9500),
+        life: rand(3200, 4200),
+        x0: cx + side * W * 0.4,
+        y0: cy + rand(-0.2, 0.2) * H,
+        x1: cx + side * -0.1 * W + rand(-0.1, 0.1) * W,
+        y1: cy + rand(-0.3, -0.05) * H,
+        size: R * rand(0.12, 0.18),
+        freq: rand(3, 5),
       };
     });
   }
 
   layout();
   build();
-
   function onResize() {
     layout();
     build();
@@ -261,137 +243,274 @@ export function runCelebration(
     opts.onDone();
   }
 
-  // ── Drawing helpers ────────────────────────────────────────────────────────
-  function drawParticles(t: number) {
-    const appear = seg(t, T.dustFrom, T.dustFrom + 1200);
-    const pDust = easeInOut(seg(t, T.dustFrom, T.dustTo));
-    const pForm = easeInOut(seg(t, T.glyphFrom, T.glyphFormed));
-    const pDisp = seg(t, T.glyphHold, T.disperseTo);
-    const dispEase = easeOut(pDisp);
-    const fadeOut = seg(t, T.fadeOutFrom, T.end);
-    const maxDim = Math.hypot(W, H);
-
+  // ── Layer draws ────────────────────────────────────────────────────────────
+  function drawStars(t: number, focus: number) {
+    const appear = smooth(seg(t, T.starsIn[0], T.starsIn[1]));
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
     ctx!.globalCompositeOperation = "lighter";
-    for (const p of particles) {
-      // Central-cloud position (with convergence swirl).
-      const ca = p.camAng + p.swirl * pDust;
-      const cloudX = cx + Math.cos(ca) * p.camR;
-      const cloudY = cy + Math.sin(ca) * p.camR;
-
-      // scatter → cloud → glyph
-      let x = lerp(p.sx, cloudX, pDust);
-      let y = lerp(p.sy, cloudY, pDust);
-      if (pForm > 0) {
-        x = lerp(x, cx + p.gx, pForm);
-        y = lerp(y, cy + p.gy, pForm);
-      }
-
-      // Glyph shimmer while held.
-      const held = pForm >= 1 && pDisp <= 0;
-      if (held) {
-        const s = Math.sin(t * 0.006 + p.tw) * R * 0.012;
-        x += s;
-        y += Math.cos(t * 0.006 + p.tw) * R * 0.012;
-      }
-
-      // Dispersal outward into a starfield.
-      if (pDisp > 0) {
-        const travel = dispEase * p.dispDist * maxDim * 0.55;
-        x += Math.cos(p.dispAng) * travel;
-        y += Math.sin(p.dispAng) * travel;
-      }
-
-      // Opacity envelope.
-      let a = appear;
-      const twinkle = 0.7 + 0.3 * Math.sin(t * 0.004 + p.tw + p.seed);
-      if (pDisp > 0) a *= (0.4 + 0.6 * twinkle) * (1 - smooth(clamp01(pDisp * 1.05)));
-      a *= 1 - fadeOut;
+    for (const s of stars) {
+      const tw = 0.6 + 0.4 * Math.sin(t * (0.0012 + s.layer * 0.0006) + s.tw);
+      const a = appear * s.base * tw * focus * (1 - fadeOut);
       if (a <= 0.01) continue;
-
-      // Slightly brighter and larger at the moment the glyph is whole.
-      const glow = 1 + 0.45 * (pForm - pDisp > 0 ? Math.max(0, pForm - pDisp) : 0);
-      const size = p.r * 5 * glow;
+      const size = s.size * (2.4 + s.layer);
       ctx!.globalAlpha = clamp01(a);
-      ctx!.drawImage(p.silver ? silver : gold, x - size / 2, y - size / 2, size, size);
+      ctx!.drawImage(s.warm ? starWarm : starCool, s.x - size / 2, s.y - size / 2, size, size);
     }
     ctx!.globalAlpha = 1;
     ctx!.globalCompositeOperation = "source-over";
   }
 
-  function drawSphere(t: number) {
-    // Rise, peak, then recede as the glyph takes over; a faint core lingers.
-    const rise = smooth(seg(t, T.sphereIn, T.spherePeak));
-    const recede = smooth(seg(t, T.glyphFrom, T.glyphFormed));
-    const fadeOut = seg(t, T.fadeOutFrom, T.end);
-    const a = rise * (1 - 0.72 * recede) * (1 - fadeOut);
+  function drawShootingStar(t: number) {
+    const p = seg(t, T.shootingStar, T.shootingStar + 1100);
+    if (p <= 0 || p >= 1) return;
+    const e = easeOut(p);
+    const x = lerp(W * 0.15, W * 0.75, e);
+    const y = lerp(H * 0.2, H * 0.5, e);
+    const len = W * 0.16;
+    const ang = Math.atan2(H * 0.3, W * 0.6);
+    const a = Math.sin(p * Math.PI);
+    ctx!.save();
+    ctx!.globalCompositeOperation = "lighter";
+    const grad = ctx!.createLinearGradient(
+      x - Math.cos(ang) * len,
+      y - Math.sin(ang) * len,
+      x,
+      y,
+    );
+    grad.addColorStop(0, "rgba(255,244,214,0)");
+    grad.addColorStop(1, `rgba(255,244,214,${0.9 * a})`);
+    ctx!.strokeStyle = grad;
+    ctx!.lineWidth = 2;
+    ctx!.lineCap = "round";
+    ctx!.beginPath();
+    ctx!.moveTo(x - Math.cos(ang) * len, y - Math.sin(ang) * len);
+    ctx!.lineTo(x, y);
+    ctx!.stroke();
+    ctx!.globalAlpha = a;
+    const hs = 26;
+    ctx!.drawImage(starWarm, x - hs / 2, y - hs / 2, hs, hs);
+    ctx!.globalAlpha = 1;
+    ctx!.restore();
+  }
+
+  function drawSphere(t: number, focus: number) {
+    const rise = smooth(seg(t, T.dustIn[0], T.spherePeak));
+    const recede = smooth(seg(t, T.glyphForm[0], T.glyphForm[1]));
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
+    const a = rise * (1 - 0.7 * recede) * (1 - fadeOut) * (0.5 + 0.5 * focus);
     if (a <= 0.01) return;
     const breathe = 1 + 0.05 * Math.sin(t * 0.003);
-    const rad = R * (0.9 + 0.5 * rise) * breathe;
+    const rad = R * (0.85 + 0.5 * rise) * breathe;
     ctx!.globalCompositeOperation = "lighter";
-    const grad = ctx!.createRadialGradient(cx, cy, 0, cx, cy, rad);
-    grad.addColorStop(0, `rgba(255,246,222,${0.9 * a})`);
-    grad.addColorStop(0.18, `rgba(240,206,138,${0.55 * a})`);
-    grad.addColorStop(0.5, `rgba(200,150,70,${0.22 * a})`);
-    grad.addColorStop(1, "rgba(120,90,140,0)"); // whisper of cosmic violet at the edge
-    ctx!.fillStyle = grad;
+    const g = ctx!.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    g.addColorStop(0, `rgba(255,246,222,${0.85 * a})`);
+    g.addColorStop(0.2, `rgba(240,206,138,${0.5 * a})`);
+    g.addColorStop(0.55, `rgba(200,150,70,${0.18 * a})`);
+    g.addColorStop(1, "rgba(120,90,150,0)");
+    ctx!.fillStyle = g;
     ctx!.beginPath();
     ctx!.arc(cx, cy, rad, 0, Math.PI * 2);
     ctx!.fill();
     ctx!.globalCompositeOperation = "source-over";
   }
 
+  function drawParticles(t: number) {
+    const appear = seg(t, T.dustIn[0], T.dustIn[0] + 1200);
+    const pDust = easeInOut(seg(t, T.dustIn[0], T.dustIn[1]));
+    const pForm = easeInOut(seg(t, T.glyphForm[0], T.glyphForm[1]));
+    const pDisp = seg(t, T.disperse[0], T.disperse[1]);
+    const dispEase = easeOut(pDisp);
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
+    const maxDim = Math.hypot(W, H);
+
+    ctx!.globalCompositeOperation = "lighter";
+    for (const p of particles) {
+      const ca = p.camAng + p.swirl * pDust;
+      const cloudX = cx + Math.cos(ca) * p.camR;
+      const cloudY = cy + Math.sin(ca) * p.camR;
+      let x = lerp(p.sx, cloudX, pDust);
+      let y = lerp(p.sy, cloudY, pDust);
+      if (pForm > 0) {
+        x = lerp(x, cx + p.gx, pForm);
+        y = lerp(y, cy + p.gy, pForm);
+      }
+      const held = pForm >= 1 && pDisp <= 0;
+      if (held) {
+        x += Math.sin(t * 0.006 + p.tw) * R * 0.01;
+        y += Math.cos(t * 0.006 + p.tw) * R * 0.01;
+      }
+      if (pDisp > 0) {
+        const travel = dispEase * p.dispDist * maxDim * 0.5;
+        x += Math.cos(p.dispAng) * travel;
+        y += Math.sin(p.dispAng) * travel - dispEase * H * 0.05; // gentle rise
+      }
+      let a = appear;
+      const twinkle = 0.7 + 0.3 * Math.sin(t * 0.004 + p.tw + p.seed);
+      if (pDisp > 0) a *= (0.4 + 0.6 * twinkle) * (1 - smooth(clamp01(pDisp)));
+      a *= 1 - fadeOut;
+      if (a <= 0.01) continue;
+      const glow = 1 + 0.4 * Math.max(0, pForm - pDisp);
+      const size = p.r * 5 * glow;
+      ctx!.globalAlpha = clamp01(a);
+      ctx!.drawImage(p.silver ? moteSilver : moteGold, x - size / 2, y - size / 2, size, size);
+    }
+    ctx!.globalAlpha = 1;
+    ctx!.globalCompositeOperation = "source-over";
+  }
+
+  /** Crisp gold line-art glyph over the particles — guarantees legibility. */
+  function drawGlyphStroke(t: number) {
+    const inA = smooth(seg(t, T.strokeIn[0], T.strokeIn[1]));
+    const out = smooth(seg(t, T.disperse[0], T.disperse[0] + 900));
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
+    const a = inA * (1 - out) * (1 - fadeOut);
+    if (a <= 0.01) return;
+    const shimmer = 0.85 + 0.15 * Math.sin(t * 0.005);
+    ctx!.save();
+    ctx!.translate(cx, cy);
+    ctx!.globalCompositeOperation = "lighter";
+    ctx!.lineCap = "round";
+    ctx!.lineJoin = "round";
+    ctx!.shadowColor = "rgba(255,224,150,0.9)";
+    ctx!.shadowBlur = R * 0.28;
+    ctx!.strokeStyle = `rgba(255,244,214,${a * shimmer})`;
+    ctx!.fillStyle = `rgba(255,244,214,${a * shimmer})`;
+    ctx!.lineWidth = R * 0.05;
+    traceCancer(ctx!, R);
+    // second pass, brighter core
+    ctx!.shadowBlur = R * 0.1;
+    ctx!.lineWidth = R * 0.02;
+    ctx!.strokeStyle = `rgba(255,255,245,${a})`;
+    traceCancer(ctx!, R);
+    ctx!.restore();
+  }
+
+  /** Cancer constellation as faint context around the glyph. */
+  function drawConstellation(t: number) {
+    const inA = smooth(seg(t, T.constellationIn[0], T.constellationIn[1]));
+    const out = smooth(seg(t, T.disperse[0], T.disperse[1]));
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
+    const a = inA * (1 - out) * (1 - fadeOut);
+    if (a <= 0.01) return;
+    // Sits in the upper-left sky as a distant asterism — context, not clutter.
+    const ccx = W * (isMobile ? 0.26 : 0.22);
+    const ccy = H * 0.24;
+    const scale = R * (isMobile ? 0.8 : 0.95);
+    const px = (p: Pt) => ccx + p.x * scale;
+    const py = (p: Pt) => ccy + p.y * scale;
+    ctx!.save();
+    ctx!.globalCompositeOperation = "lighter";
+    ctx!.strokeStyle = `rgba(226,201,138,${a * 0.22})`;
+    ctx!.lineWidth = 1;
+    for (const [i, j] of CANCER_EDGES) {
+      ctx!.beginPath();
+      ctx!.moveTo(px(CANCER_STARS[i]), py(CANCER_STARS[i]));
+      ctx!.lineTo(px(CANCER_STARS[j]), py(CANCER_STARS[j]));
+      ctx!.stroke();
+    }
+    for (const s of CANCER_STARS) {
+      const tw = 0.7 + 0.3 * Math.sin(t * 0.004 + s.x * 8);
+      const size = R * 0.16 * tw;
+      ctx!.globalAlpha = a * tw * 0.85;
+      ctx!.drawImage(starWarm, px(s) - size / 2, py(s) - size / 2, size, size);
+    }
+    ctx!.globalAlpha = 1;
+    ctx!.restore();
+  }
+
+  function drawTreeOfLife(t: number, focus: number) {
+    const growth = easeOut(seg(t, T.treeGrow[0], T.treeGrow[1]));
+    if (growth <= 0) return;
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
+    const recede = smooth(seg(t, T.glyphForm[0], T.glyphForm[1]));
+    const a = 0.5 * (1 - 0.5 * recede) * focus * (1 - fadeOut);
+    drawTree(ctx!, tree, cx, cy + R * 0.15, R * 2.4, growth, a);
+  }
+
+  function drawButterflies(t: number) {
+    const fadeOut = seg(t, T.fadeOut[0], T.end);
+    for (const f of flies) {
+      const p = seg(t, f.bornAt, f.bornAt + f.life);
+      if (p <= 0 || p >= 1) continue;
+      const fade = Math.sin(p * Math.PI);
+      const ease = easeInOut(p);
+      const x = lerp(f.x0, f.x1, ease) + Math.sin(t * 0.002 * f.freq) * 20;
+      const y = lerp(f.y0, f.y1, ease) + Math.sin(t * 0.003 * f.freq) * 26;
+      const flap = 0.5 + 0.5 * Math.sin(t * 0.02 * f.freq);
+      const ang = Math.atan2(f.y1 - f.y0, f.x1 - f.x0) + Math.sin(t * 0.002) * 0.2;
+      drawButterfly(ctx!, x, y, f.size, flap, fade * (1 - fadeOut), ang);
+    }
+  }
+
   function drawPulse(t: number) {
-    const p = seg(t, T.pulseFrom, T.pulseTo);
+    const p = seg(t, T.pulse[0], T.pulse[1]);
     if (p <= 0 || p >= 1) return;
     const e = easeOut(p);
     const maxDim = Math.hypot(W, H);
     const rad = e * maxDim * 0.62;
-    const a = (1 - p) * 0.55;
-    ctx!.globalCompositeOperation = "lighter";
+    const a = (1 - p) * 0.5;
     const width = R * 0.5 * (1 - p * 0.5);
-    const grad = ctx!.createRadialGradient(
-      cx,
-      cy,
-      Math.max(0, rad - width),
-      cx,
-      cy,
-      rad + width,
-    );
-    grad.addColorStop(0, "rgba(240,206,138,0)");
-    grad.addColorStop(0.5, `rgba(255,240,200,${a})`);
-    grad.addColorStop(1, "rgba(240,206,138,0)");
-    ctx!.fillStyle = grad;
+    ctx!.globalCompositeOperation = "lighter";
+    const g = ctx!.createRadialGradient(cx, cy, Math.max(0, rad - width), cx, cy, rad + width);
+    g.addColorStop(0, "rgba(240,206,138,0)");
+    g.addColorStop(0.5, `rgba(255,240,200,${a})`);
+    g.addColorStop(1, "rgba(240,206,138,0)");
+    ctx!.fillStyle = g;
     ctx!.beginPath();
     ctx!.arc(cx, cy, rad + width, 0, Math.PI * 2);
     ctx!.fill();
     ctx!.globalCompositeOperation = "source-over";
   }
 
-  // ── Reduced-motion: a calm static blessing, no travel ──────────────────────
-  function drawReduced(t: number) {
-    const inOut = Math.sin(clamp01(t / REDUCED_END) * Math.PI); // 0→1→0
-    ctx!.clearRect(0, 0, W, H);
-    ctx!.globalCompositeOperation = "lighter";
-    // soft central glow
-    const rad = R * 1.3;
-    const grad = ctx!.createRadialGradient(cx, cy, 0, cx, cy, rad);
-    grad.addColorStop(0, `rgba(255,246,222,${0.5 * inOut})`);
-    grad.addColorStop(0.4, `rgba(220,170,90,${0.2 * inOut})`);
-    grad.addColorStop(1, "rgba(120,90,140,0)");
-    ctx!.fillStyle = grad;
+  /** Spotlight vignette that dims the periphery while the glyph is held. */
+  function drawSpotlight(t: number, focus: number) {
+    const dim = 1 - focus; // 0 normally, up to ~0.5 during hold
+    if (dim <= 0.01) return;
+    const g = ctx!.createRadialGradient(cx, cy, R * 0.8, cx, cy, Math.hypot(W, H) * 0.55);
+    g.addColorStop(0, "rgba(6,5,14,0)");
+    g.addColorStop(1, `rgba(6,5,14,${0.55 * dim})`);
+    ctx!.fillStyle = g;
     ctx!.fillRect(0, 0, W, H);
-    // faint glyph
-    ctx!.globalAlpha = 0.85 * inOut;
-    for (const p of particles) {
-      const size = p.r * 5;
-      ctx!.drawImage(gold, cx + p.gx - size / 2, cy + p.gy - size / 2, size, size);
+  }
+
+  // Focus = 1 normally, dips during the glyph hold to spotlight it.
+  function focusAt(t: number) {
+    const into = smooth(seg(t, T.glyphForm[0], T.strokeIn[1]));
+    const back = smooth(seg(t, T.disperse[0], T.disperse[1]));
+    return 1 - 0.5 * (into - back);
+  }
+
+  function drawReduced(t: number) {
+    const io = Math.sin(clamp01(t / REDUCED_END) * Math.PI);
+    ctx!.clearRect(0, 0, W, H);
+    paintSky(ctx!, W, H, io);
+    drawNebula(ctx!, nebula, t, io * 0.8);
+    // a few stars
+    ctx!.globalCompositeOperation = "lighter";
+    for (let i = 0; i < stars.length; i += 2) {
+      const s = stars[i];
+      const size = s.size * 3;
+      ctx!.globalAlpha = io * s.base * 0.8;
+      ctx!.drawImage(s.warm ? starWarm : starCool, s.x - size / 2, s.y - size / 2, size, size);
     }
     ctx!.globalAlpha = 1;
     ctx!.globalCompositeOperation = "source-over";
-    container.style.opacity = String(0.85 * inOut + (inOut > 0 ? 0.15 : 0));
+    drawMoon(ctx!, moonX, moonY, moonR, io);
+    // crisp glyph
+    ctx!.save();
+    ctx!.translate(cx, cy);
+    ctx!.globalCompositeOperation = "lighter";
+    ctx!.lineCap = "round";
+    ctx!.shadowColor = "rgba(255,224,150,0.9)";
+    ctx!.shadowBlur = R * 0.25;
+    ctx!.strokeStyle = `rgba(255,244,214,${io})`;
+    ctx!.fillStyle = `rgba(255,244,214,${io})`;
+    ctx!.lineWidth = R * 0.05;
+    traceCancer(ctx!, R);
+    ctx!.restore();
+    container.style.opacity = String(clamp01(io * 1.2));
   }
 
-  // ── Main loop ──────────────────────────────────────────────────────────────
   function frame(now: number) {
     if (!startT) startT = now;
     const frozen = opts.freezeMs != null;
@@ -405,13 +524,25 @@ export function runCelebration(
       return;
     }
 
-    // Container veil in, then out at the finale.
     const inOpacity = smooth(seg(t, 0, T.fadeIn));
-    const outOpacity = 1 - smooth(seg(t, T.fadeOutFrom, T.end));
+    const outOpacity = 1 - smooth(seg(t, T.fadeOut[0], T.end));
     container.style.opacity = String(inOpacity * outOpacity);
 
-    drawSphere(t);
+    const skyA = smooth(seg(t, 0, T.fadeIn)) * (1 - seg(t, T.fadeOut[0], T.end));
+    const focus = focusAt(t);
+
+    paintSky(ctx!, W, H, skyA);
+    drawNebula(ctx!, nebula, t, focus * skyA);
+    drawStars(t, focus);
+    drawShootingStar(t);
+    drawMoon(ctx!, moonX, moonY, moonR, smooth(seg(t, T.moonIn[0], T.moonIn[1])) * focus * (1 - seg(t, T.fadeOut[0], T.end)));
+    drawTreeOfLife(t, focus);
+    drawSpotlight(t, focus);
+    drawSphere(t, focus);
+    drawConstellation(t);
     drawParticles(t);
+    drawGlyphStroke(t);
+    drawButterflies(t);
     drawPulse(t);
 
     if (!frozen && t >= T.end) return finish();
@@ -423,9 +554,8 @@ export function runCelebration(
   return {
     skip() {
       if (done || opts.reducedMotion) return finish();
-      // Jump to the start of the dispersal/fade so the exit stays graceful.
       const now = performance.now();
-      const target = Math.max(T.glyphHold, T.pulseFrom - 200);
+      const target = Math.max(T.holdUntil, T.pulse[0] - 200);
       if (now - startT < target) startT = now - target;
     },
     destroy() {

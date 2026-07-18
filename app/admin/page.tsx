@@ -1917,6 +1917,36 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 </button>
               </div>
 
+              {/* Sub-toggles: intro + living atmosphere */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-5 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-white/90 text-sm font-medium mb-1">Кінематографічний вступ</p>
+                    <p className="text-white/50 text-xs">Повноекранна сцена при вході (раз на відвідувача).</p>
+                  </div>
+                  <button
+                    onClick={() => updateCel({ intro: !celebration.intro })}
+                    className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${celebration.intro ? "bg-[#3A7A4E]" : "bg-white/15"}`}
+                    aria-label="Toggle intro"
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${celebration.intro ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+                <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-5 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-white/90 text-sm font-medium mb-1">Жива атмосфера</p>
+                    <p className="text-white/50 text-xs">Частинки, зорепади, магія курсора, сцена у футері, святкова вкладка.</p>
+                  </div>
+                  <button
+                    onClick={() => updateCel({ atmosphere: !celebration.atmosphere })}
+                    className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${celebration.atmosphere ? "bg-[#3A7A4E]" : "bg-white/15"}`}
+                    aria-label="Toggle atmosphere"
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${celebration.atmosphere ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+              </div>
+
               {/* Theme + label */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>

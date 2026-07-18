@@ -57,6 +57,8 @@ export default function CelebrationOverlay() {
         return;
       }
       if (!isCelebrationActive(config, todayLocalISO())) return;
+      if (!config.intro) return; // owner disabled the cinematic intro
+
       try {
         if (localStorage.getItem(celebrationSeenKey(config))) return;
       } catch {

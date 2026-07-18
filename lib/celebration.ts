@@ -15,9 +15,9 @@
 export type CelebrationTheme = "birthday_cancer";
 
 export interface CelebrationConfig {
-  /** Master switch. If false the overlay never plays. */
+  /** Master switch. If false, nothing (intro, atmosphere, footer) shows. */
   enabled: boolean;
-  /** Which animation to play. */
+  /** Which animation/theme to play. */
   theme: CelebrationTheme;
   /** Inclusive first day the overlay may appear (local date, YYYY-MM-DD). */
   startDate: string;
@@ -25,6 +25,11 @@ export interface CelebrationConfig {
   endDate: string;
   /** Owner-facing label only (never shown to visitors). */
   title: string;
+  /** Play the cinematic intro overlay (once per visitor). */
+  intro: boolean;
+  /** The living site-wide layer: ambient particles, shooting stars, cursor
+   *  magic, hover dust, footer scene and browser-tab signals. */
+  atmosphere: boolean;
 }
 
 /** Themes offered in the admin dropdown. Add new holidays here. */
@@ -43,6 +48,8 @@ export const DEFAULT_CELEBRATION: CelebrationConfig = {
   startDate: "2026-07-18",
   endDate: "2026-07-21",
   title: "День народження Ellen",
+  intro: true,
+  atmosphere: true,
 };
 
 /** Local calendar date as YYYY-MM-DD (visitor's own timezone). */
@@ -67,6 +74,8 @@ export function normalizeCelebration(raw: unknown): CelebrationConfig {
     startDate: ISO_DATE.test(c.startDate ?? "") ? (c.startDate as string) : DEFAULT_CELEBRATION.startDate,
     endDate: ISO_DATE.test(c.endDate ?? "") ? (c.endDate as string) : DEFAULT_CELEBRATION.endDate,
     title: typeof c.title === "string" && c.title.trim() ? c.title : DEFAULT_CELEBRATION.title,
+    intro: typeof c.intro === "boolean" ? c.intro : DEFAULT_CELEBRATION.intro,
+    atmosphere: typeof c.atmosphere === "boolean" ? c.atmosphere : DEFAULT_CELEBRATION.atmosphere,
   };
 }
 
