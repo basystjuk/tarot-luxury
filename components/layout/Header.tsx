@@ -103,6 +103,7 @@ export default function Header() {
           {/* Logo */}
           <Link href={`/${language}`} className="flex flex-col items-center leading-none group">
             <span
+              data-birthday-glow
               className="text-2xl tracking-wide text-[#1C1512] transition-colors group-hover:text-[#B8883A]"
               style={{ fontFamily: "var(--font-cormorant, 'Cormorant Garamond')", fontWeight: 400 }}
             >
