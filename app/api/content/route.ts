@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_SERVICES, DEFAULT_ORG } from "@/lib/data/services";
 import { testimonials as DEFAULT_TESTIMONIALS } from "@/lib/data/testimonials";
 import { DEFAULT_TOOLS_ENABLED } from "@/lib/tools-config";
+import { DEFAULT_CELEBRATION } from "@/lib/celebration";
 import { isPreviewFromRequest } from "@/lib/preview";
 
 const CONTENT_BLOB = "site-content.json";
@@ -54,6 +55,7 @@ export async function GET(req: NextRequest) {
 function defaults() {
   return {
     tools_enabled: DEFAULT_TOOLS_ENABLED,
+    celebration: DEFAULT_CELEBRATION,
     services: DEFAULT_SERVICES,
     org: DEFAULT_ORG,
     testimonials: DEFAULT_TESTIMONIALS,

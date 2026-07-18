@@ -11,6 +11,7 @@ import { PostHogProvider } from '@/components/PostHogProvider';
 import BookingModal from '@/components/ui/BookingModal';
 import GlobalSchema from '@/components/seo/GlobalSchema';
 import QuickContactModal from '@/components/ui/QuickContactModal';
+import CelebrationOverlay from '@/components/celebration/CelebrationOverlay';
 // Vercel Analytics disabled — PostHog (Phase Б) is our product analytics
 // and Hobby plan's Vercel Analytics has a 1500-event/month cap that's
 // useless for any real traffic. Re-enable only if upgrading to Pro AND
@@ -118,6 +119,7 @@ export default async function RootLayout({
               <Footer />
               <BookingModal />
               <QuickContactModal />
+              <CelebrationOverlay />
             </ModalProvider>
           </LanguageProvider>
         </PostHogProvider>

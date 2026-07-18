@@ -26,6 +26,13 @@ import {
   type PromptToolId,
   type PromptOverrides,
 } from "@/lib/ai-prompts";
+import {
+  DEFAULT_CELEBRATION,
+  CELEBRATION_THEMES,
+  isCelebrationActive,
+  todayLocalISO,
+  type CelebrationConfig,
+} from "@/lib/celebration";
 
 const ADMIN_PASSWORD = "ellensoul2025";
 const STORAGE_KEY = "ellen_admin_testimonials";
@@ -351,7 +358,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "prompts" | "notifications" | "videos">("testimonials");
+  const [activeTab, setActiveTab] = useState<"photo" | "gallery" | "testimonials" | "blog" | "services" | "faq" | "contacts" | "home" | "about" | "studio" | "access" | "celebration" | "prompts" | "notifications" | "videos">("testimonials");
 
   // Gallery state
   interface GalleryItem { url: string; pathname: string; position?: "top" | "center" | "bottom"; }
@@ -481,6 +488,13 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [previewSaving, setPreviewSaving] = useState(false);
   const [accessSaved, setAccessSaved] = useState(false);
 
+  // ── Celebration overlay (birthday / holiday) config ────────────────────
+  // Stored in the same site-content.json blob under `celebration`. Read by
+  // /api/celebration → CelebrationOverlay. Ref mirrors state for save payloads.
+  const [celebration, setCelebration] = useState<CelebrationConfig>(DEFAULT_CELEBRATION);
+  const celebrationRef = useRef<CelebrationConfig>(DEFAULT_CELEBRATION);
+  const [celebrationSaved, setCelebrationSaved] = useState(false);
+
   // ── AI prompt overrides (per-tool system+user editing) ─────────────────
   // Stored in the same site-content.json blob under `ai_prompts`. Empty
   // strings mean "use default". Refs mirror state so saveAllContent reads
@@ -582,6 +596,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           setAiPrompts(d.ai_prompts);
           aiPromptsRef.current = d.ai_prompts;
         }
+        if (d.celebration && typeof d.celebration === "object") {
+          const c = { ...DEFAULT_CELEBRATION, ...d.celebration } as CelebrationConfig;
+          setCelebration(c);
+          celebrationRef.current = c;
+        }
         setPreviewOn(Boolean(d.preview));
       })
       .catch(() => {});
@@ -628,6 +647,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           studio_tools: studioRef.current,
           tools_enabled: toolsEnabledRef.current,
           ai_prompts: aiPromptsRef.current,
+          celebration: celebrationRef.current,
         }),
       });
       if (res.ok) {
@@ -690,6 +710,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           studio_tools: studioRef.current,
           tools_enabled: toolsEnabledRef.current,
           ai_prompts: aiPromptsRef.current,
+          celebration: celebrationRef.current,
         }),
       });
       if (res.ok) {
@@ -864,7 +885,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tabs */}
       <div className="border-b border-white/10 px-6">
         <div className="flex gap-1 -mb-px">
-          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "prompts", "notifications", "videos"] as const).map((tab) => (
+          {(["photo", "gallery", "testimonials", "blog", "services", "faq", "contacts", "home", "about", "studio", "access", "celebration", "prompts", "notifications", "videos"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -885,6 +906,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 : tab === "about" ? "👤 Про мене"
                 : tab === "studio" ? "🔮 Студія"
                 : tab === "access" ? "🎛 Доступ"
+                : tab === "celebration" ? "🎉 Свято"
                 : tab === "prompts" ? "🧠 Промти"
                 : tab === "notifications" ? "🔔 Сповіщення"
                 : "🎬 Відео"}
@@ -1845,6 +1867,128 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </button>
           </div>
         )}
+
+        {/* ── Celebration Tab — birthday / holiday overlay ─────────────── */}
+        {activeTab === "celebration" && (() => {
+          const updateCel = (patch: Partial<CelebrationConfig>) => {
+            const next = { ...celebrationRef.current, ...patch };
+            celebrationRef.current = next;
+            setCelebration(next);
+          };
+          const liveNow = isCelebrationActive(celebration, todayLocalISO());
+          return (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl mb-1" style={{ fontFamily: "var(--font-cormorant)" }}>Святкова анімація</h2>
+                <p className="text-white/40 text-sm">
+                  Повноекранна кінематографічна анімація поверх сайту — грає раз на відвідувача у вікні дат.
+                  Без тексту й логотипів. Поважає «зменшений рух» у налаштуваннях пристрою.
+                </p>
+              </div>
+
+              {/* Live status */}
+              <div className={`rounded-2xl border p-4 text-sm flex items-center gap-3 ${
+                celebration.enabled && liveNow
+                  ? "border-[rgba(58,122,78,0.5)] bg-[rgba(58,122,78,0.12)] text-green-300"
+                  : "border-[rgba(196,169,122,0.2)] bg-[#2A1F18] text-white/60"
+              }`}>
+                <span className="text-lg">{celebration.enabled && liveNow ? "🟢" : "⚪"}</span>
+                <span>
+                  {!celebration.enabled
+                    ? "Вимкнено — не показується нікому."
+                    : liveNow
+                      ? "Активно зараз — відвідувачі бачать анімацію (раз на пристрій)."
+                      : `Увімкнено, але сьогодні (${todayLocalISO()}) поза вікном ${celebration.startDate} – ${celebration.endDate}.`}
+                </span>
+              </div>
+
+              {/* Enable toggle */}
+              <div className="bg-[#2A1F18] rounded-2xl border border-[rgba(196,169,122,0.2)] p-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-white/90 text-sm font-medium mb-1">Показувати анімацію</p>
+                  <p className="text-white/50 text-xs">Головний вимикач. Дати нижче все одно обмежують показ.</p>
+                </div>
+                <button
+                  onClick={() => updateCel({ enabled: !celebration.enabled })}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${celebration.enabled ? "bg-[#3A7A4E]" : "bg-white/15"}`}
+                  aria-label="Toggle celebration"
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${celebration.enabled ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+
+              {/* Theme + label */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] tracking-widest uppercase block mb-2">Тема</label>
+                  <select
+                    className="admin-input w-full"
+                    value={celebration.theme}
+                    onChange={(e) => updateCel({ theme: e.target.value as CelebrationConfig["theme"] })}
+                  >
+                    {CELEBRATION_THEMES.map((t) => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] tracking-widest uppercase block mb-2">Назва (лише для тебе)</label>
+                  <input
+                    className="admin-input w-full"
+                    value={celebration.title}
+                    onChange={(e) => updateCel({ title: e.target.value })}
+                    placeholder="День народження Ellen"
+                  />
+                </div>
+              </div>
+
+              {/* Date window */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-[#C4A97A] tracking-widest uppercase block mb-2">Показувати з</label>
+                  <input
+                    type="date"
+                    className="admin-input w-full"
+                    value={celebration.startDate}
+                    onChange={(e) => updateCel({ startDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-[#C4A97A] tracking-widest uppercase block mb-2">До (включно)</label>
+                  <input
+                    type="date"
+                    className="admin-input w-full"
+                    value={celebration.endDate}
+                    onChange={(e) => updateCel({ endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={async () => {
+                    await saveAllContent();
+                    setCelebrationSaved(true);
+                    setTimeout(() => setCelebrationSaved(false), 2000);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4A853] hover:bg-[#C4983A] text-white transition-colors text-sm font-medium"
+                >
+                  <Save size={14} /> {celebrationSaved ? "Збережено ✓" : "Зберегти"}
+                </button>
+                <button
+                  onClick={() => window.open("/uk?celebrate=1", "_blank")}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[rgba(196,169,122,0.4)] text-[#C4A97A] hover:text-[#D4A853] hover:border-[#D4A853] transition-colors text-sm font-medium"
+                >
+                  <Eye size={14} /> Переглянути зараз
+                </button>
+                <p className="text-white/30 text-xs">
+                  «Переглянути» відкриває сайт із примусовим показом (ігнорує дати й «уже бачив»).
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Prompts Tab — edit AI System+User per tool ──────────────── */}
         {activeTab === "prompts" && (() => {
