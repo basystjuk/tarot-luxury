@@ -30,7 +30,7 @@ import {
   SIGNS_UA, SIGN_GLYPHS,
 } from "@/lib/astro/calculations";
 import { computeNatalSnapshot } from "@/lib/astro/natal-snapshot";
-import { buildDayReading, formatHM } from "@/lib/astro/horoscope";
+import { buildDayReading, formatHM, calcPersonalDay, localDayFor } from "@/lib/astro/horoscope";
 import { ianaToOffsetHours } from "@/app/[lang]/studio/moon-phase/_natal";
 
 export const maxDuration = 60; // up to a minute — many small Telegram calls
@@ -190,8 +190,24 @@ function localDay(d: Date, tz: string): string {
   }).format(d);
 }
 
+/**
+ * "Повне сонячне затемнення" — the sub-type now comes from the geometry
+ * (Eclipse.kind) instead of being flattened away. Penumbral never reaches
+ * here; it is filtered out in findEclipseAlert.
+ */
+function eclipseHeadline(eclipse: Eclipse): string {
+  const KIND_UA: Record<string, string> = {
+    total: "Повне", annular: "Кільцеве", hybrid: "Гібридне", partial: "Часткове",
+    penumbral: "Напівтіньове",
+  };
+  const noun = eclipse.type === "solar" ? "сонячне затемнення" : "місячне затемнення";
+  const adj = KIND_UA[eclipse.kind] ?? "";
+  return adj ? `${adj} ${noun}` : noun.charAt(0).toUpperCase() + noun.slice(1);
+}
+
 function eclipseMessage({ eclipse, hoursAhead }: EclipseAlert, tz: string): string {
-  const kind = eclipse.type === "solar" ? "🌒 Сонячне затемнення" : "🌕 Місячне затемнення";
+  const glyph = eclipse.type === "solar" ? "🌒" : "🌕";
+  const kind = `${glyph} ${eclipseHeadline(eclipse)}`;
   const { umbralBegin, umbralEnd, date: peak } = eclipse;
 
   let timing: string;
@@ -264,12 +280,16 @@ function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function dailyHoroscopeMessage(name: string | null, theme: string, quality: string, topWindow: string | null): string {
-  const greet = name ? `, ${name}` : "";
+/**
+ * No name in the greeting (owner's call, 2026-08-12). Ukrainian address takes
+ * the vocative — "Сергію", not "Сергій" — and generating it reliably for
+ * arbitrary and foreign names is not worth the wrongness when it misses.
+ */
+function dailyHoroscopeMessage(theme: string, quality: string, topWindow: string | null): string {
   const head = quality === "flowing" ? "🌿 Сьогодні — потоковий день"
              : quality === "turbulent" ? "⚡ Сьогодні — турбулентний день"
              : "✨ Гороскоп дня";
-  let body = `<b>${head}</b>\n\nДоброго ранку${greet}! ${capitalise(theme)}`;
+  let body = `<b>${head}</b>\n\nДоброго ранку! ${capitalise(theme)}`;
   if (topWindow) body += `\n\n🍀 Вікно удачі: <b>${topWindow}</b>`;
   body += `\n\n<a href="https://ellen-soul.com/uk/studio/horoscope">Повний гороскоп на сьогодні →</a>`;
   return body;
@@ -346,9 +366,8 @@ function pushFor(kind: "eclipse" | "lunar_return" | "weekly_card" | "moon_phase_
   switch (kind) {
     case "eclipse": {
       const { eclipse, hoursAhead } = opts.eclipse!;
-      const label = eclipse.type === "solar" ? "Сонячне затемнення" : "Місячне затемнення";
       return {
-        title: `🌒 ${label}`,
+        title: `${eclipse.type === "solar" ? "🌒" : "🌕"} ${eclipseHeadline(eclipse)}`,
         body:  `Через ${hoursAhead} год — ${fmtDateTime(eclipse.date, tz)}. День не для нових починань.`,
         url:   "/uk/studio/moon-phase",
         tag:   `eclipse-${eclipse.date.toISOString().slice(0,10)}`,
@@ -428,14 +447,19 @@ function readingForProfile(profile: ProfileRow, now: Date, tzOffset: number) {
     : (profile.natal_moon_lon != null ? { moon: profile.natal_moon_lon } : undefined);
   if (!natal) return null;
 
-  // Local midnight today (Kyiv) as the day anchor.
-  const midnight = new Date(now);
-  midnight.setUTCHours(0, 0, 0, 0);
+  // `now` is the anchor; buildDayReading derives the user's own calendar day
+  // from tzOffset, so nobody gets yesterday's or tomorrow's reading.
+  const { y, m, d } = localDayFor(now, tzOffset);
   return buildDayReading({
-    date: midnight,
+    date: now,
     tzOffsetHours: tzOffset,
     language: "uk",
     natal,
+    // The web page feeds Personal Day too; without it the Telegram teaser and
+    // the page it links to described the same day differently.
+    numerology: profile.birth_date
+      ? { personalDay: calcPersonalDay(profile.birth_date, y, m, d) ?? undefined }
+      : undefined,
     // No firstName on purpose: the Telegram message already opens with
     // "Доброго ранку, <name>!", and buildTheme would prefix the name a
     // second time — "Доброго ранку Сергій! Сергій, день внутрішнього тиску".
@@ -645,7 +669,7 @@ export async function GET(req: NextRequest) {
           const topWindow = top ? `${formatHM(top.startMinutes)}–${formatHM(top.endMinutes)}` : null;
           const key = `horoscope:${reading.isoDate}`;
           await dispatch(profile.id, chatId, pushAllowed, "daily_horoscope", key,
-            () => dailyHoroscopeMessage(profile.display_name, reading.theme, reading.quality, topWindow),
+            () => dailyHoroscopeMessage(reading.theme, reading.quality, topWindow),
             () => pushFor("daily_horoscope", { name: profile.display_name, theme: reading.theme, quality: reading.quality, topWindow }, tz),
             { quality: reading.quality });
         }

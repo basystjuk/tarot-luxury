@@ -251,6 +251,20 @@ interface SlotRecord {
   contributors: ConvergenceSignal[];
 }
 
+/**
+ * The calendar day `date` falls on, as seen from a zone `tzOffsetHours` east
+ * of UTC.
+ *
+ * Deliberately not `d.setHours(0,0,0,0)`: that reads the HOST's timezone, so
+ * the same call produced a different day's reading on a UTC server than on a
+ * developer's laptop — and after per-user zones landed, "which day" stopped
+ * being the server's business entirely.
+ */
+function localDayParts(date: Date, tzOffsetHours: number): { y: number; m: number; d: number } {
+  const shifted = new Date(date.getTime() + tzOffsetHours * 3_600_000);
+  return { y: shifted.getUTCFullYear(), m: shifted.getUTCMonth() + 1, d: shifted.getUTCDate() };
+}
+
 /** Build per-slot scores across the day from transit-Moon aspects to natal. */
 function scoreSlots(input: HoroscopeInput): SlotRecord[] {
   const out: SlotRecord[] = [];
@@ -268,16 +282,12 @@ function scoreSlots(input: HoroscopeInput): SlotRecord[] {
     ["MC",      natal.mc],
   ] as Array<[string, number | undefined]>;
 
-  const d0 = new Date(input.date);
-  d0.setHours(0, 0, 0, 0);
+  const { y, m, d } = localDayParts(input.date, tzOffsetHours);
 
   for (let s = 0; s < SLOTS_PER_DAY; s++) {
     const minutes = s * SLOT_MINUTES;
-    const slot = new Date(d0.getTime() + minutes * 60_000);
-    const jd = dateToJD(
-      slot.getFullYear(), slot.getMonth() + 1, slot.getDate(),
-      slot.getHours(), slot.getMinutes(), tzOffsetHours,
-    );
+    // Slot labels are wall-clock in the user's zone; dateToJD converts them.
+    const jd = dateToJD(y, m, d, Math.floor(minutes / 60), minutes % 60, tzOffsetHours);
     const transitMoon = calcPlanetDeg(1, jd);
 
     let score = 0;
@@ -316,29 +326,38 @@ function scoreSlots(input: HoroscopeInput): SlotRecord[] {
   return out;
 }
 
-/** Compress runs of similar-polarity slots into windows. */
-function findWindows(
+/** Minutes either side of the strongest slot that a window reaches. */
+const WINDOW_HALF_WIDTH = 45;
+
+/**
+ * The day's single strongest stretch, centred on its peak slot.
+ *
+ * The previous version returned every RUN of qualifying slots ≥60 min long.
+ * With nine natal points and orbs up to 5°, aspects overlap for hours, so a
+ * "window of luck" routinely came out 7–11 hours wide and 19% of them ran into
+ * the midnight edge — advice that spans half a day advises nothing. Owner's
+ * call (2026-08-12): one window per day, ±45 min around the peak.
+ */
+function peakWindow(
   slots: SlotRecord[],
-  predicate: (slot: SlotRecord) => boolean,
-  minLengthMinutes = 60,
+  polarity: "luck" | "pressure",
 ): Array<{ startMinutes: number; endMinutes: number; peakScore: number; contributors: ConvergenceSignal[] }> {
-  const wins: Array<{ startMinutes: number; endMinutes: number; peakScore: number; contributors: ConvergenceSignal[] }> = [];
-  let cur: { startMinutes: number; endMinutes: number; peakScore: number; contributors: ConvergenceSignal[] } | null = null;
+  const qualifies = (s: SlotRecord) => polarity === "luck" ? s.score >= 2 : s.score <= -2;
+
+  let best: SlotRecord | null = null;
   for (const s of slots) {
-    if (predicate(s)) {
-      if (!cur) cur = { startMinutes: s.minutes, endMinutes: s.minutes + SLOT_MINUTES, peakScore: s.score, contributors: [...s.contributors] };
-      else {
-        cur.endMinutes = s.minutes + SLOT_MINUTES;
-        cur.peakScore  = Math.max(cur.peakScore, Math.abs(s.score));
-        cur.contributors.push(...s.contributors);
-      }
-    } else if (cur) {
-      if (cur.endMinutes - cur.startMinutes >= minLengthMinutes) wins.push(cur);
-      cur = null;
-    }
+    if (!qualifies(s)) continue;
+    if (!best || Math.abs(s.score) > Math.abs(best.score)) best = s;
   }
-  if (cur && cur.endMinutes - cur.startMinutes >= minLengthMinutes) wins.push(cur);
-  return wins;
+  if (!best) return [];
+
+  const startMinutes = Math.max(0, best.minutes - WINDOW_HALF_WIDTH);
+  const endMinutes   = Math.min(24 * 60, best.minutes + SLOT_MINUTES + WINDOW_HALF_WIDTH);
+  const contributors = slots
+    .filter(s => s.minutes >= startMinutes && s.minutes < endMinutes)
+    .flatMap(s => s.contributors);
+
+  return [{ startMinutes, endMinutes, peakScore: Math.abs(best.score), contributors }];
 }
 
 function fmtMinutes(m: number): string {
@@ -387,9 +406,9 @@ export function buildDayReading(input: HoroscopeInput): DayReading {
   const { language, date, tzOffsetHours } = input;
   const signals: ConvergenceSignal[] = [];
 
-  // Day signature
-  const d0 = new Date(date); d0.setHours(0, 0, 0, 0);
-  const noonJd = dateToJD(d0.getFullYear(), d0.getMonth() + 1, d0.getDate(), 12, 0, tzOffsetHours);
+  // Day signature — the user's calendar day, never the host's.
+  const { y, m, d } = localDayParts(date, tzOffsetHours);
+  const noonJd = dateToJD(y, m, d, 12, 0, tzOffsetHours);
   const moonLon = calcPlanetDeg(1, noonJd);
   const moonSignIdx = Math.floor(((moonLon % 360) + 360) % 360 / 30);
   const phase = moonPhaseAt(noonJd);
@@ -462,8 +481,8 @@ export function buildDayReading(input: HoroscopeInput): DayReading {
   });
 
   // ── Windows ──
-  const luckRaw = findWindows(slots, s => s.score >= 2, 60).slice(0, 3);
-  const chlRaw  = findWindows(slots, s => s.score <= -2, 60).slice(0, 2);
+  const luckRaw = peakWindow(slots, "luck");
+  const chlRaw  = peakWindow(slots, "pressure");
   const windowsOfLuck: TimeWindow[] = luckRaw.map(w => ({
     startMinutes: w.startMinutes,
     endMinutes:   w.endMinutes,
@@ -497,7 +516,8 @@ export function buildDayReading(input: HoroscopeInput): DayReading {
   const isQuiet = quality === "quiet" || (totalContent <= 1 && pd == null);
 
   return {
-    isoDate: d0.toISOString().slice(0, 10),
+    // The user's local date — also the per-user dedup key in the cron.
+    isoDate: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
     theme,
     quality,
     signals: signals.slice(0, 8), // cap UI noise
@@ -598,5 +618,36 @@ function buildAvoidVerbs(language: "uk" | "ru" | "en", signals: ConvergenceSigna
 // ──────────────────────────────────────────────────────────────────────────
 
 export function formatHM(m: number): string { return fmtMinutes(m); }
+
+/**
+ * Numerology Personal Day (Pythagorean reduction).
+ *
+ * Takes the target date as explicit calendar parts rather than a Date, so the
+ * caller decides which day it means — the browser's, the user's zone, or the
+ * server's. Reading them off a Date is how "today" quietly became the host's
+ * today. Use localDayFor() to get the parts for a given zone.
+ */
+export function calcPersonalDay(
+  birthDate: string, year: number, month: number, day: number,
+): number | null {
+  const parsed = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!parsed) return null;
+  const reduceN = (n: number): number => {
+    if (n === 11 || n === 22 || n === 33) return n;
+    if (n < 10) return n;
+    return reduceN(String(n).split("").reduce((a, c) => a + parseInt(c, 10), 0));
+  };
+  const birthMonth = parseInt(parsed[2], 10);
+  const birthDay   = parseInt(parsed[3], 10);
+  const py = reduceN(reduceN(birthDay) + reduceN(birthMonth)
+    + reduceN(String(year).split("").reduce((a, c) => a + parseInt(c, 10), 0)));
+  const pm = reduceN(py + reduceN(month));
+  return reduceN(pm + reduceN(day));
+}
+
+/** Calendar parts of `date` as seen from a zone `tzOffsetHours` east of UTC. */
+export function localDayFor(date: Date, tzOffsetHours: number): { y: number; m: number; d: number } {
+  return localDayParts(date, tzOffsetHours);
+}
 
 export { ASPECT_GLYPH };

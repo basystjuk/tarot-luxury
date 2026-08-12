@@ -28,7 +28,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useProfile } from "@/hooks/useProfile";
 import { computeNatalSnapshot } from "@/lib/astro/natal-snapshot";
 import {
-  buildDayReading, formatHM, moonPhaseAt,
+  buildDayReading, formatHM, moonPhaseAt, calcPersonalDay, localDayFor,
   type DayReading, type ConvergenceSignal, type TimeWindow, type SignalSystem,
 } from "@/lib/astro/horoscope";
 import { dateToJD, calcPlanetDeg, SIGN_GLYPHS } from "@/lib/astro/calculations";
@@ -188,24 +188,11 @@ const T = {
   },
 };
 
-// Numerology Personal Day (Pythagorean reduction). Shared with Today widget.
-function reduce(n: number): number {
-  if (n === 11 || n === 22 || n === 33) return n;
-  if (n < 10) return n;
-  return reduce(String(n).split("").reduce((a, d) => a + parseInt(d, 10), 0));
-}
-function calcPersonalDay(birthDate: string, today: Date): number | null {
-  const m = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const bM = parseInt(m[2], 10);
-  const bD = parseInt(m[3], 10);
-  const cY = today.getFullYear();
-  const cM = today.getMonth() + 1;
-  const cD = today.getDate();
-  const py = reduce(reduce(bD) + reduce(bM)
-                   + reduce(String(cY).split("").reduce((a, c) => a + parseInt(c, 10), 0)));
-  const pm = reduce(py + reduce(cM));
-  return reduce(pm + reduce(cD));
+// Personal Day now lives in lib/astro/horoscope so the cron and this page
+// cannot drift apart — they described the same day differently before.
+function personalDayFor(birthDate: string, when: Date, tzOffsetHours: number): number | null {
+  const { y, m, d } = localDayFor(when, tzOffsetHours);
+  return calcPersonalDay(birthDate, y, m, d);
 }
 
 function signalCounts(signals: ConvergenceSignal[]): { sup: number; chl: number } {
@@ -254,7 +241,7 @@ export default function HoroscopePage() {
         mc:      natalSnapshot.mc,
       } : undefined,
       numerology: profile?.birth_date ? {
-        personalDay: calcPersonalDay(profile.birth_date, now) ?? undefined,
+        personalDay: personalDayFor(profile.birth_date, now, tzOffset) ?? undefined,
       } : undefined,
       firstName: profile?.display_name ?? profile?.full_name?.split(/\s+/)[0] ?? undefined,
     });
@@ -388,7 +375,7 @@ export default function HoroscopePage() {
                   {SIGN_GLYPHS[moonInfo.sign]} {signNames[moonInfo.sign]} · {PHASE_LABEL[lang][moonInfo.phase]}
                 </span>
                 {profile?.birth_date && (() => {
-                  const pd = calcPersonalDay(profile.birth_date, new Date());
+                  const pd = personalDayFor(profile.birth_date, new Date(), -new Date().getTimezoneOffset() / 60);
                   if (pd == null) return null;
                   return (
                     <span className="flex items-center gap-1.5">

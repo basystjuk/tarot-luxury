@@ -18,6 +18,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Send, ExternalLink, Check, AlertCircle, BellRing, Globe } from "lucide-react";
+import { track } from "@/lib/analytics/posthog";
 
 interface Props {
   language: string;
@@ -259,6 +260,7 @@ export function TelegramSection({ language, initialChatId, initialUsername, init
             setChatId(data.profile.telegram_chat_id);
             setUsername(data.profile.telegram_username ?? null);
             setLinkOpened(false);
+            track("telegram_linked");   // funnel: tool → account → bot → channel
           }
         }
       } catch { /* */ }
@@ -291,6 +293,7 @@ export function TelegramSection({ language, initialChatId, initialUsername, init
       const res = await fetch("/api/telegram/verify-subscription", { method: "POST" });
       const data = await res.json();
       if (typeof data.subscribed === "boolean") {
+        if (data.subscribed && subscribed !== true) track("channel_subscribed");
         setSubscribed(data.subscribed);
       }
     } finally {
