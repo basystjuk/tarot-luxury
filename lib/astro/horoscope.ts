@@ -155,25 +155,49 @@ const ASPECT_GLYPH: Record<AspectKind, string> = {
   conjunction: "☌", sextile: "⚹", square: "□", trine: "△", opposition: "☍",
 };
 
-const PLANET_NAME: Record<string, Trio> = {
-  Sun:     { uk: "Сонцем",   ru: "Солнцем",   en: "Sun" },
-  Moon:    { uk: "Місяцем",  ru: "Луной",     en: "Moon" },
-  Mercury: { uk: "Меркурієм",ru: "Меркурием", en: "Mercury" },
-  Venus:   { uk: "Венерою",  ru: "Венерой",   en: "Venus" },
-  Mars:    { uk: "Марсом",   ru: "Марсом",    en: "Mars" },
-  Jupiter: { uk: "Юпітером", ru: "Юпитером",  en: "Jupiter" },
-  Saturn:  { uk: "Сатурном", ru: "Сатурном",  en: "Saturn" },
-  ASC:     { uk: "АСЦ",      ru: "АСЦ",       en: "ASC" },
-  MC:      { uk: "МС",       ru: "МС",        en: "MC" },
+// Planet names in uk/ru carry grammatical case, and the aspect phrase picks
+// which case: "з'єднується з твоїм Сонцем" (instrumental) but "у тригоні до
+// твого Сонця" (genitive). Storing a single form and gluing it to a fixed
+// possessive produced "у тригоні до твого Сонцем" in four aspects out of five.
+// The possessive cannot live in the aspect phrase either — Venus is feminine
+// ("до твоєї Венери"), so each planet carries both complete phrases.
+type PlanetForms = {
+  uk: { withCase: string; toCase: string };   // орудний / родовий
+  ru: { withCase: string; toCase: string };   // творительный / дательный
+  en: string;                                 // English has no cases here
 };
 
-const ASPECT_VERBAL: Record<AspectKind, Trio> = {
-  conjunction: { uk: "з'єднується з твоїм", ru: "соединяется с твоим", en: "meets your" },
-  sextile:     { uk: "у секстилі до твого", ru: "в секстиле к твоему", en: "sextile your" },
-  square:      { uk: "у квадраті до твого", ru: "в квадрате к твоему", en: "squares your" },
-  trine:       { uk: "у тригоні до твого",  ru: "в тригоне к твоему",  en: "trines your" },
-  opposition:  { uk: "в опозиції до твого", ru: "в оппозиции к твоему",en: "opposes your" },
+const PLANET_FORMS: Record<string, PlanetForms> = {
+  Sun:     { uk: { withCase: "твоїм Сонцем",    toCase: "твого Сонця"    }, ru: { withCase: "твоим Солнцем",   toCase: "твоему Солнцу"   }, en: "your Sun" },
+  Moon:    { uk: { withCase: "твоїм Місяцем",   toCase: "твого Місяця"   }, ru: { withCase: "твоей Луной",     toCase: "твоей Луне"      }, en: "your Moon" },
+  Mercury: { uk: { withCase: "твоїм Меркурієм", toCase: "твого Меркурія" }, ru: { withCase: "твоим Меркурием", toCase: "твоему Меркурию" }, en: "your Mercury" },
+  Venus:   { uk: { withCase: "твоєю Венерою",   toCase: "твоєї Венери"   }, ru: { withCase: "твоей Венерой",   toCase: "твоей Венере"    }, en: "your Venus" },
+  Mars:    { uk: { withCase: "твоїм Марсом",    toCase: "твого Марса"    }, ru: { withCase: "твоим Марсом",    toCase: "твоему Марсу"    }, en: "your Mars" },
+  Jupiter: { uk: { withCase: "твоїм Юпітером",  toCase: "твого Юпітера"  }, ru: { withCase: "твоим Юпитером",  toCase: "твоему Юпитеру"  }, en: "your Jupiter" },
+  Saturn:  { uk: { withCase: "твоїм Сатурном",  toCase: "твого Сатурна"  }, ru: { withCase: "твоим Сатурном",  toCase: "твоему Сатурну"  }, en: "your Saturn" },
+  ASC:     { uk: { withCase: "твоїм АСЦ",       toCase: "твого АСЦ"      }, ru: { withCase: "твоим АСЦ",       toCase: "твоему АСЦ"      }, en: "your ASC" },
+  MC:      { uk: { withCase: "твоїм МС",        toCase: "твого МС"       }, ru: { withCase: "твоим МС",        toCase: "твоему МС"       }, en: "your MC" },
 };
+
+// Aspect phrases stop at the preposition — the planet supplies the rest.
+const ASPECT_VERBAL: Record<AspectKind, Trio> = {
+  conjunction: { uk: "з'єднується з", ru: "соединяется с", en: "meets" },
+  sextile:     { uk: "у секстилі до", ru: "в секстиле к",  en: "sextiles" },
+  square:      { uk: "у квадраті до", ru: "в квадрате к",  en: "squares" },
+  trine:       { uk: "у тригоні до",  ru: "в тригоне к",   en: "trines" },
+  opposition:  { uk: "в опозиції до", ru: "в оппозиции к", en: "opposes" },
+};
+
+/** Aspect + natal planet as one grammatical phrase, e.g. "у тригоні до твого Сонця". */
+function aspectPhrase(kind: AspectKind, planet: string, language: "uk" | "ru" | "en"): string {
+  const forms = PLANET_FORMS[planet];
+  const verb = l(ASPECT_VERBAL[kind], language);
+  if (!forms) return verb;
+  const noun = language === "en"
+    ? forms.en
+    : kind === "conjunction" ? forms[language].withCase : forms[language].toCase;
+  return `${verb} ${noun}`;
+}
 
 // Polarity of each aspect kind, used for scoring.
 const ASPECT_POLARITY: Record<AspectKind, "supporting" | "challenging" | "neutral"> = {
@@ -273,9 +297,7 @@ function scoreSlots(input: HoroscopeInput): SlotRecord[] {
             : 1;
           score += (polarity === "supporting" ? +1 : polarity === "challenging" ? -1 : 0) * intensity;
 
-          const planetWord = l(PLANET_NAME[name], language);
-          const aspWord    = l(ASPECT_VERBAL[kind], language);
-          const label = `☽ ${aspWord} ${planetWord}`;
+          const label = `☽ ${aspectPhrase(kind, name, language)}`;
           contributors.push({
             system: "astro",
             polarity,
@@ -528,7 +550,9 @@ function buildTheme(
       ? `${greet}день внутреннего давления${pdTheme ? ` — ${pdTheme}` : ""}. Береги границы и не торопись.`
       : language === "en"
       ? `${greet}a day of internal pressure${pdTheme ? ` — ${pdTheme}` : ""}. Guard the boundary, don't rush.`
-      : `${greet}день внутрішнього тиску${pdTheme ? ` — ${pdTheme}` : ""}. Бережи кордон і не поспішай.`;
+      // "кордон" is a state border in Ukrainian — the sense here is personal
+      // boundaries, which is "межі". Direct calque from the Russian "границы".
+      : `${greet}день внутрішнього тиску${pdTheme ? ` — ${pdTheme}` : ""}. Бережи свої межі і не поспішай.`;
   }
   // mixed
   return language === "ru"

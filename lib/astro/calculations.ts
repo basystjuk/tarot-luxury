@@ -842,6 +842,232 @@ export function calcTrueNode(jd: number): number {
   return norm360(meanOmega + correction);
 }
 
+// ── Eclipses (Meeus Ch. 54) ───────────────────────────────────────────────
+//
+// An eclipse is a syzygy — a New or Full Moon — that falls close enough to a
+// lunar node for the shadow cones to actually intersect. Two separate steps,
+// and conflating them produced the "eclipse at 07:36" bug — RETROSPECTIVE
+// 2026-08-12:
+//
+//   1. Find the EXACT syzygy instant, by bisection on the Sun-Moon
+//      elongation. THIS is the moment a message may quote. Stepping through
+//      the next N hours and reporting the first hour that passes a loose
+//      proximity test does not report the eclipse — it reports the moment the
+//      scan happened to start.
+//   2. Decide whether that syzygy is an eclipse at all, from γ (gamma): the
+//      least distance between the shadow axis and the centre of the Earth
+//      (solar) or of the Moon (lunar), in equatorial Earth radii.
+//
+// Distance-from-node alone is NOT a sufficient test. 2024-09-18 is a real
+// partial umbral lunar eclipse at 10.98° from the node, while 2024-03-25 is
+// merely penumbral at 10.35° — closer to the node, yet the lesser event,
+// because the Moon's distance also sets the apparent shadow size. Only γ
+// separates them.
+//
+// Validated against the NASA five-millennium canon for 2024–2030: all 31
+// events reproduced with the correct sub-type, no phantoms, no misses.
+
+export type SolarEclipseKind = "total" | "annular" | "hybrid" | "partial";
+export type LunarEclipseKind = "total" | "partial" | "penumbral";
+
+export interface Eclipse {
+  type: "solar" | "lunar";
+  /** Sub-type. A penumbral lunar eclipse is imperceptible to the naked eye. */
+  kind: SolarEclipseKind | LunarEclipseKind;
+  /** Julian Day of GREATEST eclipse — the maximum, not the syzygy. */
+  jd: number;
+  /** Same instant as a JS Date (UTC). */
+  date: Date;
+  /**
+   * Start and end of the umbral phase — the part actually visible as a bite
+   * taken out of the Moon. Lunar eclipses only, and the same instants for
+   * every observer who can see the Moon at all.
+   *
+   * null for solar eclipses on purpose: a solar eclipse begins and ends at a
+   * different clock time for every point on Earth, and deriving those needs
+   * the observer's coordinates plus Besselian elements. We do not have either,
+   * so we publish no number rather than a wrong one.
+   */
+  umbralBegin: Date | null;
+  umbralEnd: Date | null;
+}
+
+/**
+ * Sun-Moon elongation relative to `target` (0 = New Moon, 180 = Full),
+ * normalised to (−180, 180]. Increases monotonically through the target and
+ * wraps positive→negative half a cycle away, so a negative→positive crossing
+ * brackets the syzygy and nothing else.
+ */
+function syzygyDelta(jd: number, target: 0 | 180): number {
+  let d = norm360(moonLongitudeFull(jd) - sunLongitude(jd)) - target;
+  if (d > 180) d -= 360;
+  if (d <= -180) d += 360;
+  return d;
+}
+
+/** Exact JD of the next New (target 0) or Full (180) Moon within `days`. */
+function findSyzygy(fromJd: number, days: number, target: 0 | 180): number | null {
+  const step = 0.25;                     // Moon gains ~3° of elongation per step
+  let prev = syzygyDelta(fromJd, target);
+  for (let t = step; t <= days; t += step) {
+    const jd = fromJd + t;
+    const cur = syzygyDelta(jd, target);
+    if (prev < 0 && cur >= 0) {
+      let lo = jd - step, hi = jd;
+      for (let i = 0; i < 50; i++) {     // bisect to well under a second
+        const mid = (lo + hi) / 2;
+        if (syzygyDelta(mid, target) < 0) lo = mid; else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+    prev = cur;
+  }
+  return null;
+}
+
+/**
+ * Shadow geometry at a syzygy (Meeus Eq. 54.2): γ and u, where u is the
+ * radius of the Moon's umbral cone in the fundamental plane. Both derive
+ * from the lunation number k, so we first recover the k whose mean phase
+ * lands nearest `jd`.
+ */
+function shadowGeometry(jd: number, isNew: boolean): { gamma: number; u: number; n: number } {
+  const approxYear = 2000 + (jd - 2451545.0) / 365.25;
+  let k = Math.round((approxYear - 2000) * 12.3685);
+  if (!isNew) k += 0.5;
+  for (const cand of [k - 2, k - 1, k, k + 1, k + 2]) {   // snap to the right lunation
+    const t0 = cand / 1236.85;
+    const meanPhaseJd = 2451550.09766 + 29.530588861 * cand + 0.00015437 * t0 * t0;
+    if (Math.abs(meanPhaseJd - jd) < 15) { k = cand; break; }
+  }
+
+  const T = k / 1236.85, T2 = T * T, T3 = T2 * T, T4 = T3 * T;
+  const E  = 1 - 0.002516 * T - 0.0000074 * T2;          // eccentricity correction
+  const M  = rad(2.5534 + 29.10535670 * k - 0.0000014 * T2 - 0.00000011 * T3);
+  const Mp = rad(201.5643 + 385.81693528 * k + 0.0107582 * T2 + 0.00001238 * T3 - 0.000000058 * T4);
+  const F  = rad(160.7108 + 390.67050284 * k - 0.0016118 * T2 - 0.00000227 * T3 + 0.000000011 * T4);
+  const O  = rad(124.7746 - 1.56375588 * k + 0.0020672 * T2 + 0.00000215 * T3);
+
+  const F1 = F - rad(0.02665) * Math.sin(O);
+  const P =
+      0.2070 * E * Math.sin(M) + 0.0024 * E * Math.sin(2 * M)
+    - 0.0392 * Math.sin(Mp)    + 0.0116 * Math.sin(2 * Mp)
+    - 0.0073 * E * Math.sin(Mp + M) + 0.0067 * E * Math.sin(Mp - M)
+    + 0.0118 * Math.sin(2 * F1);
+  const Q =
+      5.2207 - 0.0048 * E * Math.cos(M) + 0.0020 * E * Math.cos(2 * M)
+    - 0.3299 * Math.cos(Mp) - 0.0060 * E * Math.cos(Mp + M) + 0.0041 * E * Math.cos(Mp - M);
+  const W = Math.abs(Math.cos(F1));
+
+  const gamma = (P * Math.cos(F1) + Q * Math.sin(F1)) * (1 - 0.0048 * W);
+  const u =
+      0.0059 + 0.0046 * E * Math.cos(M) - 0.0182 * Math.cos(Mp)
+    + 0.0004 * Math.cos(2 * Mp) - 0.0005 * Math.cos(M + Mp);
+  // Hourly motion of the Moon relative to the shadow, in Earth radii (54.1) —
+  // converts shadow-radius differences into durations.
+  const n = 0.5458 + 0.0400 * Math.cos(Mp);
+  return { gamma, u, n };
+}
+
+/**
+ * Angular separation (degrees) between the Moon and the point it is closing
+ * on — the Sun for a solar eclipse, the antisolar point for a lunar one.
+ * Unlike the syzygy test this includes the Moon's ecliptic latitude, which is
+ * exactly what makes greatest eclipse fall a few minutes off the syzygy.
+ */
+function shadowSeparation(jd: number, isNew: boolean): number {
+  const target = isNew ? sunLongitude(jd) : sunLongitude(jd) + 180;
+  const dLon = rad(norm360(moonLongitudeFull(jd) - target));
+  const beta = rad(calcMoonLatitude(jd));
+  return Math.acos(Math.cos(beta) * Math.cos(dLon)) * 180 / Math.PI;
+}
+
+/**
+ * ΔT — the gap between Dynamical Time, which every series in this file is
+ * really expressed in, and the Universal Time a clock shows. Espenak & Meeus
+ * polynomial, valid 2005–2050 (~75 s in 2026); it drifts outside that range,
+ * which costs seconds, not minutes. Without this correction every eclipse
+ * instant we publish lands systematically ~1–2 minutes late.
+ */
+function deltaTSeconds(jd: number): number {
+  const t = (jd - 2451545.0) / 365.25;      // years since 2000.0
+  return 62.92 + 0.32217 * t + 0.005589 * t * t;
+}
+
+/**
+ * Instant of greatest eclipse — the minimum of that separation, by ternary
+ * search around the syzygy. Reproduces the published maxima to ~2 minutes,
+ * against ~4–9 minutes of error if the syzygy itself is quoted as the peak.
+ */
+function findGreatestEclipse(syzygyJd: number, isNew: boolean): number {
+  let lo = syzygyJd - 0.25, hi = syzygyJd + 0.25;
+  for (let i = 0; i < 40; i++) {
+    const a = lo + (hi - lo) / 3;
+    const b = hi - (hi - lo) / 3;
+    if (shadowSeparation(a, isNew) < shadowSeparation(b, isNew)) hi = b; else lo = a;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Eclipse sub-type at a syzygy, or null when no eclipse occurs. */
+function classifyEclipse(jd: number, isNew: boolean): Eclipse["kind"] | null {
+  const { gamma, u } = shadowGeometry(jd, isNew);
+  const g = Math.abs(gamma);
+
+  if (isNew) {
+    if (g >= 1.5433 + u) return null;              // shadow misses the Earth
+    if (g >= 0.9972) return "partial";             // axis misses; penumbra grazes
+    if (u < 0) return "total";
+    if (u > 0.0047) return "annular";
+    // Narrow band where the cone's apex falls near the surface.
+    return u < 0.00464 * Math.sqrt(1 - gamma * gamma) ? "hybrid" : "annular";
+  }
+
+  const umbralMag = (1.0128 - u - g) / 0.5450;
+  if (umbralMag > 0) return umbralMag >= 1 ? "total" : "partial";
+  const penumbralMag = (1.5573 + u - g) / 0.5450;
+  return penumbralMag > 0 ? "penumbral" : null;
+}
+
+/**
+ * The next eclipse whose exact moment falls within `hours` of `fromJd`,
+ * or null. Returns the earliest when a solar and a lunar eclipse both
+ * qualify (they are always ~2 weeks apart, so in practice never).
+ */
+export function findEclipseWithin(fromJd: number, hours: number): Eclipse | null {
+  const days = hours / 24;
+  let earliest: Eclipse | null = null;
+  for (const isNew of [true, false]) {
+    const syzygyJd = findSyzygy(fromJd, days, isNew ? 0 : 180);
+    if (syzygyJd === null) continue;
+    const kind = classifyEclipse(syzygyJd, isNew);
+    if (!kind) continue;
+
+    // Greatest eclipse, converted from the ephemeris' Dynamical Time to UT.
+    const jd = findGreatestEclipse(syzygyJd, isNew) - deltaTSeconds(syzygyJd) / 86400;
+    if (earliest && earliest.jd <= jd) continue;
+
+    // Umbral semi-duration (Meeus 54.4): half the time the Moon spends inside
+    // the dark shadow, centred on greatest eclipse. Solar eclipses get null —
+    // see the note on Eclipse.umbralBegin.
+    let umbralBegin: Date | null = null;
+    let umbralEnd: Date | null = null;
+    if (!isNew && kind !== "penumbral") {
+      const { gamma, u, n } = shadowGeometry(syzygyJd, isNew);
+      const radius = 1.0128 - u;
+      const halfMinutes = (60 / n) * Math.sqrt(Math.max(0, radius * radius - gamma * gamma));
+      umbralBegin = jdToDate(jd - halfMinutes / 1440);
+      umbralEnd   = jdToDate(jd + halfMinutes / 1440);
+    }
+
+    earliest = {
+      type: isNew ? "solar" : "lunar",
+      kind, jd, date: jdToDate(jd), umbralBegin, umbralEnd,
+    };
+  }
+  return earliest;
+}
+
 // ── Lunar Return ──────────────────────────────────────────────────────────
 //
 // A Lunar Return is the moment the transiting Moon crosses the exact

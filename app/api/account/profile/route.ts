@@ -20,14 +20,25 @@ type ProfilePatch = {
   birth_tz?: string | null;
   natal_moon_lon?: number | null;
   telegram_username?: string | null;
+  tz?: string | null;              // IANA zone the user lives in now
 };
 
 const ALLOWED_FIELDS = new Set<keyof ProfilePatch>([
   "display_name", "full_name",
   "birth_date", "birth_time", "birth_place",
   "birth_lat", "birth_lon", "birth_tz",
-  "natal_moon_lon", "telegram_username",
+  "natal_moon_lon", "telegram_username", "tz",
 ]);
+
+/** Is this a zone Intl actually knows? Guards against junk reaching the cron. */
+function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function GET() {
   const supa = await getSupabaseServer();
@@ -68,6 +79,12 @@ export async function POST(req: NextRequest) {
   // Telegram username — strip leading @ if present, no other validation here.
   if (typeof patch.telegram_username === "string") {
     patch.telegram_username = patch.telegram_username.replace(/^@/, "") || null;
+  }
+
+  // Timezone — a bad zone here would throw inside the notification cron and
+  // cost that user every message, so reject it at the door.
+  if (typeof patch.tz === "string" && !isValidTimeZone(patch.tz)) {
+    return NextResponse.json({ error: "bad_timezone" }, { status: 400 });
   }
 
   const { data, error } = await supa

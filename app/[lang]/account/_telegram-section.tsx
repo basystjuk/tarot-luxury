@@ -16,8 +16,8 @@
  * cabinet doesn't need to pass anything except language.
  */
 
-import { useEffect, useState } from "react";
-import { Loader2, Send, ExternalLink, Check, AlertCircle, BellRing } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Send, ExternalLink, Check, AlertCircle, BellRing, Globe } from "lucide-react";
 
 interface Props {
   language: string;
@@ -39,6 +39,19 @@ interface NotifPrefs {
 }
 
 const ELLEN_CHANNEL_URL = "https://t.me/ellen_rouge";
+
+/** What the cron falls back to when a user has never picked a zone. */
+const DEFAULT_ZONE = "Europe/Kyiv";
+
+/** Only reached on browsers without Intl.supportedValuesOf — keep it short. */
+const FALLBACK_ZONES = [
+  "Europe/Kyiv", "Europe/Warsaw", "Europe/Berlin", "Europe/Prague", "Europe/Vilnius",
+  "Europe/Chisinau", "Europe/Bucharest", "Europe/London", "Europe/Lisbon", "Europe/Madrid",
+  "Europe/Rome", "Europe/Amsterdam", "Europe/Stockholm", "Europe/Istanbul",
+  "Asia/Tbilisi", "Asia/Yerevan", "Asia/Dubai", "Asia/Jerusalem", "Asia/Almaty",
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Toronto", "America/Sao_Paulo", "Australia/Sydney",
+];
 
 const T = {
   uk: {
@@ -90,6 +103,12 @@ const T = {
     prefs_news_hint: "Промо, новини, особисті розсилки (рідко).",
     prefs_saving: "Зберігаю…",
     prefs_saved: "✓ Збережено",
+
+    tz_title: "Часовий пояс",
+    tz_hint: "Усі години в повідомленнях — затемнення, Новий Місяць, вікна удачі — показуємо в цьому поясі.",
+    tz_default_note: "Зараз не обрано — час показуємо київський.",
+    tz_use_browser: "Взяти з пристрою",
+    tz_now: "Зараз у тебе",
   },
   ru: {
     section: "Telegram-уведомления",
@@ -136,6 +155,12 @@ const T = {
     prefs_news_hint: "Промо, новости, личные рассылки (редко).",
     prefs_saving: "Сохраняю…",
     prefs_saved: "✓ Сохранено",
+
+    tz_title: "Часовой пояс",
+    tz_hint: "Все часы в сообщениях — затмения, Новая Луна, окна удачи — показываем в этом поясе.",
+    tz_default_note: "Сейчас не выбран — время показываем киевское.",
+    tz_use_browser: "Взять с устройства",
+    tz_now: "Сейчас у тебя",
   },
   en: {
     section: "Telegram notifications",
@@ -182,6 +207,12 @@ const T = {
     prefs_news_hint: "Promos, news, personal broadcasts (rare).",
     prefs_saving: "Saving…",
     prefs_saved: "✓ Saved",
+
+    tz_title: "Time zone",
+    tz_hint: "Every clock time we send — eclipses, New Moon, windows of luck — is shown in this zone.",
+    tz_default_note: "Not set — times are shown in Kyiv time.",
+    tz_use_browser: "Use my device's zone",
+    tz_now: "Your local time",
   },
 };
 
@@ -307,6 +338,66 @@ export function TelegramSection({ language, initialChatId, initialUsername, init
     }
   }
 
+  // ── Timezone ────────────────────────────────────────────────────────────
+  // Every notification time (eclipse, New Moon, window of luck) used to be
+  // rendered in Europe/Kiev for everyone. This is the zone the cron formats in.
+  const [tz, setTz] = useState<string | null>(null);
+  const [tzSaving, setTzSaving] = useState(false);
+  const [tzSavedAt, setTzSavedAt] = useState<number | null>(null);
+
+  const browserTz = useMemo(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; }
+    catch { return null; }
+  }, []);
+
+  /** Every zone this browser knows, newest API with a graceful fallback. */
+  const tzOptions = useMemo(() => {
+    const withIntl = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
+      .supportedValuesOf?.("timeZone");
+    const list = withIntl?.length ? withIntl : FALLBACK_ZONES;
+    const extras = [tz, browserTz].filter((z): z is string => !!z && !list.includes(z));
+    return [...extras, ...list];
+  }, [tz, browserTz]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/account/profile", { cache: "no-store" });
+        if (res.ok) setTz(((await res.json()).profile?.tz as string | null) ?? null);
+      } catch { /* */ }
+    })();
+  }, []);
+
+  async function saveTz(next: string) {
+    const previous = tz;
+    setTz(next);
+    setTzSaving(true);
+    try {
+      const res = await fetch("/api/account/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tz: next }),
+      });
+      if (!res.ok) { setTz(previous); return; }
+      setTzSavedAt(Date.now());
+      setTimeout(() => setTzSavedAt(null), 1800);
+    } catch {
+      setTz(previous);
+    } finally {
+      setTzSaving(false);
+    }
+  }
+
+  /** Live sample so the choice is verifiable at a glance, not a guess. */
+  const tzSample = useMemo(() => {
+    const zone = tz ?? DEFAULT_ZONE;
+    try {
+      return new Intl.DateTimeFormat("uk-UA", {
+        timeZone: zone, hour: "2-digit", minute: "2-digit",
+      }).format(new Date());
+    } catch { return null; }
+  }, [tz]);
+
   // ── Render helpers ──────────────────────────────────────────────────────
   function Toggle({ checked, onChange, id, label, hint }: {
     checked: boolean; onChange: () => void; id: string; label: string; hint: string;
@@ -410,6 +501,45 @@ export function TelegramSection({ language, initialChatId, initialUsername, init
             <span className="inline-flex items-center gap-1.5 text-xs text-[#9A8A78] italic">
               <AlertCircle size={12} /> {t.sub_link_first}
             </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Time zone ── */}
+      <div className="border-t border-[rgba(196,169,122,0.15)] pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase flex items-center gap-1.5">
+            <Globe size={11} /> {t.tz_title}
+          </p>
+          {tzSavedAt && <span className="text-[10px] text-[#3F6A35]">{t.prefs_saved}</span>}
+          {tzSaving && !tzSavedAt && <span className="text-[10px] text-[#9A8A78] italic">{t.prefs_saving}</span>}
+        </div>
+        <p className="text-[11px] text-[#9A8A78] italic leading-snug mb-2.5">{t.tz_hint}</p>
+
+        <select
+          value={tz ?? ""}
+          onChange={e => saveTz(e.target.value)}
+          aria-label={t.tz_title}
+          className="w-full min-h-[44px] px-3 py-2 rounded-lg text-sm text-[#5C4530] bg-white/70 border border-[rgba(196,169,122,0.35)] focus:outline-none focus:border-[#B8883A]"
+        >
+          {!tz && <option value="" disabled>{t.tz_default_note}</option>}
+          {tzOptions.map(z => <option key={z} value={z}>{z.replace(/_/g, " ")}</option>)}
+        </select>
+
+        <div className="flex items-center justify-between gap-3 mt-2">
+          {tzSample && (
+            <span className="text-[11px] text-[#9A8A78]">
+              {t.tz_now}: <span className="text-[#5C4530]">{tzSample}</span>
+            </span>
+          )}
+          {browserTz && browserTz !== tz && (
+            <button
+              type="button"
+              onClick={() => saveTz(browserTz)}
+              className="text-[11px] text-[#B8883A] underline underline-offset-2 min-h-[44px] px-1"
+            >
+              {t.tz_use_browser} ({browserTz.replace(/_/g, " ")})
+            </button>
           )}
         </div>
       </div>

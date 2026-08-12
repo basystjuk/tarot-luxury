@@ -26,6 +26,8 @@ export interface Profile {
   birth_lat: number | null;
   birth_lon: number | null;
   birth_tz: string | null;
+  /** IANA zone the user lives in now — drives notification times. */
+  tz: string | null;
   natal_moon_lon: number | null;
   telegram_username: string | null;
   telegram_chat_id: number | null;
