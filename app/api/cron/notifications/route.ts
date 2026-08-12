@@ -285,11 +285,8 @@ function capitalise(s: string): string {
  * the vocative — "Сергію", not "Сергій" — and generating it reliably for
  * arbitrary and foreign names is not worth the wrongness when it misses.
  */
-function dailyHoroscopeMessage(theme: string, quality: string, topWindow: string | null): string {
-  const head = quality === "flowing" ? "🌿 Сьогодні — потоковий день"
-             : quality === "turbulent" ? "⚡ Сьогодні — турбулентний день"
-             : "✨ Гороскоп дня";
-  let body = `<b>${head}</b>\n\nДоброго ранку! ${capitalise(theme)}`;
+function dailyHoroscopeMessage(theme: string, topWindow: string | null): string {
+  let body = `<b>⚡ Сьогодні — турбулентний день</b>\n\nДоброго ранку! ${capitalise(theme)}`;
   if (topWindow) body += `\n\n🍀 Вікно удачі: <b>${topWindow}</b>`;
   body += `\n\n<a href="https://ellen-soul.com/uk/studio/horoscope">Повний гороскоп на сьогодні →</a>`;
   return body;
@@ -417,9 +414,7 @@ function pushFor(kind: "eclipse" | "lunar_return" | "weekly_card" | "moon_phase_
     }
     case "daily_horoscope":
       return {
-        title: opts.quality === "flowing" ? "🌿 Потоковий день"
-             : opts.quality === "turbulent" ? "⚡ Турбулентний день"
-             : "✨ Гороскоп дня",
+        title: "⚡ Турбулентний день",
         body:  (opts.theme ?? "") + (opts.topWindow ? ` · 🍀 ${opts.topWindow}` : ""),
         url:   "/uk/studio/horoscope",
         tag:   "daily-horoscope",
@@ -660,17 +655,30 @@ export async function GET(req: NextRequest) {
           { kind: mercuryStation.kind });
       }
 
-      // ── Daily Horoscope (standout days only) ─────────────────────────
+      // ── Daily Horoscope — turbulent days ONLY ────────────────────────
+      //
+      // "Flowing" days used to ping too (owner's call 2026-08-12 to stop).
+      // Measured over 180 days, flowing + turbulent fired on 82% of days,
+      // which is not the "standout days only" the cabinet promises, and
+      // tightening the astrological threshold barely moved it (81%) — the
+      // engine finds something supportive almost every day.
+      //
+      // The two messages are also not equally worth sending. Turbulent
+      // carries an instruction ("guard your boundaries, don't rush");
+      // flowing is praise with no action attached. And the risk is
+      // asymmetric: a promised "day of flow" that goes badly costs more
+      // trust than a warned-about heavy day that passes quietly.
+      //
+      // Flowing days still render on the website — we just stop pinging.
       if (prefs.daily_horoscope !== false) {
         const reading = readingForProfile(profile, now, tzOffset);
-        // Only ping when the day clearly stands out — never on ordinary days.
-        if (reading && (reading.quality === "flowing" || reading.quality === "turbulent")) {
+        if (reading && reading.quality === "turbulent") {
           const top = reading.windowsOfLuck[0];
           const topWindow = top ? `${formatHM(top.startMinutes)}–${formatHM(top.endMinutes)}` : null;
           const key = `horoscope:${reading.isoDate}`;
           await dispatch(profile.id, chatId, pushAllowed, "daily_horoscope", key,
-            () => dailyHoroscopeMessage(reading.theme, reading.quality, topWindow),
-            () => pushFor("daily_horoscope", { name: profile.display_name, theme: reading.theme, quality: reading.quality, topWindow }, tz),
+            () => dailyHoroscopeMessage(reading.theme, topWindow),
+            () => pushFor("daily_horoscope", { theme: reading.theme, topWindow }, tz),
             { quality: reading.quality });
         }
       }
