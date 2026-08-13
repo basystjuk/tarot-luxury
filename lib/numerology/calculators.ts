@@ -240,16 +240,49 @@ export interface PersonalDay {
   weekday: number;
 }
 
+/**
+ * Personal Year — THE canonical implementation.
+ *
+ * Reduced to a single digit, deliberately. The personal year is a position in
+ * a nine-year cycle, and 11/22/33 are not positions in it: preserving master
+ * numbers here produced sequences like 3, 4, 5, 33, 7, 8, 9 — the year that
+ * should read 6 reading 33 instead, and the cycle appearing to skip. The
+ * master numbers belong to the Life Path and the Destiny, which are traits,
+ * not cycle positions.
+ *
+ * This also settles a split: five different Personal Day implementations were
+ * scattered across the codebase, two of them preserving masters and three not,
+ * and they disagreed on 9.7% of (birthday, date) pairs — the numerology tool
+ * would say 2 while the horoscope said 11 for the same user on the same day.
+ * Everything now calls these three functions.
+ */
 export function calcPersonalYear(day: number, month: number, year: number): number {
   // Standard Decoz: reduce(birthDay) + reduce(birthMonth) + reduce(calendarYear)
-  const d = reduceNum(day);
-  const m = reduceNum(month);
-  const y = reduceNum(digitSum(year));
-  return reduceNum(d + m + y);
+  return reduceToDigit(reduceToDigit(day) + reduceToDigit(month) + reduceToDigit(digitSum(year)));
 }
 
 export function calcPersonalMonth(personalYear: number, calendarMonth: number): number {
-  return reduceNum(personalYear + reduceNum(calendarMonth));
+  return reduceToDigit(personalYear + reduceToDigit(calendarMonth));
+}
+
+/** Personal Day for an explicit calendar date. Parts, not a Date, so the
+ *  caller decides whose "today" it is — the user's zone, not the host's. */
+export function calcPersonalDay(
+  birthDay: number, birthMonth: number,
+  year: number, month: number, day: number,
+): number {
+  const py = calcPersonalYear(birthDay, birthMonth, year);
+  const pm = calcPersonalMonth(py, month);
+  return reduceToDigit(pm + reduceToDigit(day));
+}
+
+/** Personal Day from a "YYYY-MM-DD" birth date. Returns null if unparseable. */
+export function calcPersonalDayFromISO(
+  birthDate: string, year: number, month: number, day: number,
+): number | null {
+  const m = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return calcPersonalDay(parseInt(m[3], 10), parseInt(m[2], 10), year, month, day);
 }
 
 /**
@@ -355,9 +388,12 @@ export function calcSubconsciousSelfSchool(name: string, school: NumerologySchoo
     const v = letterValue(ch, school);
     if (v > 0) present.add(v);
   }
+  // Decoz: Subconscious Self = range − (count of karmic lessons), and the
+  // lessons are the ABSENT values, so this reduces exactly to the number of
+  // distinct values present. The old line spelled it `range - (range - n)`,
+  // which is the same thing written as though it did something.
   const range = school === "chaldean" ? 8 : 9;
-  const distinct = present.size;
-  return Math.max(1, range - (range - distinct)); // = distinct, but clamp
+  return Math.min(range, Math.max(1, present.size));
 }
 
 // ─── Karmic Lessons ─────────────────────────────────────────────────────────

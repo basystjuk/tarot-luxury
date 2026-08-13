@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Emitted by `npm test` (tsconfig.test.json) — build output, not source.
+    ".test-build/**",
+    ".vercel/**",
   ]),
 ]);
 

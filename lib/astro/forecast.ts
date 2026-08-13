@@ -19,12 +19,15 @@
  */
 
 import {
-  dateToJD, calcPlanetDeg, findNextLunarReturn, jdToDate,
+  dateToJD, calcPlanetDeg, findNextLunarReturn, jdToDate, findNextSyzygy,
 } from "./calculations";
+import { calcPersonalDayFromISO } from "@/lib/numerology/calculators";
+import { phaseFromElongation, illuminationPercent, type PhaseKey } from "./moon-state";
+import { localDayParts } from "@/lib/time/day";
 
 // ── Day forecast ──────────────────────────────────────────────────────────
 
-export type PhaseKey = "new" | "waxing" | "full" | "waning";
+export type { PhaseKey };
 
 export interface DayForecast {
   /** Local-noon JD used for the snapshot. */
@@ -64,54 +67,45 @@ const ASPECT_ORBS: Record<NonNullable<DayForecast["topAspect"]>["kind"], number>
   conjunction: 5, sextile: 2, square: 3, trine: 3, opposition: 5,
 };
 
-function reduce(n: number): number {
-  if (n === 11 || n === 22 || n === 33) return n;
-  if (n < 10) return n;
-  return reduce(String(n).split("").reduce((a, d) => a + parseInt(d, 10), 0));
-}
-
+// Personal Day and the phase buckets both come from the shared modules now —
+// this file used to carry its own copy of each, and the copies disagreed with
+// the other four implementations on the site.
 function personalDayFor(birthDate: string, year: number, month: number, day: number): number | undefined {
-  const m = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return undefined;
-  const bM = parseInt(m[2], 10);
-  const bD = parseInt(m[3], 10);
-  const py = reduce(
-    reduce(bD) + reduce(bM)
-    + reduce(String(year).split("").reduce((a, c) => a + parseInt(c, 10), 0))
-  );
-  const pm = reduce(py + reduce(month));
-  return reduce(pm + reduce(day));
-}
-
-function phaseFromElongation(elong: number): PhaseKey {
-  if (elong < 22.5 || elong > 337.5) return "new";
-  if (Math.abs(elong - 180) < 22.5) return "full";
-  return elong < 180 ? "waxing" : "waning";
+  return calcPersonalDayFromISO(birthDate, year, month, day) ?? undefined;
 }
 
 /** Build a 7-day forecast starting from `fromDate` (default: today). */
 export function buildWeekForecast(fromDate: Date, tzOffset: number, natal?: NatalInput): DayForecast[] {
   const days: DayForecast[] = [];
-  const start = new Date(fromDate);
-  start.setHours(0, 0, 0, 0);
+  // The calendar days belong to the USER's zone, not the host's. This used to
+  // read `start.setHours(0,0,0,0)` and then pass the profile's tzOffset into
+  // dateToJD — mixing the host's idea of "which day" with the user's idea of
+  // "what time". horoscope.ts carries a comment about fixing exactly this
+  // pattern; the fix never reached here.
+  const base = localDayParts(fromDate, tzOffset);
 
   for (let i = 0; i < 7; i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
+    // Step in UTC to avoid host-DST arithmetic, then re-read the parts.
+    const dayAnchor = new Date(Date.UTC(base.y, base.m - 1, base.d) + i * 86_400_000);
+    const y = dayAnchor.getUTCFullYear();
+    const m = dayAnchor.getUTCMonth() + 1;
+    const dd = dayAnchor.getUTCDate();
+
     // Sample at noon — minimises the "Moon crosses sign at 23:50" jumpiness
     // when the user is just glancing.
-    const jd = dateToJD(d.getFullYear(), d.getMonth() + 1, d.getDate(), 12, 0, tzOffset);
+    const jd = dateToJD(y, m, dd, 12, 0, tzOffset);
     const moonLon = calcPlanetDeg(1, jd);
     const sunLon  = calcPlanetDeg(0, jd);
     const elong   = ((moonLon - sunLon) % 360 + 360) % 360;
-    const illumination = Math.round(50 * (1 - Math.cos(elong * Math.PI / 180)));
+    const illumination = illuminationPercent(elong);
     const phaseKey = phaseFromElongation(elong);
     const signIdx = Math.floor(((moonLon % 360) + 360) % 360 / 30);
     const moonDegree = Math.floor(((moonLon % 30) + 30) % 30);
+    const d = dayAnchor;
 
     let personalDay: number | undefined;
     if (natal?.birthDate) {
-      personalDay = personalDayFor(natal.birthDate, d.getFullYear(), d.getMonth() + 1, d.getDate());
+      personalDay = personalDayFor(natal.birthDate, y, m, dd);
     }
 
     // Find tightest aspect transit Moon → any natal point
@@ -178,50 +172,18 @@ function findNextSignChange(fromJd: number): { jd: number; signIdx: number } | n
   return null;
 }
 
-/** Find next New / Full Moon within `maxHours` from `fromJd`.
- *  Search via 1-hour steps then 5-min refine. */
-function findNextNewOrFull(fromJd: number, maxHours: number, want: "new" | "full"): number | null {
-  const target = want === "new" ? 0 : 180;
-  let prevSign = 0;
-  let foundCoarse: number | null = null;
-  for (let h = 0; h < maxHours; h++) {
-    const jd = fromJd + h / 24;
-    const moon = calcPlanetDeg(1, jd);
-    const sun  = calcPlanetDeg(0, jd);
-    let elong  = ((moon - sun) % 360 + 360) % 360;
-    let off    = ((elong - target + 540) % 360) - 180; // signed offset
-    if (h > 0 && Math.sign(off) !== Math.sign(prevSign) && Math.abs(off) < 30) {
-      foundCoarse = jd;
-      break;
-    }
-    prevSign = off;
-    void elong;
-  }
-  if (foundCoarse == null) return null;
-  // Refine via 5-min steps in ±2h window
-  let best = foundCoarse;
-  let bestDev = Infinity;
-  for (let m = -120; m <= 120; m += 5) {
-    const jd = foundCoarse + m / (60 * 24);
-    const moon = calcPlanetDeg(1, jd);
-    const sun  = calcPlanetDeg(0, jd);
-    const elong = ((moon - sun) % 360 + 360) % 360;
-    const off = Math.abs(((elong - target + 540) % 360) - 180);
-    if (off < bestDev) { bestDev = off; best = jd; }
-  }
-  return best;
-}
+// The 1-hour-scan-then-5-minute-refine finder that used to live here is gone.
+// findNextSyzygy in calculations.ts bisects the true elongation to well under
+// a second, and having one exact finder is what stops the Liminal Moments
+// panel and the eclipse engine quoting New Moon times minutes apart.
 
 /** Build the next batch of liminal moments. Always includes the next
  *  sign change; conditionally adds upcoming New / Full Moon and the
  *  user's Lunar Return if a natal Moon is given. */
-export function findLiminalMoments(natalMoonLon?: number): LiminalMoment[] {
-  const now = new Date();
-  const tz = -now.getTimezoneOffset() / 60;
-  const jdNow = dateToJD(
-    now.getFullYear(), now.getMonth() + 1, now.getDate(),
-    now.getHours(), now.getMinutes(), tz,
-  );
+export function findLiminalMoments(natalMoonLon?: number, now: Date = new Date()): LiminalMoment[] {
+  // JD straight from the instant — no wall-clock round trip, so seconds are
+  // kept and there is no host-vs-user zone to get wrong.
+  const jdNow = now.getTime() / 86_400_000 + 2440587.5;
 
   const out: LiminalMoment[] = [];
 
@@ -236,23 +198,12 @@ export function findLiminalMoments(natalMoonLon?: number): LiminalMoment[] {
     });
   }
 
-  // 2. Next New Moon (within 30 days)
-  const newJd = findNextNewOrFull(jdNow, 30 * 24, "new");
-  if (newJd) {
-    out.push({
-      kind: "new-moon", date: jdToDate(newJd),
-      hoursAhead: (newJd - jdNow) * 24,
-    });
-  }
+  // 2 + 3. Exact New and Full Moon, by bisection.
+  const newJd = findNextSyzygy(jdNow, 0);
+  out.push({ kind: "new-moon", date: jdToDate(newJd), hoursAhead: (newJd - jdNow) * 24 });
 
-  // 3. Next Full Moon (within 30 days)
-  const fullJd = findNextNewOrFull(jdNow, 30 * 24, "full");
-  if (fullJd) {
-    out.push({
-      kind: "full-moon", date: jdToDate(fullJd),
-      hoursAhead: (fullJd - jdNow) * 24,
-    });
-  }
+  const fullJd = findNextSyzygy(jdNow, 180);
+  out.push({ kind: "full-moon", date: jdToDate(fullJd), hoursAhead: (fullJd - jdNow) * 24 });
 
   // 4. Lunar Return (if natal Moon known)
   if (natalMoonLon != null) {

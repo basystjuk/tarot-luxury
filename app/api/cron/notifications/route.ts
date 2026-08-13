@@ -31,7 +31,10 @@ import {
 } from "@/lib/astro/calculations";
 import { computeNatalSnapshot } from "@/lib/astro/natal-snapshot";
 import { buildDayReading, formatHM, calcPersonalDay, localDayFor } from "@/lib/astro/horoscope";
-import { ianaToOffsetHours } from "@/app/[lang]/studio/moon-phase/_natal";
+import { computeNatalMoonLon } from "@/app/[lang]/studio/moon-phase/_natal";
+import { ianaToOffsetHours } from "@/lib/astro/timezone";
+import { isStale } from "@/lib/astro/version";
+import { STUDIO_ZONE } from "@/lib/time/day";
 
 export const maxDuration = 60; // up to a minute — many small Telegram calls
 
@@ -80,7 +83,7 @@ function findEclipseAlert(fromJd: number): EclipseAlert | null {
  * the cabinet; Kyiv is the fallback for everyone who never picked one, which
  * is exactly the behaviour every user had before the column existed.
  */
-const FALLBACK_ZONE = "Europe/Kiev";
+const FALLBACK_ZONE = STUDIO_ZONE;
 function zoneOf(profile: { tz?: string | null }): string {
   return profile.tz || FALLBACK_ZONE;
 }
@@ -307,6 +310,9 @@ type ProfileRow = {
   birth_tz: string | null;
   /** Optional: absent until migration 0006 is applied. */
   tz?: string | null;
+  /** Optional: absent until migration 0007 is applied. EPHEMERIS_VERSION that
+   *  produced natal_moon_lon; lower than the current constant means stale. */
+  natal_formula_version?: number | null;
 };
 type PrefsRow = {
   user_id: string;
@@ -324,25 +330,55 @@ type PrefsRow = {
 
 const PROFILE_COLS_PRE_0006 =
   "id, telegram_chat_id, natal_moon_lon, display_name, full_name, birth_date, birth_time, birth_lat, birth_lon, birth_tz";
-const PROFILE_COLS = `${PROFILE_COLS_PRE_0006}, tz`;
+const PROFILE_COLS_PRE_0007 = `${PROFILE_COLS_PRE_0006}, tz`;
+const PROFILE_COLS = `${PROFILE_COLS_PRE_0007}, natal_formula_version`;
 
 /**
- * Select profiles, surviving a deploy that lands before migration 0006.
+ * Select profiles, surviving a deploy that lands before migration 0006 or 0007.
  *
  * Selecting a column Postgres doesn't have fails the whole query, which here
  * would mean zero profiles and every notification silently stopping — the
- * worst possible failure for a job nobody watches. So: ask for `tz`, and if
- * the database hasn't got it yet, ask again without and let zoneOf() fall
- * back to Kyiv exactly as before.
+ * worst possible failure for a job nobody watches. So we walk down a ladder,
+ * dropping the newest column at each step, and let the callers fall back to
+ * their pre-migration behaviour (Kyiv for a missing `tz`, "treat the cache as
+ * stale" for a missing `natal_formula_version`).
  */
 async function selectProfiles(
   run: (cols: string) => PromiseLike<{ data: unknown; error: unknown }>,
 ): Promise<ProfileRow[]> {
-  const withTz = await run(PROFILE_COLS);
-  if (!withTz.error) return (withTz.data as ProfileRow[] | null) ?? [];
-  console.warn("profiles: tz column missing (migration 0006 not applied?) — falling back", withTz.error);
+  const full = await run(PROFILE_COLS);
+  if (!full.error) return (full.data as ProfileRow[] | null) ?? [];
+  console.warn("profiles: natal_formula_version missing (migration 0007 not applied?) — falling back", full.error);
+
+  const pre0007 = await run(PROFILE_COLS_PRE_0007);
+  if (!pre0007.error) return (pre0007.data as ProfileRow[] | null) ?? [];
+  console.warn("profiles: tz column missing (migration 0006 not applied?) — falling back", pre0007.error);
+
   const legacy = await run(PROFILE_COLS_PRE_0006);
   return (legacy.data as ProfileRow[] | null) ?? [];
+}
+
+/**
+ * The user's natal Moon longitude, never a stale one.
+ *
+ * `natal_moon_lon` is a cache stamped with the ephemeris version that filled
+ * it. When the stamp is older than the current formulas we recompute from the
+ * birth data instead of trusting it — the browser does the same on read, but
+ * the cron runs whether or not the user ever opens the site again.
+ */
+function natalMoonLonOf(profile: ProfileRow): number | null {
+  if (profile.natal_moon_lon != null && !isStale(profile.natal_formula_version)) {
+    return profile.natal_moon_lon;
+  }
+  if (!profile.birth_date || !profile.birth_time || !profile.birth_tz) {
+    // Nothing to recompute from — a stale number still beats no reading.
+    return profile.natal_moon_lon;
+  }
+  try {
+    return computeNatalMoonLon(profile.birth_date, profile.birth_time.slice(0, 5), profile.birth_tz);
+  } catch {
+    return profile.natal_moon_lon;
+  }
 }
 
 // ── Web Push helpers ──────────────────────────────────────────────────────
@@ -439,7 +475,7 @@ function readingForProfile(profile: ProfileRow, now: Date, tzOffset: number) {
   const natal = snap
     ? { sun: snap.sun, moon: snap.moon, mercury: snap.mercury, venus: snap.venus,
         mars: snap.mars, jupiter: snap.jupiter, saturn: snap.saturn, asc: snap.asc, mc: snap.mc }
-    : (profile.natal_moon_lon != null ? { moon: profile.natal_moon_lon } : undefined);
+    : (() => { const m = natalMoonLonOf(profile); return m != null ? { moon: m } : undefined; })();
   if (!natal) return null;
 
   // `now` is the anchor; buildDayReading derives the user's own calendar day
@@ -599,8 +635,9 @@ export async function GET(req: NextRequest) {
       }
 
       // ── Lunar Return ─────────────────────────────────────────────────
-      if (prefs.lunar_return && profile.natal_moon_lon != null) {
-        const returnJd = findNextLunarReturn(profile.natal_moon_lon, nowJd);
+      const lunarReturnMoon = prefs.lunar_return ? natalMoonLonOf(profile) : null;
+      if (lunarReturnMoon != null) {
+        const returnJd = findNextLunarReturn(lunarReturnMoon, nowJd);
         const hoursAhead = (returnJd - nowJd) * 24;
         if (hoursAhead >= 0 && hoursAhead <= 36) {
           const when = jdToDate(returnJd);

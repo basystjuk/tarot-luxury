@@ -18,7 +18,7 @@ import { loadPromptOverrides } from "@/lib/server-content";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
 import { detectSymbols, analyzeDream } from "@/lib/dreams/analyze";
 import { symbolName } from "@/lib/dreams/symbols";
-import { dateToJD, calcPlanetDeg } from "@/lib/astro/calculations";
+import { lunarState } from "@/lib/astro/moon-state";
 
 export const maxDuration = 30;
 const userMap = new Map<string, { day: string }>();
@@ -29,20 +29,25 @@ interface Body {
   dream: string;
 }
 
-/** Compact Moon context for tonight: phase + a "vivid/prophetic" flag near
- *  the full moon (folk tradition: full-moon dreams are the most telling). */
+/**
+ * Compact Moon context for tonight: phase + a "vivid/prophetic" flag near the
+ * full moon (folk tradition: full-moon dreams are the most telling).
+ *
+ * Two things used to be wrong here. The instant came from
+ * `now.getTimezoneOffset()`, which on Vercel is UTC, so a dream logged at
+ * 01:00 in Kyiv was read against the sky of 22:00 the previous evening. And
+ * the phase was bucketed at 45° while every other surface used 22.5°, so on
+ * 90 days of 2026 the Moon Guide said "waxing" and this said "full".
+ *
+ * The instant is now genuinely instantaneous (JD straight from epoch millis,
+ * no wall-clock round trip) and the phase comes from the shared lunar state.
+ */
 function moonContext(lang: "uk" | "ru" | "en"): string {
-  const now = new Date();
-  const tz = -now.getTimezoneOffset() / 60;
-  const jd = dateToJD(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), tz);
-  const sun = calcPlanetDeg(0, jd);
-  const moon = calcPlanetDeg(1, jd);
-  const elong = (((moon - sun) % 360) + 360) % 360; // 0=new, 180=full
-  const illum = Math.round((1 - Math.cos((elong * Math.PI) / 180)) / 2 * 100);
-  const phase = elong < 45 || elong >= 315 ? "new"
-    : elong < 135 ? "waxing"
-    : elong < 225 ? "full"
-    : "waning";
+  const jd = Date.now() / 86_400_000 + 2440587.5;
+  const state = lunarState(jd);
+  const elong = state.elongation;
+  const illum = state.illumination;
+  const phase = state.phase;
   const prophetic = elong >= 160 && elong <= 200; // near full
   const phaseLbl = {
     uk: { new: "новий місяць", waxing: "місяць росте", full: "повний місяць", waning: "місяць спадає" },

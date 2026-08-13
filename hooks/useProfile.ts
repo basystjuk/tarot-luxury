@@ -29,6 +29,10 @@ export interface Profile {
   /** IANA zone the user lives in now — drives notification times. */
   tz: string | null;
   natal_moon_lon: number | null;
+  /** EPHEMERIS_VERSION that produced natal_moon_lon. Lower than the current
+   *  constant (or null) means the cached value predates a formula change and
+   *  must be recomputed — see lib/astro/version.ts. */
+  natal_formula_version: number | null;
   telegram_username: string | null;
   telegram_chat_id: number | null;
   subscribed_to_channel: boolean;

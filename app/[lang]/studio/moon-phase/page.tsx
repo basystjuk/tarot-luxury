@@ -5,7 +5,7 @@ import { ArrowRight, Sparkles, ChevronDown, Check } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
-import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, calcTrueNode, findNextLunarReturn, jdToDate, isDayChartByCoords, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
+import { dateToJD, calcPlanetDeg, calcMoonSpeed, calcMoonDeclination, calcTrueNode, calcMeanLilith, findNextLunarReturn, jdToDate, findNextSyzygy, findEclipseWithin, isDayChartByCoords, OBLIQUITY_DEG, SIGN_TO_ELEMENT, TRIPLICITY, isDayChartByHour, type ElementKey, type PlanetKey, SIGNS_UA, SIGNS_EN, SIGN_GLYPHS } from "@/lib/astro/calculations";
 import { TermHint } from "@/components/ui/TermHint";
 import { moonHint } from "./_hints";
 import { moonAdvice, type AdviceKey } from "./_advice";
@@ -21,6 +21,9 @@ import { WeekAhead } from "./_week-ahead";
 import { LiminalMoments } from "./_liminal-moments";
 import type { ZodiacMode } from "@/lib/astro/natal-snapshot";
 import { useProfile } from "@/hooks/useProfile";
+import { isStale } from "@/lib/astro/version";
+import { isVoidOfCourse } from "@/lib/astro/moon-state";
+import { useZodiacMode } from "@/hooks/useZodiacMode";
 import { track } from "@/lib/analytics/posthog";
 
 type PhaseKey =
@@ -66,7 +69,10 @@ interface MoonData {
   rulerParticipating: PlanetKey; // participating ruler (always present)
   rulerActive: PlanetKey;     // whichever of day/night is currently active
   eclipseType: "solar" | "lunar" | null;
-  eclipseProximity: number;   // 0–100, higher = closer to exact alignment
+  /** Sub-type from the shadow geometry: total / annular / hybrid / partial /
+   *  penumbral. The old node-distance test could not tell these apart. */
+  eclipseKind: string | null;
+  eclipseProximity: number;   // 0–100, higher = closer to greatest eclipse
   fixedStar: FixedStar | null; // closest fixed star within 1° orb, if any
   fixedStarOrb: number;        // arc-minutes from exact when fixedStar set
   hoursToNextSign: number;      // until Moon enters next sign, from this jd
@@ -86,44 +92,13 @@ function calcLunarNorthNode(jd: number): number {
   return calcTrueNode(jd);
 }
 
-function calcLilithMean(jd: number): number {
-  // Mean Black Moon Lilith — apogee of Moon's orbit
-  const T = (jd - 2451545.0) / 36525.0;
-  const lambda =
-    83.35324212 + 4069.0322 * T - 0.01032 * T * T -
-    (T * T * T) / 80053 + (T * T * T * T) / 18999000;
-  return ((lambda % 360) + 360) % 360;
-}
+// Black Moon Lilith now lives in the astro library (calcMeanLilith). The copy
+// that used to sit here returned the PERIGEE, so Lilith showed the opposite
+// sign for every user — see the note on calcMeanLilith.
 
-function calcVoidOfCourse(jd: number, moonLon: number): boolean {
-  // Find arc until next sign boundary
-  const sign = Math.floor(((moonLon % 360) + 360) % 360 / 30);
-  const boundary = (sign + 1) * 30;
-  let distance = boundary - moonLon;
-  if (distance <= 0) distance += 360;
-  if (distance > 30) return false; // safety
 
-  // Get planet positions at current JD (treat as fixed during Moon's transit of sign)
-  const planetIndices = [0, 2, 3, 4, 5, 6]; // Sun, Mercury, Venus, Mars, Jupiter, Saturn
-  const planetLons = planetIndices.map(i => calcPlanetDeg(i, jd));
-
-  // Major aspect angles (Ptolemaic)
-  const aspectAngles = [0, 60, 90, 120, 180];
-
-  // For each planet, find Moon target longitudes for any major aspect
-  for (const pLon of planetLons) {
-    for (const a of aspectAngles) {
-      for (const offset of [a, -a]) {
-        const target = (((pLon + offset) % 360) + 360) % 360;
-        let diff = target - moonLon;
-        if (diff < 0) diff += 360;
-        // Moon will hit this aspect before crossing sign boundary
-        if (diff > 0.5 && diff <= distance) return false;
-      }
-    }
-  }
-  return true;
-}
+// Void of Course moved to lib/astro/moon-state (isVoidOfCourse) so the
+// horoscope reads the same answer this page renders.
 
 function calcMoonPhase(
   year: number, month: number, day: number,
@@ -135,7 +110,6 @@ function calcMoonPhase(
   observerLon?: number,
 ): MoonData {
   const jd = dateToJD(year, month, day, hour, minute, tzHours);
-  const synodicMonth = 29.53058867;
 
   // Accurate ELP2000-simplified Moon + Meeus Sun positions
   const moonLon = calcPlanetDeg(1, jd);
@@ -152,7 +126,7 @@ function calcMoonPhase(
   const isDarkMoon = elongation < 18 || elongation > 342;
 
   // Void of Course Moon
-  const voidOfCourse = calcVoidOfCourse(jd, moonLon);
+  const voidOfCourse = isVoidOfCourse(jd, moonLon);
 
   // Lunar Nodes (Rahu / Ketu)
   const northNodeLon = calcLunarNorthNode(jd);
@@ -160,7 +134,7 @@ function calcMoonPhase(
   const southNodeSignIdx = (northNodeSignIdx + 6) % 12;
 
   // Black Moon Lilith
-  const lilithLon = calcLilithMean(jd);
+  const lilithLon = calcMeanLilith(jd);
   const lilithSignIdx = Math.floor(((lilithLon % 360) + 360) % 360 / 30);
 
   // ── Eclipse detection ───────────────────────────────────────────────────
@@ -178,25 +152,19 @@ function calcMoonPhase(
   // so the UI just says "Solar/Lunar eclipse" — close enough for a daily
   // tool. Precision: detects every actual eclipse, false-positives are
   // rare (~1–2 days per year that look eclipse-adjacent but aren't quite).
-  const angDist = (a: number, b: number) => {
-    let d = Math.abs(((a - b) % 360 + 360) % 360);
-    if (d > 180) d = 360 - d;
-    return d;
-  };
-  const southNodeLon = (northNodeLon + 180) % 360;
-  const sunNodeDist  = Math.min(angDist(sunLon, northNodeLon),  angDist(sunLon, southNodeLon));
-  const moonNodeDist = Math.min(angDist(moonLon, northNodeLon), angDist(moonLon, southNodeLon));
-  const isNearNew  = elongation < 13 || elongation > 347;
-  const isNearFull = Math.abs(elongation - 180) < 13;
-  let eclipseType: "solar" | "lunar" | null = null;
-  let eclipseProximity = 0; // 0–100, higher = closer to exact alignment
-  if (isNearNew && sunNodeDist < 18) {
-    eclipseType = "solar";
-    eclipseProximity = Math.max(0, Math.round(100 * (1 - sunNodeDist / 18)));
-  } else if (isNearFull && moonNodeDist < 12) {
-    eclipseType = "lunar";
-    eclipseProximity = Math.max(0, Math.round(100 * (1 - moonNodeDist / 12)));
-  }
+  // Real shadow geometry (Meeus ch. 54) via findEclipseWithin, not the
+  // distance-from-node shortcut that used to live here — which the library's
+  // own documentation calls insufficient, with the counter-example that
+  // 2024-09-18 is a genuine partial umbral eclipse at 10.98° from the node
+  // while 2024-03-25 at 10.35° is merely penumbral. Only γ separates them.
+  const eclipseHit = findEclipseWithin(jd - 1, 48);
+  const eclipseType: "solar" | "lunar" | null = eclipseHit ? eclipseHit.type : null;
+  const eclipseKind = eclipseHit ? eclipseHit.kind : null;
+  // "Proximity" now means how close in TIME we are to greatest eclipse,
+  // which is what a reader of a daily tool actually wants to know.
+  const eclipseProximity = eclipseHit
+    ? Math.max(0, Math.round(100 * (1 - Math.abs(eclipseHit.jd - jd))))
+    : 0;
 
   // Fixed star conjunction — only the closest star within 1°. The Moon
   // moves ~13°/day so this is a ~2-hour window when it does happen.
@@ -216,24 +184,14 @@ function calcMoonPhase(
   else if (elongation < 292.5)                        { phaseKey = "last_quarter";    emoji = "🌗"; }
   else                                                { phaseKey = "waning_crescent"; emoji = "🌘"; }
 
-  // Days to next full moon (elongation → 180°)
-  const daysToFull = (() => {
-    let diff = ((180 - elongation) + 360) % 360;
-    if (diff < 0.5) diff += synodicMonth;
-    return (diff / 360) * synodicMonth;
-  })();
-
-  // Days to next new moon (elongation → 0°)
-  const daysToNew = (() => {
-    let diff = (360 - elongation) % 360;
-    if (diff < 0.5) diff += synodicMonth;
-    return (diff / 360) * synodicMonth;
-  })();
-
-  const fullDate = new Date(year, month - 1, day);
-  fullDate.setDate(fullDate.getDate() + Math.round(daysToFull));
-  const newDate = new Date(year, month - 1, day);
-  newDate.setDate(newDate.getDate() + Math.round(daysToNew));
+  // Exact New / Full Moon by bisection on the true elongation.
+  //
+  // This used to be (gap/360) x 29.53, which assumes a constant rate. The
+  // Moon's elongation rate actually swings between 10.9 and 14.4 deg/day, so
+  // the estimate was out by up to 18 hours and — after rounding to whole days
+  // — printed the wrong calendar date roughly one time in three.
+  const fullDate = jdToDate(findNextSyzygy(jd, 180));
+  const newDate  = jdToDate(findNextSyzygy(jd, 0));
 
   // Sun sign (tropical) derived from the same JD — used by the AI route
   // to compute the Sun–Moon dialogue without a manual dropdown.
@@ -276,6 +234,11 @@ function calcMoonPhase(
   const element = (["fire", "earth", "air", "water"] as const)[SIGN_TO_ELEMENT[moonSignIdx]];
   const triplicity = TRIPLICITY[element];
   // Phase М2: true sect when we have coordinates, hour-heuristic otherwise.
+  // True sect from the observer's horizon whenever we have coordinates. The
+  // 06:00–18:00 fallback disagrees with the real horizon on 13.9% of the
+  // hours in a year — every winter morning between 06:00 and 08:00 in Kyiv
+  // is called "day" while the Sun is still below the horizon — which flips
+  // the active triplicity ruler and therefore the advice.
   const isDayChart = (observerLat != null && observerLon != null)
     ? isDayChartByCoords(observerLat, observerLon, jd)
     : isDayChartByHour(hour);
@@ -297,6 +260,7 @@ function calcMoonPhase(
     rulerParticipating: triplicity.participating,
     rulerActive,
     eclipseType,
+    eclipseKind,
     eclipseProximity,
     fixedStar,
     fixedStarOrb,
@@ -635,56 +599,73 @@ export default function MoonPhasePage() {
     track("tool_viewed", { tool: "moon-phase" });
   }, []);
 
-  // Phase М10: tropical / sidereal zodiac toggle. Persisted to localStorage
-  // so the user's choice survives reloads. Default is tropical (western).
-  const [zodiac, setZodiac] = useState<ZodiacMode>("tropical");
-  useEffect(() => {
-    try {
-      const s = window.localStorage.getItem("ellen-soul:zodiac");
-      if (s === "tropical" || s === "sidereal") setZodiac(s);
-    } catch { /* */ }
-  }, []);
-  useEffect(() => {
-    try { window.localStorage.setItem("ellen-soul:zodiac", zodiac); } catch { /* */ }
-  }, [zodiac]);
+  // Tropical / sidereal. Owner's decision (2026-08-13): this is a GLOBAL
+  // setting — the hook is shared with the natal chart, horoscope, year
+  // forecast and compatibility, which all used to ignore it.
+  const [zodiac, setZodiac] = useZodiacMode();
 
   // Cloud profile (Phase В) — used by the new natal chart block. It's
   // the same data type as natalProfile (localStorage) but in the cloud
   // schema; we just access the relevant fields via useProfile.
   const { profile: cloudProfile } = useProfile();
 
-  // Auto-sync cloud profile → natalProfile state. When the cabinet has
-  // everything filled in and localStorage is empty, the user shouldn't
-  // need to visit the "Natal" tab + click Save to see the natal blocks
-  // here. We materialise the NatalProfile synchronously on profile load.
-  const [autoSyncedFromCloud, setAutoSyncedFromCloud] = useState(false);
+  // Cloud profile → local cache. THE CLOUD IS THE SOURCE OF TRUTH; the
+  // localStorage entry is a cache so signed-out visitors still get natal
+  // blocks and so this page doesn't wait on a fetch to render them.
+  //
+  // The previous version bailed out whenever localStorage held anything
+  // (`if (natalProfile) return`), which meant the cabinet and the Moon Guide
+  // drifted apart permanently: a user who corrected their birth time saw the
+  // horoscope, year forecast and natal chart update while this page kept
+  // serving the original data forever, with no way to tell.
+  //
+  // Now the cloud overwrites the cache whenever the two disagree. The Moon
+  // Guide's own natal form writes to both (see _natal-form), and a signed-out
+  // user's local edits are carried up by the migration modal on sign-in, so
+  // "cloud wins" never loses work.
   useEffect(() => {
-    if (autoSyncedFromCloud) return;
     if (!cloudProfile) return;
-    if (natalProfile) { setAutoSyncedFromCloud(true); return; }
-    if (cloudProfile.birth_date && cloudProfile.birth_time && cloudProfile.birth_place
-        && cloudProfile.birth_lat != null && cloudProfile.birth_lon != null && cloudProfile.birth_tz) {
-      let natalMoonLon = cloudProfile.natal_moon_lon ?? 0;
-      if (!natalMoonLon) {
-        try {
-          natalMoonLon = computeNatalMoonLon(cloudProfile.birth_date, cloudProfile.birth_time.slice(0, 5), cloudProfile.birth_tz);
-        } catch { /* leave 0 */ }
-      }
-      const synth: NatalProfile = {
-        birthDate: cloudProfile.birth_date,
-        birthTime: cloudProfile.birth_time.slice(0, 5),
-        birthPlace: cloudProfile.birth_place,
-        lat: cloudProfile.birth_lat,
-        lon: cloudProfile.birth_lon,
-        tz: cloudProfile.birth_tz,
-        natalMoonLon,
-        savedAt: new Date().toISOString(),
-      };
-      saveNatal(synth);
-      setNatalProfile(synth);
+    if (!cloudProfile.birth_date || !cloudProfile.birth_time || !cloudProfile.birth_place
+        || cloudProfile.birth_lat == null || cloudProfile.birth_lon == null || !cloudProfile.birth_tz) {
+      return;
     }
-    setAutoSyncedFromCloud(true);
-  }, [cloudProfile, natalProfile, autoSyncedFromCloud]);
+
+    const birthTime = cloudProfile.birth_time.slice(0, 5);
+    // Reuse the cached longitude only when the cloud's stamp says it came
+    // from the current formulas; otherwise recompute.
+    let natalMoonLon = isStale(cloudProfile.natal_formula_version)
+      ? 0
+      : (cloudProfile.natal_moon_lon ?? 0);
+    if (!natalMoonLon) {
+      try {
+        natalMoonLon = computeNatalMoonLon(cloudProfile.birth_date, birthTime, cloudProfile.birth_tz);
+      } catch { /* leave 0 */ }
+    }
+
+    // Nothing changed → don't touch storage or re-render.
+    if (natalProfile
+        && natalProfile.birthDate === cloudProfile.birth_date
+        && natalProfile.birthTime === birthTime
+        && natalProfile.lat === cloudProfile.birth_lat
+        && natalProfile.lon === cloudProfile.birth_lon
+        && natalProfile.tz === cloudProfile.birth_tz
+        && Math.abs(natalProfile.natalMoonLon - natalMoonLon) < 1e-9) {
+      return;
+    }
+
+    const synced: NatalProfile = {
+      birthDate: cloudProfile.birth_date,
+      birthTime,
+      birthPlace: cloudProfile.birth_place,
+      lat: cloudProfile.birth_lat,
+      lon: cloudProfile.birth_lon,
+      tz: cloudProfile.birth_tz,
+      natalMoonLon,
+      savedAt: new Date().toISOString(),
+    };
+    saveNatal(synced);
+    setNatalProfile(synced);
+  }, [cloudProfile, natalProfile]);
 
   const [form, setForm] = useState({
     year:   today.getFullYear().toString(),

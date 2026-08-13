@@ -19,6 +19,8 @@ type ProfilePatch = {
   birth_lon?: number | null;
   birth_tz?: string | null;
   natal_moon_lon?: number | null;
+  /** EPHEMERIS_VERSION that produced natal_moon_lon — see lib/astro/version.ts. */
+  natal_formula_version?: number | null;
   telegram_username?: string | null;
   tz?: string | null;              // IANA zone the user lives in now
 };
@@ -27,7 +29,7 @@ const ALLOWED_FIELDS = new Set<keyof ProfilePatch>([
   "display_name", "full_name",
   "birth_date", "birth_time", "birth_place",
   "birth_lat", "birth_lon", "birth_tz",
-  "natal_moon_lon", "telegram_username", "tz",
+  "natal_moon_lon", "natal_formula_version", "telegram_username", "tz",
 ]);
 
 /** Is this a zone Intl actually knows? Guards against junk reaching the cron. */
@@ -87,12 +89,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "bad_timezone" }, { status: 400 });
   }
 
-  const { data, error } = await supa
+  let { data, error } = await supa
     .from("profiles")
     .update(patch)
     .eq("id", user.id)
     .select("*")
     .maybeSingle();
+
+  // Survive a deploy that lands before migration 0007. Postgres rejects the
+  // whole UPDATE when one column is unknown, which would mean nobody can save
+  // their profile at all until the SQL is run — a far worse failure than
+  // losing a cache stamp. Retry without the new column; the client treats a
+  // missing stamp as stale and recomputes, which is the correct behaviour.
+  if (error && patch.natal_formula_version !== undefined) {
+    console.warn("profile update failed; retrying without natal_formula_version (migration 0007 not applied?)", error);
+    const { natal_formula_version: _drop, ...fallback } = patch;
+    void _drop;
+    ({ data, error } = await supa
+      .from("profiles")
+      .update(fallback)
+      .eq("id", user.id)
+      .select("*")
+      .maybeSingle());
+  }
+
   if (error) {
     console.error("profile update error:", error);
     return NextResponse.json({ error: "db_error" }, { status: 500 });

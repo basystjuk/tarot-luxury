@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "rm -rf .next/cache && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsc -p tsconfig.test.json && node .test-build/lib/astro/__invariants__.js && node .test-build/lib/numerology/__sanity__.js",
+    "test:astro": "tsc -p tsconfig.test.json && node .test-build/lib/astro/__invariants__.js"
   },
   "dependencies": {
     "@next/font": "^14.2.15",

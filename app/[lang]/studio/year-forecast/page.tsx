@@ -12,15 +12,17 @@
  * incomplete-profile users get a clear CTA. AI synthesis is auth-gated.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Sparkles, Loader2, Lock, Sun, Moon, CalendarRange, Compass } from "lucide-react";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useProfile } from "@/hooks/useProfile";
+import { useZodiacMode } from "@/hooks/useZodiacMode";
+import { signOf } from "@/lib/astro/natal-snapshot";
 import { dateToJD, calcPlanetDeg, SIGN_GLYPHS, SIGNS_UA, SIGNS_EN } from "@/lib/astro/calculations";
-import { ianaToOffsetHours } from "@/app/[lang]/studio/moon-phase/_natal";
+import { localBirthOffsetHours } from "@/lib/astro/timezone";
 import { buildYearForecast } from "@/lib/astro/progressions";
 import type { PlanetName, AspectKind } from "@/lib/astro/synastry";
 import { track } from "@/lib/analytics/posthog";
@@ -143,6 +145,14 @@ export default function YearForecastPage() {
   const t = T[lang];
   const signs = lang === "ru" ? SIGNS_RU : lang === "en" ? SIGNS_EN : SIGNS_UA;
   const { profile } = useProfile();
+  const [zodiac] = useZodiacMode();
+  // Tropical → active zodiac for DISPLAY only. The engine stays tropical;
+  // the ayanamsa shifts every longitude equally, so aspects and house
+  // placements are untouched and only the sign labels move.
+  const zSign = useCallback(
+    (lon: number, jd: number) => signOf(lon, jd, zodiac),
+    [zodiac],
+  );
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { track("tool_viewed", { tool: "year-forecast" }); }, []);
@@ -155,7 +165,7 @@ export default function YearForecastPage() {
     const hasTime = Boolean(profile.birth_time);
     const [h, mi] = hasTime ? profile.birth_time!.split(":").map(n => parseInt(n, 10)) : [12, 0];
     const hasPlace = profile.birth_lat != null && profile.birth_lon != null && Boolean(profile.birth_tz);
-    const tzOff = hasPlace ? ianaToOffsetHours(new Date(Date.UTC(y, mo - 1, d, h, mi)), profile.birth_tz!) : 0;
+    const tzOff = hasPlace ? localBirthOffsetHours(y, mo, d, h, mi, profile.birth_tz!) : 0;
     const natalJd = dateToJD(y, mo, d, h, mi, tzOff);
     const natalSun = calcPlanetDeg(0, natalJd);
     const natal: Partial<Record<PlanetName, number>> = {
@@ -167,7 +177,7 @@ export default function YearForecastPage() {
       natalJd, natalSunLon: natalSun, natal, birthMonth: mo, birthDay: d,
       lat: hasPlace ? profile.birth_lat : null, lon: hasPlace ? profile.birth_lon : null,
     });
-    return { forecast, hasTime, hasPlace };
+    return { forecast, hasTime, hasPlace, natalJd };
   }, [profile]);
 
   // ── AI ──
@@ -190,10 +200,10 @@ export default function YearForecastPage() {
           age: f.ageYears,
           srAscSign: f.solarReturn ? signs[f.solarReturn.ascSign] : "",
           srSunHouse: f.solarReturn ? String(f.solarReturn.sunHouse) : "",
-          progSunSign: signs[f.progressed.sunSign],
-          progMoonSign: signs[f.progressed.moonSign],
+          progSunSign: signs[zSign(f.progressed.Sun, data.natalJd)],
+          progMoonSign: signs[zSign(f.progressed.Moon, data.natalJd)],
           progMoonChange: f.progMoonNextSignChange
-            ? `${signs[f.progMoonNextSignChange.sign]} (${f.progMoonNextSignChange.isoDate})` : "—",
+            ? `${signs[zSign(f.progMoonNextSignChange.lon, data.natalJd)]} (${f.progMoonNextSignChange.isoDate})` : "—",
           progAspects: aspectsTxt,
         }),
       });
@@ -247,7 +257,7 @@ export default function YearForecastPage() {
                     <div>
                       <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">{t.prog_moon}</p>
                       <p className="text-lg text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-                        {SIGN_GLYPHS[data.forecast.progressed.moonSign]} {signs[data.forecast.progressed.moonSign]}
+                        {SIGN_GLYPHS[zSign(data.forecast.progressed.Moon, data.natalJd)]} {signs[zSign(data.forecast.progressed.Moon, data.natalJd)]}
                       </p>
                     </div>
                   </div>
@@ -267,7 +277,7 @@ export default function YearForecastPage() {
                         <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">{t.sr_asc}</p>
                         <p className="text-2xl text-[#1C1512] flex items-center gap-2" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
                           <Compass size={20} className="text-[#B8883A]" />
-                          {SIGN_GLYPHS[data.forecast.solarReturn.ascSign]} {signs[data.forecast.solarReturn.ascSign]}
+                          {SIGN_GLYPHS[zSign(data.forecast.solarReturn.asc, data.natalJd)]} {signs[zSign(data.forecast.solarReturn.asc, data.natalJd)]}
                         </p>
                       </div>
                       <div>
@@ -293,16 +303,16 @@ export default function YearForecastPage() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="p-3 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.15)]">
                       <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">{t.prog_moon}</p>
-                      <p className="text-lg text-[#1C1512]">{SIGN_GLYPHS[data.forecast.progressed.moonSign]} {signs[data.forecast.progressed.moonSign]}</p>
+                      <p className="text-lg text-[#1C1512]">{SIGN_GLYPHS[zSign(data.forecast.progressed.Moon, data.natalJd)]} {signs[zSign(data.forecast.progressed.Moon, data.natalJd)]}</p>
                       <p className="text-xs text-[#7A6A58] mt-1">
                         {t.moon_change}: {data.forecast.progMoonNextSignChange
-                          ? `${SIGN_GLYPHS[data.forecast.progMoonNextSignChange.sign]} ${signs[data.forecast.progMoonNextSignChange.sign]} · ${data.forecast.progMoonNextSignChange.isoDate}`
+                          ? `${SIGN_GLYPHS[zSign(data.forecast.progMoonNextSignChange.lon, data.natalJd)]} ${signs[zSign(data.forecast.progMoonNextSignChange.lon, data.natalJd)]} · ${data.forecast.progMoonNextSignChange.isoDate}`
                           : t.moon_change_none}
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-[rgba(196,169,122,0.06)] border border-[rgba(196,169,122,0.15)]">
                       <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-1">{t.prog_sun}</p>
-                      <p className="text-lg text-[#1C1512]">{SIGN_GLYPHS[data.forecast.progressed.sunSign]} {signs[data.forecast.progressed.sunSign]}</p>
+                      <p className="text-lg text-[#1C1512]">{SIGN_GLYPHS[zSign(data.forecast.progressed.Sun, data.natalJd)]} {signs[zSign(data.forecast.progressed.Sun, data.natalJd)]}</p>
                     </div>
                   </div>
 
@@ -319,8 +329,8 @@ export default function YearForecastPage() {
                                transformOrigin: "bottom",
                                transitionDelay: `${i * 40}ms`,
                              }}
-                             title={`${t.months[i]} · ${signs[p.sign]}`} />
-                        <p className="text-[8px] text-center text-[#9A8A78] mt-1">{SIGN_GLYPHS[p.sign]}</p>
+                             title={`${t.months[i]} · ${signs[zSign(p.lon, data.natalJd)]}`} />
+                        <p className="text-[8px] text-center text-[#9A8A78] mt-1">{SIGN_GLYPHS[zSign(p.lon, data.natalJd)]}</p>
                       </div>
                     ))}
                   </div>

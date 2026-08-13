@@ -31,6 +31,7 @@ import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { searchCity, coordsToIana, computeNatalMoonLon, type GeoCandidate } from "@/app/[lang]/studio/moon-phase/_natal";
 import { invalidateProfileCache } from "@/hooks/useProfile";
+import { EPHEMERIS_VERSION } from "@/lib/astro/version";
 import type { Profile } from "@/hooks/useProfile";
 
 interface Props {
@@ -230,6 +231,8 @@ export function CabinetClient({ initialProfile, email, lang: langProp }: Props) 
         birth_lon: picked?.lon ?? null,
         birth_tz: tz || null,
         natal_moon_lon: natalMoonLon,
+        // Stamp the cache so a later formula change can spot and refresh it.
+        natal_formula_version: natalMoonLon == null ? null : EPHEMERIS_VERSION,
       };
 
       const res = await fetch("/api/account/profile", {

@@ -13,7 +13,7 @@
  * Each entry shows:
  *   - Glyph + label
  *   - "in 14 h" / "in 3 days" rough lead time
- *   - Exact Kyiv-local timestamp
+ *   - Exact timestamp in the VISITOR"S zone
  *
  * Sorted chronologically, soonest first. Auto-refreshes via parent
  * re-render (the parent already ticks every minute in "today" mode).
@@ -36,7 +36,7 @@ const GLYPH: Record<LiminalKind, string> = {
 const COPY = {
   uk: {
     heading: "Точки переходу",
-    sub: "Найближчі моменти зміни — у локальному часі Києва. Гарні точки для пауз і нових починань.",
+    sub: "Найближчі моменти зміни — у твоєму місцевому часі. Гарні точки для пауз і нових починань.",
     in_h: (h: number) => `через ${h} год`,
     in_d: (d: number) => `через ${d} дн.`,
     sign_change: (signGlyph: string, signName: string) => `Місяць заходить у ${signGlyph} ${signName}`,
@@ -46,7 +46,7 @@ const COPY = {
   },
   ru: {
     heading: "Точки перехода",
-    sub: "Ближайшие моменты смены — в локальном времени Киева. Хорошие точки для пауз и новых начинаний.",
+    sub: "Ближайшие моменты смены — в твоём местном времени. Хорошие точки для пауз и новых начинаний.",
     in_h: (h: number) => `через ${h} ч`,
     in_d: (d: number) => `через ${d} дн.`,
     sign_change: (signGlyph: string, signName: string) => `Луна заходит в ${signGlyph} ${signName}`,
@@ -56,7 +56,7 @@ const COPY = {
   },
   en: {
     heading: "Threshold moments",
-    sub: "The closest upcoming shifts — in local Kyiv time. Good points for pauses and new beginnings.",
+    sub: "The closest upcoming shifts — in your local time. Good points for pauses and new beginnings.",
     in_h: (h: number) => `in ${h} h`,
     in_d: (d: number) => `in ${d} d`,
     sign_change: (signGlyph: string, signName: string) => `Moon enters ${signGlyph} ${signName}`,
@@ -66,10 +66,18 @@ const COPY = {
   },
 };
 
-function fmtKyiv(d: Date, lang: "uk" | "ru" | "en"): string {
+/**
+ * The visitor's own clock, not Kyiv's.
+ *
+ * This pinned `timeZone: "Europe/Kiev"` while the rest of the Moon Guide
+ * rendered times in the browser's zone — two panels on one screen quoting the
+ * same sign change an hour apart for anyone outside Ukraine. Omitting
+ * `timeZone` lets Intl use the visitor's, which is what every other time on
+ * the page already does.
+ */
+function fmtLocal(d: Date, lang: "uk" | "ru" | "en"): string {
   const locale = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uk-UA";
   return d.toLocaleString(locale, {
-    timeZone: "Europe/Kiev",
     weekday: "short", day: "numeric", month: "long",
     hour: "2-digit", minute: "2-digit",
   });
@@ -111,7 +119,7 @@ export function LiminalMoments({ language, signNames, natalMoonLon }: Props) {
                     {label}
                   </p>
                   <p className="text-[11px] text-[#9A8A78] mt-0.5">
-                    <span className="text-[#B8883A]">{lead}</span> · {fmtKyiv(m.date, language)}
+                    <span className="text-[#B8883A]">{lead}</span> · {fmtLocal(m.date, language)}
                   </p>
                 </div>
               </div>

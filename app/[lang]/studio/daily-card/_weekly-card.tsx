@@ -17,6 +17,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { TAROT_CARDS, getCardName, drawCard } from "@/lib/data/tarot-cards";
+import { STUDIO_ZONE } from "@/lib/time/day";
 import { getMeaning } from "@/lib/data/tarot-meanings";
 import { track } from "@/lib/analytics/posthog";
 
@@ -32,7 +33,7 @@ interface WeeklyDraw {
 function kyivMondayKey(): string {
   // Get Kyiv "now" as a Date in local tz (we use the day-of-week math, no DST tricks needed)
   const fmt = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Kiev", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short",
+    timeZone: STUDIO_ZONE, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short",
   });
   const parts = fmt.formatToParts(new Date());
   const y = parseInt(parts.find(p => p.type === "year")?.value ?? "2000", 10);

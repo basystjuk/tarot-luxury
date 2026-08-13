@@ -41,7 +41,11 @@ export const FIXED_STARS: readonly FixedStar[] = [
   },
   {
     key: "regulus",
-    ecliptic: sign(4, 0.00), // 0°00' ♌ Leo (slowly precessing toward ♍ Virgo; using leadership star tradition)
+    // 29°50' ♌ Leo at J2000. It was written as 0°00' Leo — the wrong end of
+    // the sign, 29.83° out, so the star never fired where it should and fired
+    // a whole sign early. Regulus crossed into ♍ Virgo in 2011; precessedLon()
+    // carries it there on its own.
+    ecliptic: sign(4, 29.83),
     i18n: {
       uk: { name: "Регул",   meaning: "Серце Лева, страж Півночі. Лідерство, гідність, шляхетний шлях; падіння — лише через помсту." },
       ru: { name: "Регул",   meaning: "Сердце Льва, страж Севера. Лидерство, достоинство, благородный путь; падение — только через месть." },

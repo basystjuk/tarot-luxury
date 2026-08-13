@@ -58,19 +58,35 @@ export function calcLST(jd: number, lon: number): number {
 }
 
 /** Obliquity of the ecliptic in degrees */
-function calcObliquity(jd: number): number {
+export function calcObliquity(jd: number): number {
   const T = (jd - 2451545.0) / 36525.0;
   return 23.439291111 - 0.013004167 * T - 1.638889e-7 * T * T + 5.03611e-7 * T * T * T;
 }
 
-/** Ascendant (ecliptic longitude of eastern horizon) */
+/**
+ * Ascendant — the ecliptic longitude rising on the EASTERN horizon.
+ *
+ *   ASC = atan2( cos(RAMC), −(sin(RAMC)·cos ε + tan φ·sin ε) )
+ *
+ * The previous form negated both arguments of the atan2, which rotates the
+ * result by exactly 180° and therefore returned the DESCENDANT. It was wrong
+ * at every latitude and every sidereal time, so nothing about the chart hid
+ * it — the Ascendant simply showed the opposite sign, and the Placidus cusps
+ * built on top of it could never close into a valid house set.
+ *
+ * Ground truth used to pin the sign convention (audit 2026-08-13): with 0°
+ * Aries culminating (LST = 0) on the equator (φ = 0), the points 6ʰ of right
+ * ascension east of the meridian are rising, so RA = 90° is on the eastern
+ * horizon and the ecliptic point there is λ = 90° — 0° Cancer. This function
+ * must return 90, not 270.
+ */
 export function calcAscendant(lst: number, lat: number, e: number): number {
   const lstRad = (lst * Math.PI) / 180;
   const latRad = (lat * Math.PI) / 180;
   const eRad = (e * Math.PI) / 180;
-  const y = -Math.cos(lstRad);
-  const x = Math.sin(eRad) * Math.tan(latRad) + Math.cos(eRad) * Math.sin(lstRad);
-  let asc = (Math.atan2(y, x) * 180) / Math.PI;
+  const y = Math.cos(lstRad);
+  const x = -(Math.sin(lstRad) * Math.cos(eRad) + Math.tan(latRad) * Math.sin(eRad));
+  const asc = (Math.atan2(y, x) * 180) / Math.PI;
   return ((asc % 360) + 360) % 360;
 }
 
@@ -368,10 +384,29 @@ function heliocentricEclipticXYZ(planet: keyof typeof ELEMENTS_J2000, T: number)
   return { x, y, z };
 }
 
+/**
+ * General precession in ecliptic longitude since J2000, in degrees.
+ *
+ * The JPL orbital elements above are referred to the mean ecliptic and
+ * equinox of **J2000**. The Meeus series for the Sun and the Moon are
+ * referred to the mean equinox **of date** — the tropical zodiac the whole
+ * site reads. Mixing the two frames left every planet from Mercury to Pluto
+ * systematically displaced against the luminaries: nothing at all in 2000,
+ * −41′ for a 1950 birth, +22′ today, +42′ by 2050. It grew by 1° every 72
+ * years in both directions from J2000 and would never have stopped.
+ *
+ * Adding this term converts the planets into the equinox of date, which is
+ * the frame everything else in this file already speaks. Accurate to about
+ * 1″ across the 1900–2100 range the tools serve.
+ */
+export function precessionSinceJ2000(T: number): number {
+  return 1.396971 * T + 0.0003086 * T * T;
+}
+
 /** Calculate geocentric ecliptic longitude for a planet.
  *  Index: 0=Sun, 1=Moon, 2=Mercury, 3=Venus, 4=Mars, 5=Jupiter,
  *         6=Saturn, 7=Uranus, 8=Neptune, 9=Pluto.
- *  Returns degrees in [0, 360). */
+ *  Returns degrees in [0, 360), mean equinox of date. */
 export function calcPlanetDeg(planetIdx: number, jd: number): number {
   if (planetIdx === 0) return sunLongitude(jd);
   if (planetIdx === 1) return moonLongitudeFull(jd);
@@ -383,12 +418,13 @@ export function calcPlanetDeg(planetIdx: number, jd: number): number {
   const p = heliocentricEclipticXYZ(planet, T);
   const earth = heliocentricEclipticXYZ("earth", T);
 
-  // Geocentric = planet − Earth (heliocentric ecliptic of date).
+  // Geocentric = planet − Earth (heliocentric ecliptic, J2000 frame).
   const X = p.x - earth.x;
   const Y = p.y - earth.y;
   // Z is dropped — we only need ecliptic longitude.
 
-  return norm360(Math.atan2(Y, X) * 180 / Math.PI);
+  // J2000 → equinox of date, so planets share the Sun's and Moon's frame.
+  return norm360(Math.atan2(Y, X) * 180 / Math.PI + precessionSinceJ2000(T));
 }
 
 /** Same, but returns full ecliptic spherical (longitude + latitude) — for
@@ -412,10 +448,37 @@ export function calcPlanetEcliptic(planetIdx: number, jd: number): { lon: number
   const Y = p.y - earth.y;
   const Z = p.z - earth.z;
 
-  const lon = norm360(Math.atan2(Y, X) * 180 / Math.PI);
+  // Same J2000 → equinox-of-date correction as calcPlanetDeg. Precession
+  // rotates about the ecliptic pole, so longitude shifts and latitude
+  // doesn't (to the accuracy this approximation claims).
+  const lon = norm360(Math.atan2(Y, X) * 180 / Math.PI + precessionSinceJ2000(T));
   const r = Math.sqrt(X * X + Y * Y);
   const lat = Math.atan2(Z, r) * 180 / Math.PI;
   return { lon, lat };
+}
+
+// ── Black Moon Lilith (mean lunar apogee) ─────────────────────────────────
+//
+// Lilith is the APOGEE of the Moon's orbit — the far end of the line of
+// apsides. The mean longitude of the perigee follows exactly from the two
+// lunar arguments this file already uses:
+//
+//   L′ = 218.3164477 + 481267.88123421·T     (mean longitude)
+//   M′ = 134.9633964 + 477198.8675055·T      (mean anomaly)
+//   Π  = L′ − M′ = 83.3530513 + 4069.0137287·T
+//
+// and the apogee is Π + 180°. The Moon Guide previously carried its own copy
+// of this series that returned Π itself — the perigee — so Lilith was shown
+// in the opposite sign for every user, on every date. Its drift coefficient
+// was off too (4069.0322 against 4069.0137287, ~1′ per century).
+
+/** Mean Black Moon Lilith — the lunar apogee — in degrees, equinox of date. */
+export function calcMeanLilith(jd: number): number {
+  const T = (jd - 2451545.0) / 36525.0;
+  const perigee =
+    83.3530513 + 4069.0137287 * T - 0.0103200 * T * T
+    - (T * T * T) / 80053 + (T * T * T * T) / 18999000;
+  return norm360(perigee + 180);
 }
 
 /** Get sign index (0-11) from ecliptic longitude */
@@ -520,16 +583,32 @@ export function calcPlacidusHouses(lst: number, lat: number, e: number): number[
     return norm360((lambda * 180) / Math.PI);
   }
 
+  // S = +1 walks EAST of the meridian (RA = ARMC + F·SDA): the arc from the
+  // MC down to the Ascendant, i.e. houses 11 and 12.
   cusps[10] = intermediateCusp(1 / 3, +1); // House 11
   cusps[11] = intermediateCusp(2 / 3, +1); // House 12
-  cusps[1]  = intermediateCusp(1 / 3, -1); // House 2
-  cusps[2]  = intermediateCusp(2 / 3, -1); // House 3
+
+  // S = −1 walks WEST of the meridian (RA = ARMC − F·SDA). That is the arc
+  // from the MC down to the DESCENDANT — houses 9 and 8, NOT 2 and 3.
+  //
+  // Why these are the right cusps to solve for: cusp 8 sits opposite cusp 2,
+  // so δ₈ = −δ₂ and SDA(δ₈) = 180° − SDA(δ₂). Substituting into the Placidus
+  // definition of cusp 2 (RA₂ = RAMC + 180° − ⅔·NSA) collapses to the clean
+  // form RA₈ = RAMC − ⅔·SDA(δ₈), which is exactly what this iteration finds.
+  // Cusps 2 and 3 then come free as the oppositions.
+  //
+  // Assigning these two results to houses 2 and 3 (the previous code) left
+  // the cusp array non-monotonic: the twelve arcs summed to 1800° instead of
+  // 360°, and whichPlacidusHouse() could only ever return house 1 or 2 — so
+  // every planet of every chart landed in one of those two houses.
+  cusps[8]  = intermediateCusp(1 / 3, -1); // House 9
+  cusps[7]  = intermediateCusp(2 / 3, -1); // House 8
 
   // Opposite cusps
   cusps[4] = norm360(cusps[10] + 180); // House 5
   cusps[5] = norm360(cusps[11] + 180); // House 6
-  cusps[7] = norm360(cusps[1]  + 180); // House 8
-  cusps[8] = norm360(cusps[2]  + 180); // House 9
+  cusps[2] = norm360(cusps[8]  + 180); // House 3
+  cusps[1] = norm360(cusps[7]  + 180); // House 2
 
   // Defensive: if any cusp became NaN (numeric breakdown), fall back to
   // an equal-house value so the wheel still renders something.
@@ -905,6 +984,24 @@ function syzygyDelta(jd: number, target: 0 | 180): number {
   return d;
 }
 
+/**
+ * Exact JD of the next New (target 0) or Full (180) Moon after `fromJd`.
+ *
+ * The canonical syzygy finder. Three cheaper ones used to live around the
+ * codebase — a 5-minute stepper, a 1-hour cron scan, and a constant-rate
+ * estimate on the Moon Guide that was off by up to 18 hours and therefore
+ * printed the wrong calendar date about a third of the time. Everything now
+ * comes here; the search is a bisection on the true elongation, so the answer
+ * is good to well under a second.
+ */
+export function findNextSyzygy(fromJd: number, target: 0 | 180): number {
+  // A synodic month is 29.53 days, so 40 always brackets the next one.
+  const jd = findSyzygy(fromJd, 40, target);
+  if (jd !== null) return jd;
+  // Unreachable in practice; keep the contract non-null for callers.
+  return fromJd + (target === 0 ? 29.530588861 : 14.765294431);
+}
+
 /** Exact JD of the next New (target 0) or Full (180) Moon within `days`. */
 function findSyzygy(fromJd: number, days: number, target: 0 | 180): number | null {
   const step = 0.25;                     // Moon gains ~3° of elongation per step
@@ -991,7 +1088,12 @@ function shadowSeparation(jd: number, isNew: boolean): number {
  */
 function deltaTSeconds(jd: number): number {
   const t = (jd - 2451545.0) / 365.25;      // years since 2000.0
-  return 62.92 + 0.32217 * t + 0.005589 * t * t;
+  // Espenak & Meeus fitted this for 2005–2050. Outside that window it drifts,
+  // so clamp rather than extrapolate a polynomial nobody validated there —
+  // the residual costs seconds on an eclipse instant, which is inside the
+  // minute we display, whereas an unbounded quadratic does not stay bounded.
+  const tc = Math.max(5, Math.min(50, t));
+  return 62.92 + 0.32217 * tc + 0.005589 * tc * tc;
 }
 
 /**
@@ -1088,8 +1190,10 @@ export function findNextLunarReturn(natalMoonLon: number, fromJd: number): numbe
   // First-pass estimate: travel time at the Moon's mean motion (13.176°/day).
   const lon0 = moonLongitudeFull(jd);
   let diff = norm360(natalMoonLon - lon0);
-  // If we're already at or just past the natal point, push to the NEXT return.
-  if (diff < 0.5) diff += 360;
+  // Only skip to the next cycle when we are effectively ON the point already.
+  // The old 0.5° threshold (≈ 55 minutes of Moon travel) silently swallowed
+  // a return that was about to happen within the hour.
+  if (diff < 0.01) diff += 360;
   jd += diff / 13.176;
 
   // Refine

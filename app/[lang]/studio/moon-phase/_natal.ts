@@ -28,6 +28,8 @@
  */
 
 import { dateToJD, calcPlanetDeg } from "@/lib/astro/calculations";
+import { EPHEMERIS_VERSION, isStale } from "@/lib/astro/version";
+import { localBirthOffsetHours } from "@/lib/astro/timezone";
 
 export interface NatalProfile {
   birthDate: string;      // "1990-04-15"
@@ -38,6 +40,9 @@ export interface NatalProfile {
   tz: string;             // IANA, e.g. "Europe/Kyiv"
   natalMoonLon: number;   // tropical ecliptic longitude (degrees)
   savedAt: string;        // ISO timestamp
+  /** EPHEMERIS_VERSION that produced natalMoonLon. Absent on profiles saved
+   *  before versioning existed — those read as 0 and get recomputed. */
+  formulaVersion?: number;
 }
 
 export const NATAL_STORAGE_KEY = "tarot-luxury:natal";
@@ -56,6 +61,25 @@ export function loadNatal(): NatalProfile | null {
       typeof parsed.lat !== "number" || typeof parsed.lon !== "number" ||
       !parsed.tz || typeof parsed.natalMoonLon !== "number"
     ) return null;
+
+    // The cached natalMoonLon may predate a formula change. Recompute rather
+    // than serve a number the current code would never produce.
+    if (isStale(parsed.formulaVersion)) {
+      try {
+        const fresh = computeNatalMoonLon(parsed.birthDate, parsed.birthTime, parsed.tz);
+        const migrated: NatalProfile = {
+          ...parsed,
+          natalMoonLon: fresh,
+          formulaVersion: EPHEMERIS_VERSION,
+        };
+        saveNatal(migrated);
+        return migrated;
+      } catch {
+        // Recompute failed (malformed date/tz) — keep the stored value rather
+        // than dropping the user's profile entirely.
+        return parsed;
+      }
+    }
     return parsed;
   } catch {
     return null;
@@ -65,7 +89,10 @@ export function loadNatal(): NatalProfile | null {
 export function saveNatal(profile: NatalProfile): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(NATAL_STORAGE_KEY, JSON.stringify(profile));
+    window.localStorage.setItem(
+      NATAL_STORAGE_KEY,
+      JSON.stringify({ ...profile, formulaVersion: EPHEMERIS_VERSION }),
+    );
   } catch { /* quota / private mode — non-fatal */ }
 }
 
@@ -74,41 +101,16 @@ export function clearNatal(): void {
   try { window.localStorage.removeItem(NATAL_STORAGE_KEY); } catch { /* */ }
 }
 
-// ── Timezone offset (IANA → hours) ─────────────────────────────────────────
-//
-// We resolve the IANA timezone (e.g. "Europe/Kyiv") to its UTC offset
-// AT THE BIRTH DATE — not today. This matters for historical DST changes
-// (the rules have shifted over decades; some countries flipped offset
-// permanently in the 1990s). `Intl.DateTimeFormat` honors the historical
-// rules.
-
-/** Offset in hours EAST of UTC at the given UTC instant, in the given IANA tz. */
-export function ianaToOffsetHours(date: Date, iana: string): number {
-  try {
-    const dtf = new Intl.DateTimeFormat("en-US", {
-      timeZone: iana,
-      timeZoneName: "shortOffset",
-    });
-    const parts = dtf.formatToParts(date);
-    const tzName = parts.find(p => p.type === "timeZoneName")?.value ?? "";
-    // Formats: "GMT", "GMT+3", "GMT-5:30", "GMT+03:00"
-    const m = tzName.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
-    if (!m) return 0;
-    const sign = m[1] === "-" ? -1 : 1;
-    const hh = parseInt(m[2], 10);
-    const mm = m[3] ? parseInt(m[3], 10) : 0;
-    return sign * (hh + mm / 60);
-  } catch {
-    return 0;
-  }
-}
-
 // ── Natal Moon computation ─────────────────────────────────────────────────
+//
+// `ianaToOffsetHours` moved to lib/astro/timezone.ts — every natal
+// computation on the site needs it, and having it live in a page module made
+// the astro library import upward into app/.
 
 /**
  * Compute the tropical ecliptic longitude of the Moon at someone's birth.
- * The local birth time is converted to UT via the IANA timezone (using
- * the historical offset that was in force on that calendar date).
+ * The local birth time is converted to UT via the IANA timezone, using the
+ * historical offset in force on that calendar date.
  */
 export function computeNatalMoonLon(
   birthDate: string,   // "YYYY-MM-DD"
@@ -117,12 +119,7 @@ export function computeNatalMoonLon(
 ): number {
   const [y, mo, d] = birthDate.split("-").map(n => parseInt(n, 10));
   const [h, min] = birthTime.split(":").map(n => parseInt(n, 10));
-  // Need an approximate UTC date instant to query the historical offset.
-  // We build it assuming UTC, then correct via the offset at THAT instant.
-  // For DST edge cases (the 1-2h window around switchover) this iterates
-  // once to converge — good enough for natal Moon, which moves <0.6°/h.
-  const approxUtc = new Date(Date.UTC(y, mo - 1, d, h, min));
-  const offset = ianaToOffsetHours(approxUtc, iana);
+  const offset = localBirthOffsetHours(y, mo, d, h, min, iana);
   const jd = dateToJD(y, mo, d, h, min, offset);
   return calcPlanetDeg(1, jd);
 }

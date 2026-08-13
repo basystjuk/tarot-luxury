@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { studioDayISO } from "@/lib/time/day";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { getSupabaseServer } from "@/lib/supabase/server";
@@ -26,11 +27,10 @@ export const maxDuration = 30;
 // would be more robust — kept in-memory for now (single Vercel instance
 // regional dominance + low traffic = good enough).
 const userMap = new Map<string, { day: string }>();
-function getKyivDay(): string {
-  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
-}
+// Day key comes from lib/time/day — one implementation, one format (ISO).
+// Four copies used to exist in two different formats.
 function checkRate(userId: string): boolean {
-  const today = getKyivDay();
+  const today = studioDayISO();
   const e = userMap.get(userId);
   if (!e || e.day !== today) { userMap.set(userId, { day: today }); return true; }
   return false;

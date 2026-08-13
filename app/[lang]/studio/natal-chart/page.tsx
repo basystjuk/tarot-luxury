@@ -27,16 +27,19 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useProfile } from "@/hooks/useProfile";
+import { useZodiacMode } from "@/hooks/useZodiacMode";
+import { applyZodiac } from "@/lib/astro/natal-snapshot";
+import { localBirthOffsetHours } from "@/lib/astro/timezone";
 import {
   dateToJD, calcPlanetDeg, calcLST, calcAscendant, calcMC,
-  calcPlacidusHouses, whichPlacidusHouse, formatDegree,
+  calcPlacidusHouses, whichPlacidusHouse, formatDegree, calcObliquity,
   SIGN_GLYPHS, SIGNS_UA, SIGNS_EN,
 } from "@/lib/astro/calculations";
 import type { AspectKey } from "@/lib/astro/natal-snapshot";
 import { meaningSun, meaningMoon, meaningAsc, meaningMc, meaningAspect } from "./_meanings";
 import {
   type GeoCandidate,
-  searchCity, coordsToIana, ianaToOffsetHours,
+  searchCity, coordsToIana,
 } from "@/app/[lang]/studio/moon-phase/_natal";
 import { track } from "@/lib/analytics/posthog";
 
@@ -229,11 +232,10 @@ function computeChart(birthDate: string, birthTime: string, lat: number, lon: nu
   const [h, mi] = birthTime.split(":").map(n => parseInt(n, 10));
   if (![y, mo, d, h, mi].every(Number.isFinite)) return null;
 
-  const approxUtc = new Date(Date.UTC(y, mo - 1, d, h, mi));
-  const tzOffset = ianaToOffsetHours(approxUtc, tz);
+  const tzOffset = localBirthOffsetHours(y, mo, d, h, mi, tz);
   const jd = dateToJD(y, mo, d, h, mi, tzOffset);
   const lst = calcLST(jd, lon);
-  const e = 23.439291111;
+  const e = calcObliquity(jd);
 
   const planets: Record<string, number> = {
     Sun:     calcPlanetDeg(0, jd),
@@ -260,6 +262,10 @@ export default function NatalChartPage() {
   const t = T[lang];
   const signNames = lang === "ru" ? SIGNS_RU : lang === "en" ? SIGNS_EN : SIGNS_UA;
   const { profile } = useProfile();
+  // Global tropical/sidereal setting (owner's decision 2026-08-13). Houses are
+  // unaffected — the ayanamsa shifts every longitude equally — so only the
+  // sign labels and degree readouts move.
+  const [zodiac] = useZodiacMode();
 
   // ── Form state ─────────────────────────────────────────────────────────
   const [name, setName] = useState("");
@@ -360,12 +366,14 @@ export default function NatalChartPage() {
     setPortraitLoading(true);
     setPortraitError("none");
     try {
-      const venusIdx = Math.floor(((chart.planets.Venus % 360) + 360) % 360 / 30);
-      const marsIdx  = Math.floor(((chart.planets.Mars  % 360) + 360) % 360 / 30);
-      const sunIdx   = Math.floor(((chart.planets.Sun   % 360) + 360) % 360 / 30);
-      const moonIdx  = Math.floor(((chart.planets.Moon  % 360) + 360) % 360 / 30);
-      const ascIdx   = Math.floor(((chart.asc % 360) + 360) % 360 / 30);
-      const mcIdx    = Math.floor(((chart.mc  % 360) + 360) % 360 / 30);
+      const zi = (lon: number) =>
+        Math.floor(((applyZodiac(lon, chart.jd, zodiac) % 360) + 360) % 360 / 30);
+      const venusIdx = zi(chart.planets.Venus);
+      const marsIdx  = zi(chart.planets.Mars);
+      const sunIdx   = zi(chart.planets.Sun);
+      const moonIdx  = zi(chart.planets.Moon);
+      const ascIdx   = zi(chart.asc);
+      const mcIdx    = zi(chart.mc);
 
       // Stellium detection: which house holds 3+ planets?
       const houseCount: Record<number, string[]> = {};
@@ -841,6 +849,7 @@ function PlanetTable({ chart, lang, signNames, t }: {
   chart: NatalChartData; lang: "uk" | "ru" | "en"; signNames: string[];
   t: typeof T["uk"];
 }) {
+  const [zodiac] = useZodiacMode();
   const rows = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","ASC","MC"];
   return (
     <div className="card-luxury">
@@ -850,8 +859,11 @@ function PlanetTable({ chart, lang, signNames, t }: {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {rows.map(name => {
           const lon = name === "ASC" ? chart.asc : name === "MC" ? chart.mc : chart.planets[name];
-          const signIdx = Math.floor(((lon % 360) + 360) % 360 / 30);
-          const inSign = ((lon % 30) + 30) % 30;
+          // Sign + degree are read in the active zodiac; the house lookup below
+          // stays on the tropical longitude, since the cusps are tropical too.
+          const shownLon = applyZodiac(lon, chart.jd, zodiac);
+          const signIdx = Math.floor(((shownLon % 360) + 360) % 360 / 30);
+          const inSign = ((shownLon % 30) + 30) % 30;
           const deg = Math.floor(inSign);
           const min = Math.floor((inSign - deg) * 60);
           const house = (name === "ASC" || name === "MC") ? null : whichPlacidusHouse(lon, chart.cusps);

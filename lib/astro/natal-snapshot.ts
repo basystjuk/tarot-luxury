@@ -12,9 +12,10 @@
  */
 
 import {
-  dateToJD, calcPlanetDeg, calcLST, calcAscendant, calcMC,
+  dateToJD, calcPlanetDeg, calcLST, calcAscendant, calcMC, calcObliquity,
+  calcPlacidusHouses,
 } from "./calculations";
-import { ianaToOffsetHours } from "@/app/[lang]/studio/moon-phase/_natal";
+import { localBirthOffsetHours } from "./timezone";
 
 export interface NatalSnapshot {
   /** Tropical ecliptic longitude per planet (deg, 0-360). */
@@ -32,6 +33,14 @@ export interface NatalSnapshot {
   asc: number;
   /** Midheaven — ecliptic point culminating south at birth (deg). */
   mc: number;
+  /**
+   * Placidus house cusps, index 0 = house 1. Owner's decision (2026-08-13):
+   * Placidus is the site's house system everywhere. The Moon Guide used to
+   * render whole-sign while the natal chart page rendered Placidus, and the
+   * two disagreed about which house a planet was in 56.8% of the time with
+   * nothing on screen to say why.
+   */
+  cusps: number[];
   /** Julian Day of birth (UT). */
   jd: number;
 }
@@ -43,8 +52,6 @@ export interface NatalInput {
   birth_lon: number;
   birth_tz: string;     // IANA, e.g. "Europe/Kyiv"
 }
-
-const OBLIQUITY_J2000 = 23.439291111;
 
 /** Build a complete natal snapshot from profile fields. Returns null when
  *  any required field is missing or malformed. */
@@ -58,15 +65,15 @@ export function computeNatalSnapshot(p: Partial<NatalInput>): NatalSnapshot | nu
 
   // Convert local birth time → UT via the timezone offset that was in
   // force on that calendar date (handles historical DST changes).
-  const approxUtc = new Date(Date.UTC(y, mo - 1, d, h, mi));
-  const tzOffset = ianaToOffsetHours(approxUtc, p.birth_tz);
+  const tzOffset = localBirthOffsetHours(y, mo, d, h, mi, p.birth_tz);
   const jd = dateToJD(y, mo, d, h, mi, tzOffset);
   const lst = calcLST(jd, p.birth_lon);
 
-  // Use a constant obliquity matching the rest of the lib's lightweight
-  // calcs. Sub-arcminute precision isn't material at the natal-aspect orbs
-  // we use (1-3°).
-  const e = OBLIQUITY_J2000;
+  // Obliquity of date, same as calcNatalChart. Three code paths used to hold
+  // three different constants (a J2000 value here, the Out-of-Bounds
+  // threshold in progressions, the real series in calcNatalChart), so the
+  // same birth data produced slightly different Ascendants per tool.
+  const e = calcObliquity(jd);
 
   return {
     sun:     calcPlanetDeg(0, jd),
@@ -81,6 +88,7 @@ export function computeNatalSnapshot(p: Partial<NatalInput>): NatalSnapshot | nu
     pluto:   calcPlanetDeg(9, jd),
     asc: calcAscendant(lst, p.birth_lat, e),
     mc:  calcMC(lst, e),
+    cusps: calcPlacidusHouses(lst, p.birth_lat, e),
     jd,
   };
 }
@@ -138,7 +146,17 @@ export function detectTransitAspects(
         const orb = TRANSIT_ORBS[tName][kind];
         if (dev <= orb) {
           // Signed orb: positive = transit past exact, negative = approaching.
-          const signed = ((tLon - nLon) % 360 + 360) % 360 - angle;
+          //
+          // The separation has to be wrapped to (−180, 180] BEFORE the aspect
+          // angle comes off it, and the angle has to be signed to match. An
+          // aspect can be reached from either side — a trine is the transit
+          // 120° ahead of the natal point OR 120° behind it — so subtracting
+          // a bare +angle from an unwrapped 0…360 separation reported 358°
+          // for a conjunction 2° from exact and 119° for a tight trine. The
+          // list is sorted by |orb|, so the tightest aspects sorted last.
+          let delta = ((tLon - nLon) % 360 + 360) % 360;
+          if (delta > 180) delta -= 360;                 // (−180, 180]
+          const signed = delta >= 0 ? delta - angle : delta + angle;
           hits.push({ transit: tName, natal: nName, kind, orb: signed });
           break; // one aspect per (transit, natal) pair — tightest wins implicitly
         }

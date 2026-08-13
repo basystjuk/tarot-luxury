@@ -10,6 +10,8 @@
  * stays consistent with the rate-limit + draw-once-per-day rules.
  */
 
+import { studioDayISO } from "@/lib/time/day";
+
 const STORAGE_KEY = "ellen-soul:tarot-history";
 const MAX_ENTRIES = 30;
 
@@ -28,13 +30,11 @@ export interface HistoryEntry {
   drawnAt: string;        // ISO timestamp (informational)
 }
 
+/** Re-export of the shared studio day so existing callers keep working.
+ *  The implementation (and the canonical "Europe/Kyiv" spelling) lives in
+ *  lib/time/day.ts. */
 export function getKyivDay(): string {
-  try {
-    // sv-SE locale gives ISO YYYY-MM-DD reliably
-    return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Kiev" });
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
+  return studioDayISO();
 }
 
 function readAll(): HistoryEntry[] {

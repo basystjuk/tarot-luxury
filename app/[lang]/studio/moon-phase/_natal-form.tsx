@@ -22,6 +22,7 @@ import {
   loadNatal, saveNatal, clearNatal,
 } from "./_natal";
 import { useProfile, invalidateProfileCache } from "@/hooks/useProfile";
+import { EPHEMERIS_VERSION, isStale } from "@/lib/astro/version";
 
 interface Props {
   language: string;
@@ -132,9 +133,10 @@ export function NatalForm({ language, onSaved }: Props) {
       });
       setTz(profile.birth_tz);
 
-      // Compute the cached natal Moon longitude. Skip if the cloud
-      // already has it (preserves precision across signups).
-      let natalMoonLon = profile.natal_moon_lon ?? 0;
+      // Compute the cached natal Moon longitude. Reuse the cloud's value only
+      // when it was produced by the CURRENT formulas — a stamp older than
+      // EPHEMERIS_VERSION means it predates a fix and has to be redone.
+      let natalMoonLon = isStale(profile.natal_formula_version) ? 0 : (profile.natal_moon_lon ?? 0);
       if (!natalMoonLon) {
         try {
           natalMoonLon = computeNatalMoonLon(profile.birth_date, profile.birth_time.slice(0, 5), profile.birth_tz);
@@ -255,6 +257,7 @@ export function NatalForm({ language, onSaved }: Props) {
             birth_lon: picked.lon,
             birth_tz: tz,
             natal_moon_lon: natalMoonLon,
+            natal_formula_version: EPHEMERIS_VERSION,
           }),
         });
         invalidateProfileCache();

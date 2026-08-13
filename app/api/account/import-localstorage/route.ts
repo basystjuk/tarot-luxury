@@ -35,6 +35,8 @@ interface ImportPayload {
     lon: number;
     tz: string;
     natalMoonLon: number;
+    /** EPHEMERIS_VERSION the browser stamped — see lib/astro/version.ts. */
+    formulaVersion?: number;
   };
 }
 
@@ -116,6 +118,11 @@ export async function POST(req: NextRequest) {
           birth_lon:   natal.lon,
           birth_tz:    natal.tz,
           natal_moon_lon: natal.natalMoonLon,
+          // Carry the stamp the browser wrote. Absent (pre-versioning blob)
+          // → null → the next client read treats it as stale and recomputes.
+          natal_formula_version: typeof natal.formulaVersion === "number"
+            ? natal.formulaVersion
+            : null,
         })
         .eq("id", user.id);
       if (error) summary.errors.push(`natal: ${error.message}`);

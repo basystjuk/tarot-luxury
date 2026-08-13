@@ -14,6 +14,7 @@ import {
 import { t as ts, hint as tHint, letterMeaning, planeDominantNote, pinnacleMeaning, challengeMeaning } from "./_strings";
 import { track } from "@/lib/analytics/posthog";
 import { useProfile } from "@/hooks/useProfile";
+import { studioDayISO } from "@/lib/time/day";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -82,7 +83,7 @@ interface NumerologyResult {
 // the same Kyiv day — no API call required, no 429.
 function getKyivDay(): string {
   try {
-    return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
+    return studioDayISO();
   } catch {
     return new Date().toISOString().slice(0, 10);
   }
@@ -1160,7 +1161,7 @@ function NumerologyResultView({
       )}
 
       <p className="text-xs text-[#7A6A58] text-center pt-2 italic leading-relaxed">
-        {isRu ? "Расчёт по школе Hans Decoz · " : isEn ? "Calculation by Hans Decoz school · " : "Розрахунок за школою Hans Decoz · "}
+        {isRu ? "Расчёт по школе: " : isEn ? "Calculated with: " : "Розрахунок за школою: "}
         <span className="text-[#B8883A]">
           {SCHOOL_LABELS[school][language === "ru" ? "ru" : language === "en" ? "en" : "uk"]}
         </span>
@@ -1790,7 +1791,7 @@ export default function NumerologyPage() {
                     Chaldean = transliterate + Babylonian sound-grouping (8 numbers). */}
                 <div className="pt-1">
                   <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-2">
-                    {isRu ? "Школа розрахунку" : isEn ? "Calculation school" : "Школа розрахунку"}
+                    {isRu ? "Школа расчёта" : isEn ? "Calculation school" : "Школа розрахунку"}
                   </p>
                   <div role="tablist" aria-label="school" className="flex flex-wrap p-1 rounded-2xl bg-[rgba(196,169,122,0.08)] border border-[rgba(196,169,122,0.2)]">
                     {([

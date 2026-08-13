@@ -6,7 +6,7 @@
  * Surfaces in the Moon Guide when the user has saved a full natal
  * profile (birth_date + time + lat + lon + tz). Shows:
  *   1. Natal planet table (Sun..Pluto + ASC + MC) with sign + house
- *      under whole-sign houses (simpler than Placidus, works at any lat)
+ *      under Placidus houses — the site's one house system
  *   2. Active transit aspects matrix: every transiting Sun/Mercury/Venus/
  *      Mars/Jupiter/Saturn → every natal Sun/Moon/Mercury/Venus/Mars/
  *      Jupiter/Saturn/ASC/MC, filtered to tight per-planet orbs
@@ -17,10 +17,9 @@
  */
 
 import { useMemo } from "react";
-import { SIGN_GLYPHS, SIGNS_UA, SIGNS_EN, calcPlanetDeg, dateToJD } from "@/lib/astro/calculations";
+import { SIGN_GLYPHS, SIGNS_UA, SIGNS_EN, calcPlanetDeg, dateToJD, whichPlacidusHouse } from "@/lib/astro/calculations";
 import {
-  computeNatalSnapshot, detectTransitAspects, buildWholeSignHouses,
-  whichWholeSignHouse, signOf,
+  computeNatalSnapshot, detectTransitAspects, signOf,
   type AspectKey, type NatalSnapshot, type TransitPoint, type NatalPoint, type ZodiacMode,
 } from "@/lib/astro/natal-snapshot";
 import type { Profile } from "@/hooks/useProfile";
@@ -52,7 +51,7 @@ const T = {
   uk: {
     heading_natal:   "Твоя натальна карта",
     heading_trans:   "Транзитні аспекти зараз",
-    heading_houses:  "Будинки (whole-sign)",
+    heading_houses:  "Доми (Placidus)",
     natal_required:  "Збережи натальні дані (дата, час, місце народження) у кабінеті — побачиш повну карту з ASC, MC, будинками й транзитними аспектами.",
     sign_label:      "знак",
     house_label:     "будинок",
@@ -67,7 +66,7 @@ const T = {
   ru: {
     heading_natal:   "Твоя натальная карта",
     heading_trans:   "Транзитные аспекты сейчас",
-    heading_houses:  "Дома (whole-sign)",
+    heading_houses:  "Дома (Placidus)",
     natal_required:  "Сохрани натальные данные (дата, время, место рождения) в кабинете — увидишь полную карту с ASC, MC, домами и транзитными аспектами.",
     sign_label:      "знак",
     house_label:     "дом",
@@ -82,7 +81,7 @@ const T = {
   en: {
     heading_natal:   "Your natal chart",
     heading_trans:   "Transit aspects right now",
-    heading_houses:  "Houses (whole-sign)",
+    heading_houses:  "Houses (Placidus)",
     natal_required:  "Save your birth data (date, time, place) in the cabinet — you'll see the full chart with ASC, MC, houses and transit aspects.",
     sign_label:      "sign",
     house_label:     "house",
@@ -173,7 +172,8 @@ export function NatalChartBlock({ language, profile, zodiac, onZodiacChange }: P
     );
   }
 
-  const houses = buildWholeSignHouses(natal.asc);
+  // Placidus — the site's one house system (owner's decision 2026-08-13).
+  const cusps = natal.cusps;
   const natalPoints: Partial<Record<NatalPoint, number>> = {
     Sun: natal.sun, Moon: natal.moon, Mercury: natal.mercury, Venus: natal.venus,
     Mars: natal.mars, Jupiter: natal.jupiter, Saturn: natal.saturn,
@@ -245,7 +245,7 @@ export function NatalChartBlock({ language, profile, zodiac, onZodiacChange }: P
             const info = lonInfo(lon, ZODIAC_HELP_JD);
             const house = name === "ASC" || name === "MC"
               ? null
-              : whichWholeSignHouse(applyZodiacForHouse(lon, ZODIAC_HELP_JD, zodiac), houses);
+              : whichPlacidusHouse(lon, cusps);
             return (
               <div key={name} className="flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.12)] text-sm">
                 <span className="flex items-center gap-2 text-[#5C4530]">
@@ -306,26 +306,22 @@ export function NatalChartBlock({ language, profile, zodiac, onZodiacChange }: P
           {t.heading_houses}
         </h3>
         <div className="grid grid-cols-2 gap-1.5">
-          {houses.cusps.map((signIdx, i) => {
-            // Sign index from buildWholeSignHouses is already in tropical
-            // because ASC was tropical. For sidereal display we apply the
-            // shift here only to the label.
-            const displayIdx = zodiac === "sidereal"
-              ? signOf(signIdx * 30, transit.jd, "sidereal")
-              : signIdx;
+          {cusps.map((cuspLon, i) => {
+            // Placidus cusps are real longitudes, not whole signs, so the row
+            // shows the degree the house actually starts at.
+            const shown = signOf(cuspLon, natal.jd, zodiac);
+            const degInSign = Math.floor(((cuspLon % 30) + 30) % 30);
             // Which natal planets live in this house?
             const occupants = natalRows
               .filter(r => r.name !== "ASC" && r.name !== "MC")
-              .filter(r => {
-                const h = whichWholeSignHouse(applyZodiacForHouse(r.lon, ZODIAC_HELP_JD, zodiac), houses);
-                return h === i + 1;
-              })
+              .filter(r => whichPlacidusHouse(r.lon, cusps) === i + 1)
               .map(r => PLANET_GLYPH[r.name]);
             return (
               <div key={i} className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.12)] text-sm">
                 <span className="text-[#9A8A78] w-8 text-xs">{t.house_n(i + 1)}</span>
                 <span className="text-[#5C4530] flex-1 flex items-center gap-1.5">
-                  {SIGN_GLYPHS[displayIdx]} <span style={{ fontFamily: "var(--font-cormorant)" }}>{signNames[displayIdx]}</span>
+                  <span className="text-[#9A8A78] text-xs tabular-nums">{degInSign}°</span>
+                  {SIGN_GLYPHS[shown]} <span style={{ fontFamily: "var(--font-cormorant)" }}>{signNames[shown]}</span>
                 </span>
                 <span className="text-[#B8883A] text-sm">{occupants.join(" ")}</span>
               </div>

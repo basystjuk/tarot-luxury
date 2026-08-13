@@ -34,6 +34,9 @@
 import {
   dateToJD, calcPlanetDeg, jdToDate,
 } from "./calculations";
+import { calcPersonalDayFromISO } from "@/lib/numerology/calculators";
+import { localDayParts as sharedLocalDayParts } from "@/lib/time/day";
+import { lunarDayState } from "./moon-state";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Types
@@ -155,6 +158,41 @@ const ASPECT_GLYPH: Record<AspectKind, string> = {
   conjunction: "☌", sextile: "⚹", square: "□", trine: "△", opposition: "☍",
 };
 
+// Wording for the shared lunar-state reasons. The reason ids come from
+// lib/astro/moon-state; each surface renders them in its own voice, so the
+// Moon Guide and the horoscope can read differently while never disagreeing
+// about what the sky is doing.
+const LUNAR_REASON_LABEL: Record<"eclipse" | "dark-moon" | "void-of-course", Trio> = {
+  "eclipse":        { uk: "Затемнення — день не для нових починань",
+                      ru: "Затмение — день не для новых начинаний",
+                      en: "Eclipse — not a day for new beginnings" },
+  "dark-moon":      { uk: "Темний Місяць — вікно тиші перед новим циклом",
+                      ru: "Тёмная Луна — окно тишины перед новым циклом",
+                      en: "Dark Moon — the quiet window before a new cycle" },
+  "void-of-course": { uk: "Місяць без курсу — рішення зараз не тримаються",
+                      ru: "Луна без курса — решения сейчас не держатся",
+                      en: "Void of Course Moon — decisions don't stick right now" },
+};
+
+const LUNAR_REASON_WHY: Record<"eclipse" | "dark-moon" | "void-of-course", Trio> = {
+  "eclipse":        { uk: "точна геометрія тіні, не просто близькість вузла",
+                      ru: "точная геометрия тени, не просто близость узла",
+                      en: "exact shadow geometry, not mere node proximity" },
+  "dark-moon":      { uk: "Місяць у межах 18° від точного з'єднання із Сонцем",
+                      ru: "Луна в пределах 18° от точного соединения с Солнцем",
+                      en: "the Moon within 18° of exact conjunction with the Sun" },
+  "void-of-course": { uk: "до зміни знаку Місяць не утворює жодного мажорного аспекту",
+                      ru: "до смены знака Луна не образует ни одного мажорного аспекта",
+                      en: "the Moon makes no further major aspect before changing sign" },
+};
+
+function lunarReasonLabel(
+  reason: "eclipse" | "dark-moon" | "void-of-course",
+  language: "uk" | "ru" | "en",
+): string {
+  return l(LUNAR_REASON_LABEL[reason], language);
+}
+
 // Planet names in uk/ru carry grammatical case, and the aspect phrase picks
 // which case: "з'єднується з твоїм Сонцем" (instrumental) but "у тригоні до
 // твого Сонця" (genitive). Storing a single form and gluing it to a fixed
@@ -260,10 +298,7 @@ interface SlotRecord {
  * developer's laptop — and after per-user zones landed, "which day" stopped
  * being the server's business entirely.
  */
-function localDayParts(date: Date, tzOffsetHours: number): { y: number; m: number; d: number } {
-  const shifted = new Date(date.getTime() + tzOffsetHours * 3_600_000);
-  return { y: shifted.getUTCFullYear(), m: shifted.getUTCMonth() + 1, d: shifted.getUTCDate() };
-}
+const localDayParts = sharedLocalDayParts;
 
 /** Build per-slot scores across the day from transit-Moon aspects to natal. */
 function scoreSlots(input: HoroscopeInput): SlotRecord[] {
@@ -498,6 +533,22 @@ export function buildDayReading(input: HoroscopeInput): DayReading {
     directive:    l(CHL_DIRECTIVE_TOP, language),
   }));
 
+  // ── Lunar state — the shared layer ──
+  //
+  // Owner's decision (2026-08-13): the horoscope must not describe a day the
+  // Moon Guide is flagging. Scoring transit aspects alone let this engine call
+  // a Dark Moon day "a day of flow" ten times in every hundred and twenty.
+  const lunar = lunarDayState(noonJd);
+  if (lunar.reasons.length > 0) {
+    signals.push({
+      system: "moon",
+      polarity: lunar.verdict === "hold" ? "challenging" : "neutral",
+      intensity: lunar.verdict === "hold" ? 3 : 1,
+      label: lunarReasonLabel(lunar.reasons[0], language),
+      reasoning: l(LUNAR_REASON_WHY[lunar.reasons[0]], language),
+    });
+  }
+
   // ── Quality bucket ──
   const supportingCount  = signals.filter(s => s.polarity === "supporting").length;
   const challengingCount = signals.filter(s => s.polarity === "challenging").length;
@@ -507,6 +558,10 @@ export function buildDayReading(input: HoroscopeInput): DayReading {
   else if (supportingCount > challengingCount * 2) quality = "flowing";
   else if (challengingCount > supportingCount) quality = "turbulent";
   else quality = "mixed";
+
+  // A lunar "hold" overrides the aspect arithmetic outright. An eclipse or a
+  // Dark Moon is not something a couple of pleasant trines can outvote.
+  if (lunar.verdict === "hold" && quality === "flowing") quality = "mixed";
 
   // ── Theme + actions ──
   const theme = buildTheme(language, quality, signals, input);
@@ -630,19 +685,7 @@ export function formatHM(m: number): string { return fmtMinutes(m); }
 export function calcPersonalDay(
   birthDate: string, year: number, month: number, day: number,
 ): number | null {
-  const parsed = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!parsed) return null;
-  const reduceN = (n: number): number => {
-    if (n === 11 || n === 22 || n === 33) return n;
-    if (n < 10) return n;
-    return reduceN(String(n).split("").reduce((a, c) => a + parseInt(c, 10), 0));
-  };
-  const birthMonth = parseInt(parsed[2], 10);
-  const birthDay   = parseInt(parsed[3], 10);
-  const py = reduceN(reduceN(birthDay) + reduceN(birthMonth)
-    + reduceN(String(year).split("").reduce((a, c) => a + parseInt(c, 10), 0)));
-  const pm = reduceN(py + reduceN(month));
-  return reduceN(pm + reduceN(day));
+  return calcPersonalDayFromISO(birthDate, year, month, day);
 }
 
 /** Calendar parts of `date` as seen from a zone `tzOffsetHours` east of UTC. */

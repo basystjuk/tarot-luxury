@@ -26,6 +26,8 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useProfile } from "@/hooks/useProfile";
+import { useZodiacMode } from "@/hooks/useZodiacMode";
+import { signOf } from "@/lib/astro/natal-snapshot";
 import { computeNatalSnapshot } from "@/lib/astro/natal-snapshot";
 import {
   buildDayReading, formatHM, moonPhaseAt, calcPersonalDay, localDayFor,
@@ -210,6 +212,9 @@ export default function HoroscopePage() {
   const t = T[lang];
   const signNames = lang === "ru" ? SIGNS_RU : lang === "en" ? SIGNS_EN : SIGNS_UA;
   const { profile } = useProfile();
+  // Global tropical/sidereal setting — the engine works in tropical, the
+  // labels are rendered in whatever the visitor picked.
+  const [zodiac] = useZodiacMode();
 
   useEffect(() => { track("tool_viewed", { tool: "horoscope" }); }, []);
 
@@ -248,16 +253,16 @@ export default function HoroscopePage() {
   }, [profile, lang]);
 
   // Moon snapshot for the hero card
+  // Read the clock in an effect — Date.now() during render is impure and
+  // makes the server and the first client render disagree.
+  const [nowJd, setNowJd] = useState<number | null>(null);
+  useEffect(() => { setNowJd(Date.now() / 86_400_000 + 2440587.5); }, []);
   const moonInfo = useMemo(() => {
-    const now = new Date();
-    const tz = -now.getTimezoneOffset() / 60;
-    const jd = dateToJD(now.getFullYear(), now.getMonth() + 1, now.getDate(),
-                        now.getHours(), now.getMinutes(), tz);
-    const moonLon = calcPlanetDeg(1, jd);
-    const sign = Math.floor(((moonLon % 360) + 360) % 360 / 30);
-    const phase = moonPhaseAt(jd);
-    return { sign, phase, lon: moonLon };
-  }, []);
+    if (nowJd == null) return null;
+    const moonLon = calcPlanetDeg(1, nowJd);
+    // The sign label honours the global tropical/sidereal setting.
+    return { sign: signOf(moonLon, nowJd, zodiac), phase: moonPhaseAt(nowJd), lon: moonLon };
+  }, [nowJd, zodiac]);
 
   // ── AI portrait ─────────────────────────────────────────────────────────
   const [portrait, setPortrait] = useState<{ essence?: string; windows?: string; do?: string } | null>(null);
@@ -286,8 +291,8 @@ export default function HoroscopePage() {
           topSignals,
           windowsOfLuck: windowsTxt,
           challenges: challengesTxt,
-          moonSign: signNames[moonInfo.sign],
-          moonPhase: PHASE_LABEL[lang][moonInfo.phase],
+          moonSign: moonInfo ? signNames[moonInfo.sign] : "—",
+          moonPhase: moonInfo ? PHASE_LABEL[lang][moonInfo.phase] : "—",
           personalDay: reading.signals.find(s => s.system === "numerology")?.label.match(/\d+/)?.[0] ?? "",
         }),
       });
@@ -372,7 +377,7 @@ export default function HoroscopePage() {
               <div className="flex items-center gap-4 mt-4 text-sm text-[#5C4530] flex-wrap">
                 <span className="flex items-center gap-1.5">
                   <MoonStar size={14} className="text-[#B8883A]" />
-                  {SIGN_GLYPHS[moonInfo.sign]} {signNames[moonInfo.sign]} · {PHASE_LABEL[lang][moonInfo.phase]}
+                  {moonInfo && <>{SIGN_GLYPHS[moonInfo.sign]} {signNames[moonInfo.sign]} · {PHASE_LABEL[lang][moonInfo.phase]}</>}
                 </span>
                 {profile?.birth_date && (() => {
                   const pd = personalDayFor(profile.birth_date, new Date(), -new Date().getTimezoneOffset() / 60);

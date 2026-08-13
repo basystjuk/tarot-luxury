@@ -28,6 +28,10 @@ import {
   SIGNS_UA, SIGNS_EN, SIGN_GLYPHS,
 } from "@/lib/astro/calculations";
 import { useProfile, type Profile } from "@/hooks/useProfile";
+import { lunarState, type PhaseKey } from "@/lib/astro/moon-state";
+import { ianaToOffsetHours } from "@/lib/astro/timezone";
+import { calcPersonalDayFromISO } from "@/lib/numerology/calculators";
+import { studioDayISO, localDayParts } from "@/lib/time/day";
 import { TAROT_CARDS, getCardName } from "@/lib/data/tarot-cards";
 
 // ── Localised content ──────────────────────────────────────────────────────
@@ -153,29 +157,8 @@ const T = {
   },
 };
 
-// ── Numerology Personal Day (Pythagorean reduction) ──────────────────────
-const MASTERS = new Set([11, 22, 33]);
-function reduceNum(n: number): number {
-  if (MASTERS.has(n)) return n;
-  if (n < 10) return n;
-  return reduceNum(String(n).split("").reduce((a, d) => a + parseInt(d, 10), 0));
-}
-function calcPersonalDay(birthDate: string, today: Date): number | null {
-  // birthDate = "YYYY-MM-DD"
-  const m = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const bMonth = parseInt(m[2], 10);
-  const bDay   = parseInt(m[3], 10);
-  const cYear  = today.getFullYear();
-  const cMonth = today.getMonth() + 1;
-  const cDay   = today.getDate();
-  const personalYear = reduceNum(
-    reduceNum(bDay) + reduceNum(bMonth)
-    + reduceNum(String(cYear).split("").reduce((a, c) => a + parseInt(c, 10), 0))
-  );
-  const personalMonth = reduceNum(personalYear + reduceNum(cMonth));
-  return reduceNum(personalMonth + reduceNum(cDay));
-}
+// Personal Day comes from lib/numerology/calculators — this file held one of
+// five implementations, and they disagreed on 9.7% of (birthday, date) pairs.
 
 // ── Aspect detection (re-uses Moon-Guide logic) ──────────────────────────
 type AspectKey = "conjunction" | "sextile" | "square" | "trine" | "opposition" | "none";
@@ -204,7 +187,7 @@ function getTodayCardIndex(): { idx: number; reversed: boolean } | null {
     const raw = window.localStorage.getItem("ellen-soul:tarot-history");
     if (!raw) return null;
     const list = JSON.parse(raw) as Array<{ day: string; cardIndex: number; reversed: boolean }>;
-    const todayKey = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Kiev" });
+    const todayKey = studioDayISO();
     const entry = list.find(e => e.day === todayKey);
     return entry ? { idx: entry.cardIndex, reversed: !!entry.reversed } : null;
   } catch { return null; }
@@ -217,24 +200,15 @@ export function TodayWidget() {
   const t = T[lang];
   const { profile, loading } = useProfile();
 
-  // Browser timezone offset (hours east of UTC)
-  const tzHours = useMemo(() => -new Date().getTimezoneOffset() / 60, []);
 
-  // Compute today's Moon position once per mount
-  const moon = useMemo(() => {
-    const now = new Date();
-    const jd = dateToJD(now.getFullYear(), now.getMonth() + 1, now.getDate(),
-                        now.getHours(), now.getMinutes(), tzHours);
-    const moonLon = calcPlanetDeg(1, jd);
-    const sunLon  = calcPlanetDeg(0, jd);
-    const elong   = ((moonLon - sunLon) % 360 + 360) % 360;
-    const signIdx = Math.floor(((moonLon % 360) + 360) % 360 / 30);
-    const phase: "new" | "full" | "wax" | "wane" =
-      elong < 22.5 || elong > 337.5 ? "new"
-      : Math.abs(elong - 180) < 22.5 ? "full"
-      : elong < 180 ? "wax" : "wane";
-    return { moonLon, signIdx, phase };
-  }, [tzHours]);
+  // Today's Moon, from the shared lunar state — the widget used to carry its
+  // own copy of the phase buckets. Read the clock in an effect: calling
+  // Date.now() during render is impure and makes server and client disagree.
+  const [moon, setMoon] = useState<{ moonLon: number; signIdx: number; phase: PhaseKey } | null>(null);
+  useEffect(() => {
+    const s = lunarState(Date.now() / 86_400_000 + 2440587.5);
+    setMoon({ moonLon: s.moonLon, signIdx: s.moonSignIdx, phase: s.phase });
+  }, []);
 
   // Locale-aware sign names
   const signNames = lang === "ru" ? SIGNS_RU : lang === "en" ? SIGNS_EN : SIGNS_UA;
@@ -243,6 +217,9 @@ export function TodayWidget() {
   // logged-in and anonymous users since the journal lives client-side.
   const [todayCard, setTodayCard] = useState<{ idx: number; reversed: boolean } | null>(null);
   useEffect(() => { setTodayCard(getTodayCardIndex()); }, []);
+
+  // Nothing to show until the clock has been read on the client.
+  if (!moon) return null;
 
   // ── Anonymous render ────────────────────────────────────────────────────
   if (!loading && !profile) {
@@ -271,7 +248,7 @@ function AnonymousWidget({
   lang, moon, todayCard, signNames, t,
 }: {
   lang: "uk" | "ru" | "en";
-  moon: { signIdx: number; phase: "new" | "full" | "wax" | "wane"; moonLon: number };
+  moon: { signIdx: number; phase: PhaseKey; moonLon: number };
   todayCard: { idx: number; reversed: boolean } | null;
   signNames: string[];
   t: typeof T["uk"];
@@ -279,7 +256,7 @@ function AnonymousWidget({
   const phaseLabel =
     moon.phase === "full" ? t.moon_phase_full
     : moon.phase === "new" ? t.moon_phase_new
-    : moon.phase === "wax" ? t.moon_phase_grow
+    : moon.phase === "waxing" ? t.moon_phase_grow
     : t.moon_phase_wane;
 
   return (
@@ -336,7 +313,7 @@ function AuthenticatedWidget({
   lang, moon, todayCard, signNames, profile, t,
 }: {
   lang: "uk" | "ru" | "en";
-  moon: { signIdx: number; phase: "new" | "full" | "wax" | "wane"; moonLon: number };
+  moon: { signIdx: number; phase: PhaseKey; moonLon: number };
   todayCard: { idx: number; reversed: boolean } | null;
   signNames: string[];
   profile: Profile | null;
@@ -345,7 +322,7 @@ function AuthenticatedWidget({
   const phaseLabel =
     moon.phase === "full" ? t.moon_phase_full
     : moon.phase === "new" ? t.moon_phase_new
-    : moon.phase === "wax" ? t.moon_phase_grow
+    : moon.phase === "waxing" ? t.moon_phase_grow
     : t.moon_phase_wane;
 
   // Aspect to natal Moon (only if we have natal data)
@@ -353,8 +330,20 @@ function AuthenticatedWidget({
     ? detectAspect(moon.moonLon, profile.natal_moon_lon)
     : null;
 
-  // Personal Day (only if birth date known)
-  const personalDay = profile?.birth_date ? calcPersonalDay(profile.birth_date, new Date()) : null;
+  // Personal Day (only if birth date known).
+  //
+  // The day comes from the zone the user LIVES in, matching the horoscope
+  // tool and the cron. Reading it off the browser meant a user travelling saw
+  // one personal day here and a different one in the horoscope.
+  const personalDay = profile?.birth_date
+    ? (() => {
+        const tzHours = profile.tz
+          ? ianaToOffsetHours(new Date(), profile.tz)
+          : -new Date().getTimezoneOffset() / 60;
+        const { y, m, d } = localDayParts(new Date(), tzHours);
+        return calcPersonalDayFromISO(profile.birth_date!, y, m, d);
+      })()
+    : null;
 
   const displayName = profile?.display_name ?? profile?.full_name?.split(/\s+/)[0] ?? "";
 

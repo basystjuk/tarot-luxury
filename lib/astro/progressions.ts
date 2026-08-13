@@ -18,7 +18,7 @@
  */
 
 import {
-  calcPlanetDeg, dateToJD, calcLST, calcAscendant, calcMC, calcPlacidusHouses, jdToDate, OBLIQUITY_DEG,
+  calcPlanetDeg, dateToJD, calcLST, calcAscendant, calcMC, calcPlacidusHouses, jdToDate, calcObliquity,
 } from "./calculations";
 import { computeSynastry, type SynastryAspect, type PlanetName } from "./synastry";
 
@@ -101,7 +101,10 @@ export function solarReturnChart(
 ): SolarReturn {
   const jd = findSolarReturnJd(natalSunLon, targetYear, birthMonth, birthDay);
   const lst = calcLST(jd, lon);
-  const e = OBLIQUITY_DEG;
+  // Obliquity of date — OBLIQUITY_DEG is the Out-of-Bounds threshold, not an
+  // obliquity, and using it here made the solar-return Ascendant disagree
+  // with the natal chart for the same person.
+  const e = calcObliquity(jd);
   const asc = calcAscendant(lst, lat, e);
   const mc = calcMC(lst, e);
   const cusps = calcPlacidusHouses(lst, lat, e);
@@ -110,7 +113,7 @@ export function solarReturnChart(
   return { jd, asc, mc, cusps, planets, sunHouse: whichHouse(planets.Sun, cusps), ascSign: signOfLon(asc) };
 }
 
-export interface MoonTimelinePoint { monthOffset: number; isoDate: string; sign: number; }
+export interface MoonTimelinePoint { monthOffset: number; isoDate: string; sign: number; lon: number; }
 
 /** Progressed-Moon sign for each of the next `months` months. */
 export function progressedMoonTimeline(natalJd: number, fromJd: number, months = 12): MoonTimelinePoint[] {
@@ -118,19 +121,21 @@ export function progressedMoonTimeline(natalJd: number, fromJd: number, months =
   for (let m = 0; m <= months; m++) {
     const atJd = fromJd + m * (TROPICAL_YEAR / 12);
     const pJd = progressedJd(natalJd, atJd);
-    out.push({ monthOffset: m, isoDate: jdToDate(atJd).toISOString().slice(0, 10), sign: signOfLon(calcPlanetDeg(1, pJd)) });
+    const lon = calcPlanetDeg(1, pJd);
+    out.push({ monthOffset: m, isoDate: jdToDate(atJd).toISOString().slice(0, 10), sign: signOfLon(lon), lon });
   }
   return out;
 }
 
 /** Date the progressed Moon next changes sign (searched up to 3 years out). */
-export function nextProgMoonSignChange(natalJd: number, fromJd: number): { sign: number; isoDate: string } | null {
+export function nextProgMoonSignChange(natalJd: number, fromJd: number): { sign: number; isoDate: string; lon: number; jd: number } | null {
   const startSign = signOfLon(calcPlanetDeg(1, progressedJd(natalJd, fromJd)));
   const stepDays = 5;
   for (let d = stepDays; d <= TROPICAL_YEAR * 3; d += stepDays) {
     const atJd = fromJd + d;
-    const s = signOfLon(calcPlanetDeg(1, progressedJd(natalJd, atJd)));
-    if (s !== startSign) return { sign: s, isoDate: jdToDate(atJd).toISOString().slice(0, 10) };
+    const lon = calcPlanetDeg(1, progressedJd(natalJd, atJd));
+    const s = signOfLon(lon);
+    if (s !== startSign) return { sign: s, isoDate: jdToDate(atJd).toISOString().slice(0, 10), lon, jd: atJd };
   }
   return null;
 }
@@ -139,7 +144,7 @@ export interface YearForecast {
   isoDate: string;
   ageYears: number;
   progressed: ProgressedChart & { sunSign: number; moonSign: number };
-  progMoonNextSignChange: { sign: number; isoDate: string } | null;
+  progMoonNextSignChange: { sign: number; isoDate: string; lon: number; jd: number } | null;
   progToNatalAspects: SynastryAspect[];
   solarReturn: SolarReturn | null;   // null when birth time/location unknown
   moonTimeline: MoonTimelinePoint[];

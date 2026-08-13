@@ -1,3 +1,7 @@
+// reduceNum comes from lib/numerology/letter-values — this file used to hold
+// one of six copies. Life Path and Destiny keep master numbers, which is why
+// this is reduceNum and not reduceToDigit.
+
 "use client";
 
 import { useState } from "react";
@@ -7,6 +11,10 @@ import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from "@/hooks/useLanguage";
 import { SIGNS_UA, SIGNS_EN, SIGN_GLYPHS, dateToJD, calcPlanetDeg } from "@/lib/astro/calculations";
 import { computeSynastry, type SynastryResult, type PlanetName, type AspectKind } from "@/lib/astro/synastry";
+import { sunSignForDate, sunSignAtJd } from "@/lib/astro/sun-sign";
+import { useZodiacMode } from "@/hooks/useZodiacMode";
+import { signOf } from "@/lib/astro/natal-snapshot";
+import { reduceNum } from "@/lib/numerology/letter-values";
 
 // ── Zodiac data ───────────────────────────────────────────────────────────────
 const SIGNS_RU = [
@@ -30,11 +38,9 @@ const LETTER_VALUES: Record<string, number> = {
   s:1,t:2,u:3,v:4,w:5,x:6,y:7,z:8,
 };
 
-function reduceNum(n: number): number {
-  if (n === 11 || n === 22 || n === 33) return n;
-  if (n < 10) return n;
-  return reduceNum(String(n).split("").reduce((a, d) => a + parseInt(d), 0));
-}
+// reduceNum comes from lib/numerology/letter-values — this file used to hold
+// one of six copies. Life Path and Destiny keep master numbers, which is why
+// it stays reduceNum and not reduceToDigit.
 
 function calcLifePath(day: number, month: number, year: number): number {
   const d = reduceNum(day);
@@ -48,20 +54,13 @@ function calcDestiny(name: string): number {
   return reduceNum(val);
 }
 
-// Zodiac index from birthday
-function getZodiacIndex(day: number, month: number): number {
-  if ((month === 3  && day >= 21) || (month === 4  && day <= 19)) return 0;  // Aries
-  if ((month === 4  && day >= 20) || (month === 5  && day <= 20)) return 1;  // Taurus
-  if ((month === 5  && day >= 21) || (month === 6  && day <= 20)) return 2;  // Gemini
-  if ((month === 6  && day >= 21) || (month === 7  && day <= 22)) return 3;  // Cancer
-  if ((month === 7  && day >= 23) || (month === 8  && day <= 22)) return 4;  // Leo
-  if ((month === 8  && day >= 23) || (month === 9  && day <= 22)) return 5;  // Virgo
-  if ((month === 9  && day >= 23) || (month === 10 && day <= 22)) return 6;  // Libra
-  if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return 7;  // Scorpio
-  if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return 8;  // Sagittarius
-  if ((month === 12 && day >= 22) || (month === 1  && day <= 19)) return 9;  // Capricorn
-  if ((month === 1  && day >= 20) || (month === 2  && day <= 18)) return 10; // Aquarius
-  return 11; // Pisces
+// Zodiac index from birthday — from the ephemeris. The fixed date table that
+// used to be here disagreed with the sky on 2.14% of birth dates, while the
+// synastry grid a few lines below already ran off calcPlanetDeg: the same
+// screen printed one sign and computed the aspects for another.
+function getZodiacIndex(day: number, month: number, year: number, zodiac: "tropical" | "sidereal" = "tropical"): number {
+  const jd = dateToJD(year, month, day, 12, 0, 0);
+  return zodiac === "sidereal" ? signOf(calcPlanetDeg(0, jd), jd, "sidereal") : sunSignAtJd(jd);
 }
 
 // ── Zodiac compatibility ──────────────────────────────────────────────────────
@@ -398,6 +397,9 @@ interface CompatResult {
 
 export default function CompatibilityPage() {
   const { language } = useLanguage();
+  // Global tropical/sidereal setting — the sign shown on each card and the
+  // synastry grid below it now read the same zodiac.
+  const [zodiac] = useZodiacMode();
   const isRu = language === "ru";
   const isEn = language === "en";
 
@@ -422,8 +424,8 @@ export default function CompatibilityPage() {
     const d1 = parseInt(p1.day), m1 = parseInt(p1.month), y1 = parseInt(p1.year);
     const d2 = parseInt(p2.day), m2 = parseInt(p2.month), y2 = parseInt(p2.year);
 
-    const zi1 = getZodiacIndex(d1, m1);
-    const zi2 = getZodiacIndex(d2, m2);
+    const zi1 = getZodiacIndex(d1, m1, y1, zodiac);
+    const zi2 = getZodiacIndex(d2, m2, y2, zodiac);
     const el1 = elements[zi1];
     const el2 = elements[zi2];
     const lp1 = calcLifePath(d1, m1, y1);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { studioDayISO } from "@/lib/time/day";
 import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
@@ -10,12 +11,11 @@ export const maxDuration = 30;
 // Rate limit: 1 reading per IP per Kyiv calendar day
 const ipMap = new Map<string, { day: string }>();
 
-function getKyivDay(): string {
-  return new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
-}
+// Day key comes from lib/time/day — one implementation, one format (ISO).
+// Four copies used to exist in two different formats.
 
 function checkRateLimit(ip: string): boolean {
-  const today = getKyivDay();
+  const today = studioDayISO();
   const entry = ipMap.get(ip);
   if (!entry || entry.day !== today) {
     ipMap.set(ip, { day: today });

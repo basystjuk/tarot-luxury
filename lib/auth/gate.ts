@@ -15,6 +15,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { studioDayISO } from "@/lib/time/day";
 import { getSupabaseServer } from "@/lib/supabase/server";
 
 type SupabaseUser = { id: string; email?: string };
@@ -57,7 +58,7 @@ export async function requireAiAuth(): Promise<AuthGateResult> {
  * Returns true if allowed, false if blocked (the caller should respond 429).
  */
 export function checkPerUserDailyRate(map: Map<string, { day: string }>, userId: string): boolean {
-  const today = new Date().toLocaleDateString("uk-UA", { timeZone: "Europe/Kiev" });
+  const today = studioDayISO();
   const entry = map.get(userId);
   if (!entry || entry.day !== today) {
     map.set(userId, { day: today });

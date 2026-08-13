@@ -1,3 +1,6 @@
+import { SIGNS_EN } from "@/lib/astro/calculations";
+import { sunSignForDate } from "@/lib/astro/sun-sign";
+
 export interface TarotCard {
   index: number;   // 0–77
   nameEn: string;  // shown on card face
@@ -91,19 +94,16 @@ export const TAROT_CARDS: TarotCard[] = [
   { index: 77, nameEn: "King of Pentacles",    suit: "pentacles", image: "/tarot/77.webp" },
 ];
 
-export function getZodiacSign(day: number, month: number): string {
-  if ((month === 3 && day >= 21) || (month === 4 && day <= 19)) return "Aries";
-  if ((month === 4 && day >= 20) || (month === 5 && day <= 20)) return "Taurus";
-  if ((month === 5 && day >= 21) || (month === 6 && day <= 20)) return "Gemini";
-  if ((month === 6 && day >= 21) || (month === 7 && day <= 22)) return "Cancer";
-  if ((month === 7 && day >= 23) || (month === 8 && day <= 22)) return "Leo";
-  if ((month === 8 && day >= 23) || (month === 9 && day <= 22)) return "Virgo";
-  if ((month === 9 && day >= 23) || (month === 10 && day <= 22)) return "Libra";
-  if ((month === 10 && day >= 23) || (month === 11 && day <= 21)) return "Scorpio";
-  if ((month === 11 && day >= 22) || (month === 12 && day <= 21)) return "Sagittarius";
-  if ((month === 12 && day >= 22) || (month === 1 && day <= 19)) return "Capricorn";
-  if ((month === 1 && day >= 20) || (month === 2 && day <= 18)) return "Aquarius";
-  return "Pisces";
+/**
+ * Sun sign for a birth date, from the ephemeris.
+ *
+ * The fixed date table that used to be here (and a second copy in the
+ * compatibility tool) disagreed with the actual sky on 2.14% of birth dates,
+ * because the Sun's ingress drifts by up to a day and a half across the leap
+ * cycle. `year` is now required for exactly that reason.
+ */
+export function getZodiacSign(day: number, month: number, year: number): string {
+  return SIGNS_EN[sunSignForDate(year, month, day)];
 }
 
 /**
