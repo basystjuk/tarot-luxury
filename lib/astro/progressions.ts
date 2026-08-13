@@ -203,7 +203,10 @@ export function buildYearForecast(input: YearForecastInput): YearForecast {
  *  passed-or-today, else last year's (the cycle you're currently inside). */
 function defaultSrYear(now: Date, birthMonth: number, birthDay: number): number {
   const y = now.getUTCFullYear();
-  const bday = new Date(Date.UTC(y, birthMonth - 1, birthDay));
+  // 29 February in a non-leap year would roll to 1 March and move the cycle
+  // boundary by a day; clamp to the last day the month actually has.
+  const daysInMonth = new Date(Date.UTC(y, birthMonth, 0)).getUTCDate();
+  const bday = new Date(Date.UTC(y, birthMonth - 1, Math.min(birthDay, daysInMonth)));
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   return today >= bday ? y : y - 1;
 }

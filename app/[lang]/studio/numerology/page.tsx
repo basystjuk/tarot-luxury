@@ -44,7 +44,7 @@ import {
   type MasterPhase,
   type Bridges,
 } from "@/lib/numerology/calculators";
-import { type NumerologySchool, SCHOOL_LABELS } from "@/lib/numerology/letter-values";
+import { type NumerologySchool, SCHOOL_LABELS, reduceNum } from "@/lib/numerology/letter-values";
 import { KarmicLessonsScale, PersonalYearGraph, CoreNumbersWheel } from "./_visuals";
 import { ActivationBlock } from "./_activation";
 
@@ -118,11 +118,8 @@ function writePortraitCache(key: string, value: { intro: string; portrait: strin
 // Balance, Karmic Lessons) route through @/lib/numerology/calculators, which is
 // school-aware (Slavic / Western / Chaldean) and never mixes Cyrillic with
 // Latin in one table. The date-based helpers below stay local.
-function reduceNum(n: number): number {
-  if (n === 11 || n === 22 || n === 33) return n;
-  if (n < 10) return n;
-  return reduceNum(String(n).split("").reduce((a, d) => a + parseInt(d), 0));
-}
+// reduceNum comes from lib/numerology/letter-values — this was the last of
+// six private copies.
 
 function calcBirthday(day: number): number {
   return reduceNum(day);

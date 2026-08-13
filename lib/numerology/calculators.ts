@@ -61,6 +61,10 @@ export function calcPinnacles(
   const lpForWindow = lifePath > 9 ? digitSum(lifePath) : lifePath;
   const end1 = 36 - lpForWindow;
 
+  // endAge is INCLUSIVE and ages are whole years, so [0,34] and [35,43] are
+  // already contiguous — 34 is the last year of the first cycle, 35 the first
+  // year of the second. The audit flagged this as an off-by-one; it isn't,
+  // and __sanity__ caught the "fix". Left as-is deliberately.
   return [
     { number: p1, startAge: 0,         endAge: end1 },
     { number: p2, startAge: end1 + 1,  endAge: end1 + 9 },
@@ -97,6 +101,7 @@ export function calcChallenges(
   const lpForWindow = lifePath > 9 ? digitSum(lifePath) : lifePath;
   const end1 = 36 - lpForWindow;
 
+  // Inclusive whole-year windows, same convention as the pinnacles above.
   return [
     { number: reduceToDigit(c1), startAge: 0,         endAge: end1 },
     { number: reduceToDigit(c2), startAge: end1 + 1,  endAge: end1 + 9 },

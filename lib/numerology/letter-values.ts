@@ -57,8 +57,9 @@ const SLAVIC_VALUES: Record<string, number> = {
 const SLAVIC_VOWELS = new Set([
   "а", "е", "є", "и", "і", "ї", "о", "у", "ю", "я", "ё", "ы", "э",
   "a", "e", "i", "o", "u",
-  // Y treated as vowel in Slavic school (matches the Latin-Pythagorean default
-  // for non-y-as-semi-vowel detection).
+  // Latin "y" is a CONSONANT here. The comment used to claim the opposite,
+  // which is the sort of thing that gets "corrected" into a real behaviour
+  // change by someone trusting the prose over the set.
 ]);
 
 // ── 2. Western Pythagorean (Latin position-based, after transliteration) ───
