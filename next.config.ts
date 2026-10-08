@@ -61,6 +61,27 @@ const nextConfig: NextConfig = {
       { source: "/ingest/decide",        destination: "https://eu.i.posthog.com/decide" },
     ];
   },
+  // Baseline security headers. Framing is blocked only for the admin panel
+  // (clickjacking); the public site stays embeddable for third-party tools
+  // such as analytics heatmap overlays.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      {
+        source: "/admin/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+        ],
+      },
+    ];
+  },
   // Required when reverse-proxying PostHog through Next.js rewrites — the
   // SDK relies on exact paths without trailing-slash redirects.
   skipTrailingSlashRedirect: true,

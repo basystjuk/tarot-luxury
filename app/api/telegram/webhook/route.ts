@@ -9,6 +9,8 @@
  * Security:
  *   - Telegram sends X-Telegram-Bot-Api-Secret-Token if you set it on
  *     the setWebhook call. We compare to TELEGRAM_WEBHOOK_SECRET env var.
+ *   - Fail closed: if the secret is not configured, every update is
+ *     rejected (503) instead of being trusted blindly.
  *
  * Uses the service-role Supabase client because there's no logged-in
  * user at the time of the webhook — we resolve identity via the token.
@@ -45,13 +47,16 @@ export async function POST(req: NextRequest) {
   if (!isTelegramConfigured()) {
     return NextResponse.json({ ok: true }); // silently accept until configured
   }
-  // Verify the secret header set on setWebhook().
+  // Verify the secret header set on setWebhook(). No secret configured =
+  // no way to tell Telegram from a forged POST, so refuse everything.
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (expected) {
-    const got = req.headers.get("x-telegram-bot-api-secret-token");
-    if (got !== expected) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  if (!expected) {
+    console.error("[telegram/webhook] TELEGRAM_WEBHOOK_SECRET is not set — rejecting update");
+    return NextResponse.json({ error: "not_configured" }, { status: 503 });
+  }
+  const got = req.headers.get("x-telegram-bot-api-secret-token");
+  if (got !== expected) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   let update: TelegramUpdate;
