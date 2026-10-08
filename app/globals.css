@@ -19,6 +19,10 @@
   --gold-600:  #9A6E28;
   --muted:     #7A6A58;
   --radius:    0.75rem;
+  /* Status colours (admin feedback). Success = the green already in use;
+     danger = a warm terracotta that sits with the palette. */
+  --success:   #3F6A35;
+  --danger:    #A8432F;
 }
 
 /* ─── Base Reset ────────────────────────────────────────────────────── */

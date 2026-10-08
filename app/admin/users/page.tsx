@@ -1,25 +1,18 @@
 "use client";
 
 /**
- * Admin user panel (Phase Е).
- *
- * Lives at /admin/users. Auth: reuses the same sessionStorage-based gate
- * as the main /admin page + ensures the preview cookie is set (via
- * /api/admin/preview) so the underlying /api/admin/users/* endpoints
- * accept the request.
- *
- * Layout:
- *   - left: list of users with search + pagination + per-user stats
- *   - right: selected user detail (profile, prefs, last card pulls,
- *            notifications, "send Telegram message" action)
+ * Admin users: list with search + pagination, per-user detail (profile,
+ * notification prefs, card pulls, notifications sent) and a personal
+ * Telegram message to one user.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import { Search, RefreshCw, Send, ExternalLink, Loader2, ChevronLeft, Users, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, Search, Send, Users } from "lucide-react";
+import { adminFetch, ensureAdminCookie, responseError } from "@/components/admin/admin-fetch";
+import { formatDateTime } from "@/components/admin/format";
+import { Badge, Button, Card, EmptyState, Notice, PageHeader, Skeleton, TextAreaField, useConfirm, useToast } from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 
-const ADMIN_PASSWORD = "ellensoul2025";
-
-// ── Types matching the API contract ──────────────────────────────────────────
 interface UserRow {
   id: string;
   email: string | null;
@@ -33,504 +26,300 @@ interface UserRow {
   natal_moon_lon: number | null;
   created_at: string;
   updated_at: string;
-  stats: { cards: number; notifications: number };
+  stats?: { cards: number; notifications: number };
 }
-
-interface TarotEntry {
-  id: string;
-  day: string;
-  card_index: number;
-  reversed: boolean;
-  question: string | null;
-  reading: { meaning: string; advice: string; affirmation: string } | null;
-  drawn_at: string;
-}
-
-interface NotifEntry {
-  id: string;
-  kind: string;
-  key: string;
-  sent_at: string;
-  payload: unknown;
-}
-
 interface UserDetail {
   profile: UserRow;
   prefs: Record<string, boolean | string> | null;
-  tarot_history: TarotEntry[];
-  notifications: NotifEntry[];
+  tarot_history: { id: string; day: string; card_index: number; reversed: boolean; question: string | null; reading: { meaning: string; advice?: string; affirmation?: string } | null }[];
+  notifications: { id: string; kind: string; key: string; sent_at: string }[];
 }
 
-// ── Auth screen (same logic as /admin) ────────────────────────────────────────
-function AuthGate({ onLogin }: { onLogin: () => void }) {
-  const [pass, setPass] = useState("");
-  const [error, setError] = useState(false);
+const PAGE = 50;
+const MSG_MAX = 4000;
+const SIGNS = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"];
+const moonSign = (lon: number | null) =>
+  lon == null ? "—" : `${SIGNS[Math.floor((((lon % 360) + 360) % 360) / 30)]} ${Math.floor((((lon % 30) + 30) % 30))}°`;
+const nameOf = (u: UserRow) => u.display_name || u.full_name || u.email || "Без імені";
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (pass !== ADMIN_PASSWORD) {
-      setError(true);
-      setTimeout(() => setError(false), 1500);
-      return;
-    }
-    sessionStorage.setItem("admin_auth", "1");
-    // Also ensure the preview cookie is set so /api/admin/users/* auth
-    // succeeds. /api/admin/preview is idempotent — safe to call repeatedly.
-    try {
-      await fetch("/api/admin/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": ADMIN_PASSWORD },
-        body: JSON.stringify({ enabled: true }),
-      });
-    } catch { /* */ }
-    onLogin();
+function SendMessage({ user }: { user: UserRow }) {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  if (!user.telegram_chat_id) {
+    return <p className="text-sm text-[var(--muted)]">Користувач не підключив Telegram-бота — написати не можна.</p>;
   }
 
+  const send = async () => {
+    const ok = await confirm({
+      title: "Надіслати повідомлення?",
+      description: `${nameOf(user)} отримає його в Telegram від «✦ Ellen». Скасувати після відправки не можна.`,
+      confirmLabel: "Надіслати",
+      tone: "primary",
+    });
+    if (!ok) return;
+    setSending(true);
+    try {
+      const res = await adminFetch(`/api/admin/users/${user.id}/send-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      const j = res.ok ? await res.json() : null;
+      if (!res.ok || !j?.sent) throw new Error(res.ok ? "Telegram не прийняв повідомлення" : await responseError(res));
+      setText("");
+      toast({ title: "Повідомлення надіслано" });
+    } catch (e) {
+      toast({ tone: "danger", title: "Не надіслано", description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#1C1512] flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-10">
-          <p className="text-[#C4A97A] text-xs tracking-[0.2em] uppercase mb-2">Адмінка · Юзери</p>
-          <h1 className="text-4xl text-white" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 300 }}>Ellen Soul</h1>
-        </div>
-        <form onSubmit={submit} className="space-y-4">
-          <input
-            type="password"
-            placeholder="Пароль"
-            value={pass}
-            onChange={e => setPass(e.target.value)}
-            className={`w-full bg-white/5 border rounded-xl px-4 py-3 text-white placeholder-white/30 outline-none transition-colors ${
-              error ? "border-red-400/60 bg-red-400/5" : "border-white/15 focus:border-[#C4A97A]"
-            }`}
-          />
-          {error && <p className="text-red-400 text-sm text-center">Невірний пароль</p>}
-          <button type="submit" className="w-full bg-[#D4A853] hover:bg-[#C4983A] text-white py-3 rounded-xl transition-colors font-medium">
-            Увійти
-          </button>
-        </form>
-      </div>
+    <div className="space-y-3">
+      <TextAreaField
+        label="Текст повідомлення"
+        value={text}
+        onChange={(v) => setText(v.slice(0, MSG_MAX))}
+        placeholder="Привіт! Хотіла нагадати про нашу зустріч…"
+        rows={4}
+        maxLength={MSG_MAX}
+        hint="Звичайний текст. Повідомлення прийде з підписом «✦ Ellen»."
+      />
+      <Button onClick={() => void send()} loading={sending} disabled={!text.trim()}>
+        {!sending && <Send size={16} aria-hidden />} Надіслати в Telegram
+      </Button>
     </div>
   );
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("uk-UA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  } catch { return iso; }
-}
-function fmtDay(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("uk-UA", { day: "numeric", month: "short", year: "numeric" });
-  } catch { return iso; }
-}
-function moonSign(lon: number | null): string {
-  if (lon == null) return "—";
-  const signs = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
-  const idx = Math.floor(((lon % 360) + 360) % 360 / 30);
-  const deg = Math.floor(((lon % 30) + 30) % 30);
-  return `${signs[idx]} ${deg}°`;
-}
+function Detail({ id, onBack }: { id: string; onBack: () => void }) {
+  const [data, setData] = useState<UserDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-// ── Main page ───────────────────────────────────────────────────────────────
-export default function AdminUsersPage() {
-  const [authed, setAuthed] = useState(false);
-  useEffect(() => {
-    setAuthed(sessionStorage.getItem("admin_auth") === "1");
-  }, []);
-
-  if (!authed) return <AuthGate onLogin={() => setAuthed(true)} />;
-  return <AdminUsersContent />;
-}
-
-function AdminUsersContent() {
-  const [users, setUsers]       = useState<UserRow[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [offset, setOffset]     = useState(0);
-  const [limit]                 = useState(50);
-  const [q, setQ]               = useState("");
-  const [loading, setLoading]   = useState(true);
-  const [selected, setSelected] = useState<UserDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-
-  const load = useCallback(async (offsetOverride?: number, qOverride?: string) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        limit: String(limit),
-        offset: String(offsetOverride ?? offset),
-      });
-      const effectiveQ = qOverride ?? q;
-      if (effectiveQ) params.set("q", effectiveQ);
-      const res = await fetch(`/api/admin/users?${params}`, { cache: "no-store" });
-      if (!res.ok) {
-        setUsers([]);
-        setTotal(0);
-      } else {
-        const data = await res.json();
-        setUsers(data.users ?? []);
-        setTotal(data.total ?? 0);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [q, offset, limit]);
-
-  // Ensure the preview cookie is set before the first load. Needed when the
-  // owner arrived here from the main /admin page (which sets sessionStorage
-  // auth but not necessarily the preview cookie the /api/admin/users/* routes
-  // require) — otherwise the list would 401 and look empty. Idempotent.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        await fetch("/api/admin/preview", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-admin-password": ADMIN_PASSWORD },
-          body: JSON.stringify({ enabled: true }),
-        });
-      } catch { /* */ }
-      if (!cancelled) load();
+        const res = await adminFetch(`/api/admin/users/${id}`);
+        if (!res.ok) throw new Error(await responseError(res));
+        const j = await res.json();
+        if (!cancelled) setData(j);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      }
     })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const back = (
+    <Button variant="ghost" size="sm" onClick={onBack} className="mb-3 lg:hidden">
+      <ChevronLeft size={16} aria-hidden /> До списку
+    </Button>
+  );
+  if (error) return <>{back}<Notice tone="danger" title="Не вдалося відкрити профіль">{error}</Notice></>;
+  if (!data) return <>{back}<Skeleton className="h-64" /></>;
+
+  const p = data.profile;
+  return (
+    <div className="space-y-4">
+      {back}
+      <Card title={nameOf(p)} description={p.email ?? undefined}>
+        <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+          {[
+            ["Повне імʼя", p.full_name || "—"],
+            ["Дата народження", p.birth_date || "—"],
+            ["Місце народження", p.birth_place || "—"],
+            ["Натальний Місяць", moonSign(p.natal_moon_lon)],
+            ["Telegram", p.telegram_username ? `@${p.telegram_username}` : p.telegram_chat_id ? "підключено" : "—"],
+            ["На каналі", p.subscribed_to_channel ? "так" : "ні"],
+            ["Зареєстровано", formatDateTime(p.created_at)],
+            ["Оновлено", formatDateTime(p.updated_at)],
+          ].map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-xs text-[var(--muted)]">{k}</dt>
+              <dd className="mt-0.5">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </Card>
+
+      <Card title="Персональне повідомлення">
+        <SendMessage user={p} />
+      </Card>
+
+      {data.prefs && (
+        <Card title="Налаштування сповіщень">
+          <ul className="grid gap-2 text-sm sm:grid-cols-2">
+            {Object.entries(data.prefs)
+              .filter(([k]) => k !== "user_id" && k !== "updated_at")
+              .map(([k, v]) => (
+                <li key={k} className="flex items-center justify-between gap-3 rounded-lg bg-[var(--cream-100)] px-3 py-2">
+                  <span className="truncate text-[var(--warm-600)]">{k}</span>
+                  <Badge tone={v === true ? "success" : "muted"}>{v === true ? "увімк." : v === false ? "вимк." : String(v)}</Badge>
+                </li>
+              ))}
+          </ul>
+        </Card>
+      )}
+
+      <Card title={`Карти дня (${data.tarot_history.length})`}>
+        {data.tarot_history.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">Ще жодної карти.</p>
+        ) : (
+          <ul className="divide-y divide-[var(--sand-100)] text-sm">
+            {data.tarot_history.map((h) => (
+              <li key={h.id} className="py-2">
+                <span className="text-[var(--muted)]">{h.day}</span> · карта №{h.card_index}
+                {h.reversed && <Badge tone="muted" className="ml-2">перевернута</Badge>}
+                {h.question && <p className="mt-1 italic text-[var(--muted)]">«{h.question}»</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card title={`Надіслані сповіщення (${data.notifications.length})`}>
+        {data.notifications.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">Ще нічого не надсилали.</p>
+        ) : (
+          <ul className="divide-y divide-[var(--sand-100)] text-sm">
+            {data.notifications.map((n) => (
+              <li key={n.id} className="flex flex-wrap justify-between gap-2 py-2">
+                <span><strong className="font-medium">{n.kind}</strong> · <span className="text-[var(--muted)]">{n.key}</span></span>
+                <span className="text-[var(--muted)]">{formatDateTime(n.sent_at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+export default function UsersPage() {
+  const [query, setQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [users, setUsers] = useState<UserRow[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const cookieReady = useRef<Promise<void> | null>(null);
+
+  const load = useCallback(async (q: string, from: number) => {
+    try {
+      cookieReady.current ??= ensureAdminCookie();
+      await cookieReady.current;
+      const params = new URLSearchParams({ limit: String(PAGE), offset: String(from) });
+      if (q.trim()) params.set("q", q.trim());
+      const res = await adminFetch(`/api/admin/users?${params}`);
+      if (!res.ok) throw new Error(await responseError(res));
+      const j = await res.json();
+      setUsers(j.users ?? []);
+      setTotal(j.total ?? 0);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setUsers([]);
+      setTotal(0);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Search as you type (after a short pause) and on page change.
+  useEffect(() => {
+    const t = setTimeout(() => void load(query, offset), query ? 400 : 0);
+    return () => clearTimeout(t);
+  }, [query, offset, load]);
 
-  async function openDetail(id: string) {
-    setDetailLoading(true);
-    setSelected(null);
-    try {
-      const res = await fetch(`/api/admin/users/${id}`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setSelected(data);
-      }
-    } finally {
-      setDetailLoading(false);
-    }
-  }
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setOffset(0);
-    load(0, q);
-  }
+  const from = total === 0 ? 0 : offset + 1;
+  const to = Math.min(offset + PAGE, total);
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      <header className="bg-[#1C1512] text-white px-6 py-4 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <Users size={20} className="text-[#C4A97A]" />
-          <div>
-            <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase">Адмінка</p>
-            <h1 className="text-lg" style={{ fontFamily: "var(--font-cormorant)" }}>Юзери</h1>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 text-xs">
-          <a href="/admin" className="text-white/60 hover:text-white">← Контент</a>
-          <span className="text-white/30">·</span>
-          <span className="text-white/80">{total} {total === 1 ? "юзер" : "юзерів"}</span>
-        </div>
-      </header>
-
-      <div className="grid lg:grid-cols-[480px_1fr] min-h-[calc(100vh-60px)]">
-        {/* ── Sidebar: list ── */}
-        <aside className="border-r border-[rgba(196,169,122,0.2)] bg-white flex flex-col">
-          <form onSubmit={handleSearch} className="p-4 border-b border-[rgba(196,169,122,0.18)] flex gap-2">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C4A97A]" />
+    <>
+      <PageHeader title="Користувачі" description={total ? `Усього зареєстровано: ${total}` : "Зареєстровані користувачі сайту."} />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,360px)_1fr] lg:gap-6">
+        <div className={cn(selected && "hidden lg:block")}>
+          <Card className="p-3 sm:p-3">
+            <label htmlFor="user-search" className="sr-only">Пошук користувачів</label>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--sand-400)]" aria-hidden />
               <input
-                type="text"
-                value={q}
-                onChange={e => setQ(e.target.value)}
-                placeholder="Пошук: email, імʼя, @telegram"
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-[rgba(196,169,122,0.3)] focus:border-[#B8883A] outline-none text-sm"
+                id="user-search"
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setOffset(0);
+                }}
+                placeholder="Email, імʼя або @telegram"
+                className="w-full rounded-xl border border-[var(--sand-200)] bg-white py-2.5 pl-9 pr-3 text-base focus:border-[var(--sand-400)] focus:outline-none focus:ring-2 focus:ring-[var(--gold-400)]/40 sm:text-sm"
               />
             </div>
-            <button type="submit" className="px-3 py-2 rounded-lg bg-[#B8883A] hover:bg-[#9a6e28] text-white text-xs">
-              ⇢
-            </button>
-            <button type="button" onClick={() => load()} className="p-2 text-[#7A6A58] hover:text-[#B8883A]" title="Оновити">
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            </button>
-          </form>
 
-          <div className="flex-1 overflow-y-auto">
-            {loading && users.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#9A8A78]">
-                <Loader2 size={20} className="animate-spin mx-auto mb-2" />
-                Завантажуємо…
+            {error && <Notice tone="danger" className="mt-3">{error}</Notice>}
+
+            {users === null ? (
+              <div className="mt-3 space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14" />)}</div>
+            ) : users.length === 0 && !error ? (
+              <div className="mt-3">
+                <EmptyState icon={<Users size={28} />} title={query ? `Нікого не знайдено за «${query}»` : "Користувачів ще немає"} />
               </div>
-            ) : users.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[#9A8A78]">Юзерів немає {q && `за пошуком «${q}»`}</div>
             ) : (
-              <ul className="divide-y divide-[rgba(196,169,122,0.12)]">
-                {users.map(u => (
+              <ul className="mt-3 divide-y divide-[var(--sand-100)]">
+                {users.map((u) => (
                   <li key={u.id}>
                     <button
                       type="button"
-                      onClick={() => openDetail(u.id)}
-                      className={`w-full text-left px-4 py-3 hover:bg-[rgba(196,169,122,0.06)] ${selected?.profile.id === u.id ? "bg-[rgba(212,168,83,0.12)]" : ""}`}
+                      onClick={() => setSelected(u.id)}
+                      aria-current={selected === u.id ? "true" : undefined}
+                      className={cn(
+                        "flex min-h-14 w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-[var(--cream-100)]",
+                        selected === u.id && "bg-[var(--sand-100)]",
+                      )}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm text-[#1C1512] font-medium truncate">
-                            {u.display_name || u.email || "Без імені"}
-                          </p>
-                          <p className="text-[11px] text-[#7A6A58] truncate">{u.email}</p>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-[#9A8A78]">
-                            <span title="карти">🃏 {u.stats.cards}</span>
-                            <span title="нотифікації">📨 {u.stats.notifications}</span>
-                            {u.telegram_chat_id && <span title="TG підключено" className="text-[#3F6A35]">✓ TG</span>}
-                            {u.subscribed_to_channel && <span title="на каналі" className="text-[#B8883A]">★</span>}
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-[#9A8A78] flex-shrink-0">{fmtDay(u.created_at)}</span>
-                      </div>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{nameOf(u)}</span>
+                        <span className="block truncate text-xs text-[var(--muted)]">{u.email}</span>
+                      </span>
+                      <span className="flex shrink-0 flex-col items-end gap-1">
+                        {u.telegram_chat_id && <Badge tone="success">TG</Badge>}
+                        <span className="text-[11px] text-[var(--muted)]">{formatDateTime(u.created_at).split(",")[0]}</span>
+                      </span>
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
 
-          {/* Pagination */}
-          <div className="p-3 border-t border-[rgba(196,169,122,0.18)] flex items-center justify-between text-xs">
-            <button
-              type="button"
-              disabled={offset === 0}
-              onClick={() => { const next = Math.max(0, offset - limit); setOffset(next); load(next); }}
-              className="px-3 py-1 rounded text-[#5C4530] disabled:opacity-30 hover:bg-[rgba(196,169,122,0.08)]"
-            >← prev</button>
-            <span className="text-[#7A6A58]">{offset + 1}-{Math.min(offset + limit, total)} of {total}</span>
-            <button
-              type="button"
-              disabled={offset + limit >= total}
-              onClick={() => { const next = offset + limit; setOffset(next); load(next); }}
-              className="px-3 py-1 rounded text-[#5C4530] disabled:opacity-30 hover:bg-[rgba(196,169,122,0.08)]"
-            >next →</button>
-          </div>
-        </aside>
+            {total > PAGE && (
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--sand-100)] pt-3 text-sm">
+                <Button variant="ghost" size="sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>
+                  Назад
+                </Button>
+                <span className="text-[var(--muted)]">{from}–{to} з {total}</span>
+                <Button variant="ghost" size="sm" disabled={offset + PAGE >= total} onClick={() => setOffset(offset + PAGE)}>
+                  Далі
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
 
-        {/* ── Detail panel ── */}
-        <main className="overflow-y-auto p-6 max-w-3xl">
-          {detailLoading ? (
-            <div className="flex items-center justify-center py-20 text-[#9A8A78]">
-              <Loader2 size={20} className="animate-spin mr-2" /> Завантажуємо…
-            </div>
-          ) : !selected ? (
-            <div className="text-center py-20 text-[#9A8A78]">
-              <Users size={32} className="mx-auto mb-3 opacity-40" />
-              <p className="text-sm">Обери юзера зліва щоб подивитись деталі</p>
-            </div>
+        <div className={cn("min-w-0", !selected && "hidden lg:block")}>
+          {selected ? (
+            <Detail key={selected} id={selected} onBack={() => setSelected(null)} />
           ) : (
-            <UserDetailPanel user={selected} onClose={() => setSelected(null)} />
+            <EmptyState icon={<Users size={32} />} title="Оберіть користувача">
+              Деталі профілю, налаштування сповіщень, історія карт і персональне повідомлення.
+            </EmptyState>
           )}
-        </main>
-      </div>
-    </div>
-  );
-}
-
-// ── User detail panel ───────────────────────────────────────────────────────
-function UserDetailPanel({ user, onClose }: { user: UserDetail; onClose: () => void }) {
-  const { profile, prefs, tarot_history, notifications } = user;
-  const [msgOpen, setMsgOpen] = useState(false);
-  const [msgText, setMsgText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [sendResult, setSendResult] = useState<"idle" | "sent" | "error" | "no-tg">("idle");
-
-  async function sendCustomMessage() {
-    if (!msgText.trim() || !profile.telegram_chat_id) {
-      setSendResult("no-tg");
-      return;
-    }
-    setSending(true);
-    setSendResult("idle");
-    try {
-      const res = await fetch(`/api/admin/users/${profile.id}/send-message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msgText.trim() }),
-      });
-      const data = await res.json();
-      if (data.sent) {
-        setSendResult("sent");
-        setMsgText("");
-        setTimeout(() => setMsgOpen(false), 1500);
-      } else {
-        setSendResult("error");
-      }
-    } catch {
-      setSendResult("error");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <button onClick={onClose} className="lg:hidden text-xs text-[#7A6A58] mb-2 inline-flex items-center gap-1">
-            <ChevronLeft size={12} /> До списку
-          </button>
-          <h2 className="text-2xl text-[#1C1512]" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>
-            {profile.display_name || profile.email || "Без імені"}
-          </h2>
-          <p className="text-sm text-[#7A6A58]">{profile.email}</p>
-          <p className="text-[11px] text-[#9A8A78] mt-1">ID: <span className="font-mono">{profile.id}</span></p>
         </div>
       </div>
-
-      {/* ── Quick stats ── */}
-      <div className="grid grid-cols-4 gap-3">
-        <Stat label="Карти" value={user.profile.stats?.cards ?? tarot_history.length} />
-        <Stat label="Нотифікації" value={user.profile.stats?.notifications ?? notifications.length} />
-        <Stat label="TG" value={profile.telegram_chat_id ? "✓" : "—"} />
-        <Stat label="Канал" value={profile.subscribed_to_channel ? "✓" : "—"} />
-      </div>
-
-      {/* ── Profile block ── */}
-      <Section title="Профіль">
-        <Field label="Повне імʼя">{profile.full_name || "—"}</Field>
-        <Field label="Дата народження">{profile.birth_date || "—"}</Field>
-        <Field label="Місце народження">{profile.birth_place || "—"}</Field>
-        <Field label="Натальний Місяць">{moonSign(profile.natal_moon_lon)}</Field>
-        <Field label="Telegram">{profile.telegram_username ? `@${profile.telegram_username}` : "—"}</Field>
-        <Field label="Telegram chat ID">{profile.telegram_chat_id ?? "—"}</Field>
-        <Field label="Створено">{fmtDate(profile.created_at)}</Field>
-        <Field label="Оновлено">{fmtDate(profile.updated_at)}</Field>
-      </Section>
-
-      {/* ── Notification prefs ── */}
-      {prefs && (
-        <Section title="Налаштування нотифікацій">
-          <div className="grid sm:grid-cols-2 gap-2 text-sm">
-            {Object.entries(prefs).filter(([k]) => k !== "user_id" && k !== "updated_at").map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between p-2 rounded bg-[rgba(196,169,122,0.05)]">
-                <span className="text-[#5C4530]">{k}</span>
-                <span className={v === true ? "text-[#3F6A35] font-medium" : "text-[#9A8A78]"}>
-                  {v === true ? "ON" : v === false ? "OFF" : String(v)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Send custom Telegram message ── */}
-      <Section title="Надіслати персональне повідомлення">
-        {!profile.telegram_chat_id ? (
-          <p className="text-sm text-[#9A8A78] italic">Юзер не підключив Telegram-бот — повідомлення надіслати не можна.</p>
-        ) : !msgOpen ? (
-          <button onClick={() => setMsgOpen(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[#B8883A] hover:bg-[#9a6e28] text-white text-sm">
-            <Send size={14} /> Написати в Telegram
-          </button>
-        ) : (
-          <div className="space-y-3">
-            <textarea
-              value={msgText}
-              onChange={e => setMsgText(e.target.value.slice(0, 4000))}
-              rows={4}
-              placeholder="Привіт! Хотіла нагадати про нашу зустріч…"
-              className="w-full p-3 rounded-lg border border-[rgba(196,169,122,0.3)] focus:border-[#B8883A] outline-none text-sm resize-none"
-            />
-            <p className="text-[11px] text-[#9A8A78]">
-              Можна HTML: <code>&lt;b&gt;жирний&lt;/b&gt;</code>, <code>&lt;i&gt;курсив&lt;/i&gt;</code>, <code>&lt;a href=&quot;…&quot;&gt;посилання&lt;/a&gt;</code>.
-              Лімі: 4000 символів. Надсилається з префіксом «✦ Ellen».
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={sendCustomMessage}
-                disabled={sending || !msgText.trim()}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[#B8883A] hover:bg-[#9a6e28] disabled:opacity-50 text-white text-sm"
-              >
-                {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                {sending ? "Надсилаю…" : "Надіслати"}
-              </button>
-              <button onClick={() => { setMsgOpen(false); setMsgText(""); setSendResult("idle"); }} className="text-sm text-[#7A6A58]">
-                <X size={14} className="inline" /> Скасувати
-              </button>
-              {sendResult === "sent"  && <span className="text-sm text-[#3F6A35]">✓ Надіслано</span>}
-              {sendResult === "error" && <span className="text-sm text-[#9A6E28]">⚠ Помилка</span>}
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* ── Tarot history ── */}
-      <Section title={`Журнал карт (${tarot_history.length})`}>
-        {tarot_history.length === 0 ? (
-          <p className="text-sm text-[#9A8A78] italic">Ще жодної карти.</p>
-        ) : (
-          <ul className="space-y-2">
-            {tarot_history.map(h => (
-              <li key={h.id} className="p-3 rounded-lg bg-[rgba(196,169,122,0.05)] border border-[rgba(196,169,122,0.15)] text-sm">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-[#7A6A58]">{fmtDay(h.day)} · <strong className="text-[#5C4530]">card #{h.card_index}</strong>{h.reversed && <span className="ml-1 text-[10px] text-[#B8883A] italic uppercase tracking-wider">reversed</span>}</span>
-                </div>
-                {h.question && <p className="text-xs italic text-[#7A6A58] mt-1">«{h.question}»</p>}
-                {h.reading && (
-                  <details className="mt-2 text-xs">
-                    <summary className="cursor-pointer text-[#B8883A]">Показати читання</summary>
-                    <div className="mt-2 space-y-2 text-[#5C4530]">
-                      <p>{h.reading.meaning}</p>
-                      {h.reading.advice && <p>{h.reading.advice}</p>}
-                      {h.reading.affirmation && <p className="italic text-[#B8883A]">«{h.reading.affirmation}»</p>}
-                    </div>
-                  </details>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      {/* ── Notification log ── */}
-      <Section title={`Надіслані сповіщення (${notifications.length})`}>
-        {notifications.length === 0 ? (
-          <p className="text-sm text-[#9A8A78] italic">Ще нічого не надсилали.</p>
-        ) : (
-          <ul className="space-y-1.5 text-xs">
-            {notifications.map(n => (
-              <li key={n.id} className="flex items-center justify-between gap-3 p-2 rounded bg-[rgba(196,169,122,0.05)]">
-                <span className="text-[#5C4530]"><strong>{n.kind}</strong> · {n.key}</span>
-                <span className="text-[#9A8A78]">{fmtDate(n.sent_at)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="p-3 rounded-lg bg-white border border-[rgba(196,169,122,0.2)] text-center">
-      <p className="text-[10px] text-[#9A8A78] tracking-widest uppercase">{label}</p>
-      <p className="text-lg text-[#B8883A] mt-1" style={{ fontFamily: "var(--font-cormorant)", fontWeight: 500 }}>{value}</p>
-    </div>
-  );
-}
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="p-4 rounded-xl bg-white border border-[rgba(196,169,122,0.2)]">
-      <p className="text-[10px] text-[#C4A97A] tracking-widest uppercase mb-3">{title}</p>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 text-sm">
-      <span className="text-[#9A8A78] text-xs uppercase tracking-wide">{label}</span>
-      <span className="text-[#5C4530] text-right">{children}</span>
-    </div>
+    </>
   );
 }
