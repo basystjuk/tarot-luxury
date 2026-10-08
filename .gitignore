@@ -5,3 +5,5 @@ node_modules/
 *.log
 .vercel
 .test-build/
+# Local site-content store for the "admin-safe-local" dev profile
+.local-content/
