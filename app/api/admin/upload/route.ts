@@ -1,5 +1,6 @@
 import { put, list, del } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
+import { previewWriteBlocked } from "@/lib/admin-auth";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
 const PHOTO_PREFIX = "ellen-soul-taro-konsultant";
@@ -10,6 +11,8 @@ export async function POST(req: NextRequest) {
   if (password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
 
   // Blob storage configured?
   if (!process.env.BLOB_READ_WRITE_TOKEN) {

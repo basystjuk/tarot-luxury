@@ -46,7 +46,9 @@ export async function GET(req: NextRequest) {
 
   if (q) {
     // PostgREST `or` filter — case-insensitive contains across 4 cols.
-    const safe = q.replace(/[%_]/g, ""); // strip wildcards from user input
+    // Strip LIKE wildcards and PostgREST filter syntax (, ( ) " \ *): a comma
+    // in the search box used to split the `or` filter and fail the request.
+    const safe = q.replace(/[%_,()"\\*]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
     query = query.or(`email.ilike.%${safe}%,display_name.ilike.%${safe}%,full_name.ilike.%${safe}%,telegram_username.ilike.%${safe}%`);
   }
 

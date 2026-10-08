@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isPreviewFromRequest } from "@/lib/preview";
+import { isPreviewReadOnly } from "@/lib/admin-auth";
 
 export const maxDuration = 15;
 
@@ -39,6 +40,10 @@ function authorised(req: NextRequest): boolean {
 export async function POST(req: NextRequest): Promise<NextResponse<SetupResult>> {
   if (!authorised(req)) {
     return NextResponse.json({ configured: false, error: "unauthorized" }, { status: 404 });
+  }
+  // Re-registering the webhook from a preview would repoint the live bot.
+  if (isPreviewReadOnly()) {
+    return NextResponse.json({ configured: false, error: "preview_read_only" }, { status: 403 });
   }
 
   const token  = process.env.TELEGRAM_BOT_TOKEN;

@@ -21,7 +21,8 @@ export async function GET() {
     let meta: GalleryMeta = {};
     if (metaBlob) {
       try {
-        const res = await fetch(metaBlob.url, { next: { revalidate: 3600 } });
+        // This response is CDN-cached already; don't add a second hour-long cache.
+        const res = await fetch(metaBlob.url, { cache: "no-store" });
         if (res.ok) meta = await res.json();
       } catch {}
     }
@@ -38,8 +39,9 @@ export async function GET() {
       { items },
       {
         headers: {
-          // Edge cache: serve from CDN for 1 hour, stale up to 24h while revalidating
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          // Edge cache 60 s (like the rest of the admin-edited content) so a new
+          // or removed photo reaches the About page within a minute.
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=600",
         },
       }
     );

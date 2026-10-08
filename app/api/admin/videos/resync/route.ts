@@ -13,6 +13,7 @@ import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { syncChannel } from "@/lib/youtube/sync";
 import { indexNowSubmit, journalUrls } from "@/lib/seo/indexnow";
+import { previewWriteBlocked } from "@/lib/admin-auth";
 
 export const maxDuration = 30;
 
@@ -25,6 +26,8 @@ function authorised(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
   const apiKey = process.env.YOUTUBE_API_KEY;
   const channelId = process.env.YOUTUBE_CHANNEL_ID;
   if (!apiKey || !channelId) {

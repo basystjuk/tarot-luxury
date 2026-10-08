@@ -1,8 +1,9 @@
 import { put, del, list } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
+import { GALLERY_PREFIX, galleryExtension, isGalleryImagePathname } from "@/lib/gallery";
+import { previewWriteBlocked } from "@/lib/admin-auth";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
-const GALLERY_PREFIX = "gallery/";
 const META_PATHNAME = "gallery-meta.json";
 
 type GalleryMeta = Record<string, { position?: "top" | "center" | "bottom" }>;
@@ -34,21 +35,49 @@ async function writeMeta(meta: GalleryMeta): Promise<void> {
   });
 }
 
+// GET — the gallery for the admin, straight from storage (the public
+// /api/gallery is CDN-cached, so a fresh upload wouldn't show up there yet)
+export async function GET(req: NextRequest) {
+  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!process.env.BLOB_READ_WRITE_TOKEN)
+    return NextResponse.json({ error: "Blob not configured" }, { status: 503 });
+  try {
+    const { blobs } = await list({ prefix: "gallery" });
+    const meta = await readMetaFromBlobs(blobs);
+    const items = blobs
+      .filter((b) => isGalleryImagePathname(b.pathname))
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .map((b) => ({
+        url: b.url,
+        pathname: b.pathname,
+        size: b.size,
+        uploadedAt: new Date(b.uploadedAt).toISOString(),
+        position: meta[b.pathname]?.position ?? "top",
+      }));
+    return NextResponse.json({ items }, { headers: { "Cache-Control": "no-store" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: "gallery_read_failed", message }, { status: 502 });
+  }
+}
+
 // POST — upload a new gallery image
 export async function POST(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
   if (!process.env.BLOB_READ_WRITE_TOKEN)
     return NextResponse.json({ error: "Blob not configured" }, { status: 503 });
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
-  if (!file.type.startsWith("image/"))
-    return NextResponse.json({ error: "Not an image" }, { status: 400 });
+  const ext = galleryExtension(file.type);
+  if (!ext)
+    return NextResponse.json({ error: "Unsupported image type (allowed: JPG, PNG, WebP, AVIF, GIF)" }, { status: 400 });
   if (file.size > 8 * 1024 * 1024)
     return NextResponse.json({ error: "Max 8 MB" }, { status: 400 });
 
-  const ext = file.name.split(".").pop() ?? "jpg";
   const filename = `${GALLERY_PREFIX}${Date.now()}.${ext}`;
   const blob = await put(filename, file, {
     access: "public",
@@ -61,12 +90,14 @@ export async function POST(req: NextRequest) {
 // PATCH — update photo position metadata
 export async function PATCH(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
   if (!process.env.BLOB_READ_WRITE_TOKEN)
     return NextResponse.json({ error: "Blob not configured" }, { status: 503 });
 
   const body = await req.json() as { pathname: string; position: "top" | "center" | "bottom" };
   const { pathname, position } = body;
-  if (!pathname || !["top", "center", "bottom"].includes(position))
+  if (!pathname || !isGalleryImagePathname(pathname) || !["top", "center", "bottom"].includes(position))
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 
   // One list() call for both gallery items and meta
@@ -80,12 +111,16 @@ export async function PATCH(req: NextRequest) {
 // DELETE — remove a gallery image by pathname query param
 export async function DELETE(req: NextRequest) {
   if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
   if (!process.env.BLOB_READ_WRITE_TOKEN)
     return NextResponse.json({ error: "Blob not configured" }, { status: 503 });
 
   const url = new URL(req.url);
   const pathname = url.searchParams.get("pathname");
   if (!pathname) return NextResponse.json({ error: "Missing pathname" }, { status: 400 });
+  // Only gallery images may be deleted here — never gallery-meta.json or other blobs.
+  if (!isGalleryImagePathname(pathname)) return NextResponse.json({ error: "Invalid pathname" }, { status: 400 });
 
   try {
     // One list() call for both image and meta

@@ -7,9 +7,8 @@
  * cold start (which happens often enough on serverless).
  */
 
-import { list } from "@vercel/blob";
+import { loadStoredContent } from "./public-content";
 
-const CONTENT_BLOB = "site-content.json";
 const CACHE_TTL_MS = 30_000;
 
 interface CacheEntry {
@@ -25,20 +24,8 @@ export async function loadSiteContent(): Promise<Record<string, unknown> | null>
     return cache.data;
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    cache = { fetchedAt: now, data: null };
-    return null;
-  }
-
   try {
-    const { blobs } = await list({ prefix: CONTENT_BLOB });
-    const blob = blobs[0];
-    if (!blob) {
-      cache = { fetchedAt: now, data: null };
-      return null;
-    }
-    const res = await fetch(blob.url, { cache: "no-store" });
-    const data = (await res.json()) as Record<string, unknown>;
+    const data = await loadStoredContent();
     cache = { fetchedAt: now, data };
     return data;
   } catch {

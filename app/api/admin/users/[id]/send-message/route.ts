@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendMessage, isTelegramConfigured, escapeHtml } from "@/lib/telegram/bot";
+import { previewWriteBlocked } from "@/lib/admin-auth";
 
 function authorised(req: NextRequest): boolean {
   if (isPreviewFromRequest(req)) return true;
@@ -24,6 +25,8 @@ function authorised(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
   if (!isTelegramConfigured()) {
     return NextResponse.json({ error: "telegram_not_configured" }, { status: 503 });
   }

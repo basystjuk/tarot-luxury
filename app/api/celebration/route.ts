@@ -1,6 +1,6 @@
-import { list } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import { DEFAULT_CELEBRATION, normalizeCelebration, type CelebrationConfig } from "@/lib/celebration";
+import { normalizeCelebration } from "@/lib/celebration";
+import { loadPublicContent } from "@/lib/public-content";
 
 /**
  * GET /api/celebration
@@ -11,23 +11,12 @@ import { DEFAULT_CELEBRATION, normalizeCelebration, type CelebrationConfig } fro
  * of the content pipeline.
  */
 
-const CONTENT_BLOB = "site-content.json";
 const CACHE = "public, s-maxage=60, stale-while-revalidate=300";
 
 export async function GET() {
-  const respond = (celebration: CelebrationConfig) =>
-    NextResponse.json({ celebration }, { headers: { "Cache-Control": CACHE } });
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return respond(DEFAULT_CELEBRATION);
-
-  try {
-    const { blobs } = await list({ prefix: CONTENT_BLOB });
-    const blob = blobs[0];
-    if (!blob) return respond(DEFAULT_CELEBRATION);
-    const res = await fetch(blob.url, { cache: "no-store" });
-    const data = await res.json();
-    return respond(normalizeCelebration(data?.celebration));
-  } catch {
-    return respond(DEFAULT_CELEBRATION);
-  }
+  const content = await loadPublicContent();
+  return NextResponse.json(
+    { celebration: normalizeCelebration(content.celebration) },
+    { headers: { "Cache-Control": CACHE } },
+  );
 }

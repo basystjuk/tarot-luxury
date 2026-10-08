@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ALL_TOOL_IDS, type ToolId } from "@/lib/tools-config";
+import { previewWriteBlocked } from "@/lib/admin-auth";
 
 function authorised(req: NextRequest): boolean {
   if (isPreviewFromRequest(req)) return true;
@@ -36,6 +37,8 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  const blocked = previewWriteBlocked();
+  if (blocked) return blocked;
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "no_admin_client" }, { status: 503 });
 
