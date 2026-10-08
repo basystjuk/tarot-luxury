@@ -18,6 +18,7 @@
 
 import { TOOL_LABELS, type ToolId } from "@/lib/tools-config";
 import Breadcrumbs from "./Breadcrumbs";
+import { jsonLd } from "@/lib/seo/json-ld";
 
 const SITE = "https://ellen-soul.com";
 
@@ -109,7 +110,7 @@ export default function ToolSchema({ id, lang }: { id: ToolId; lang: "uk" | "ru"
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+        dangerouslySetInnerHTML={jsonLd(data)}
       />
       <Breadcrumbs items={[
         { name: HOME_LABEL[lang], url: `${SITE}/${lang}` },

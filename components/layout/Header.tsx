@@ -89,6 +89,10 @@ export default function Header() {
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
+  // The admin panel has its own header (save status, logout); the fixed public
+  // nav would cover it.
+  if (pathname?.startsWith("/admin")) return null;
+
   return (
     <>
       <header

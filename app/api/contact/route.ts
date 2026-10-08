@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_SERVICES } from "@/lib/data/services";
+import { DEFAULT_SERVICES, type ServiceItem } from "@/lib/data/services";
+import { loadPublicContent } from "@/lib/public-content";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,11 +18,21 @@ export async function POST(req: NextRequest) {
     const chatIds = rawIds.split(",").map(s => s.trim()).filter(Boolean);
 
     if (!token || !chatIds.length) {
-      return NextResponse.json({ ok: true });
+      // Nowhere to deliver the lead — say so, so the form can point the
+      // visitor to Ellen's direct contacts instead of a false "received".
+      console.error("[contact] Telegram delivery is not configured — lead not delivered");
+      return NextResponse.json({ error: "delivery_unavailable" }, { status: 503 });
     }
 
     // ── Topic → Russian title + price ─────────────────────────────────────
-    const matched = DEFAULT_SERVICES.find(
+    // Names and prices as currently on the site (edited in the admin) — the
+    // form offers those titles, so matching against code defaults would miss
+    // renamed services and report stale prices.
+    const content = await loadPublicContent();
+    const services = (Array.isArray(content.services) && content.services.length > 0
+      ? content.services
+      : DEFAULT_SERVICES) as ServiceItem[];
+    const matched = services.find(
       s => s.title_ru === topic || s.title_uk === topic || s.title_en === topic
     );
     const topicLine = matched
@@ -66,6 +77,10 @@ export async function POST(req: NextRequest) {
     if (failed.length) {
       const errs = await Promise.all(failed.map(r => r.text()));
       console.error("Telegram errors:", errs);
+    }
+    if (failed.length === results.length) {
+      // Not a single recipient got it — the lead would be lost silently.
+      return NextResponse.json({ error: "delivery_failed" }, { status: 502 });
     }
 
     return NextResponse.json({ ok: true });

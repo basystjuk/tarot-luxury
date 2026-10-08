@@ -10,6 +10,7 @@
 
 import type { JournalVideo } from "@/app/api/journal/videos/route";
 import { describeVideo } from "@/lib/youtube/format";
+import { jsonLd } from "@/lib/seo/json-ld";
 
 const SITE = "https://ellen-soul.com";
 
@@ -61,9 +62,9 @@ export default function VideoSchema({ videos, lang }: { videos: JournalVideo[]; 
   return (
     <script
       type="application/ld+json"
-      // JSON.stringify is XSS-safe here (no user-controlled HTML) and Schema
-      // markup must be inlined in <head>/<body>, not loaded externally.
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }}
+      // Titles/descriptions come from YouTube — jsonLd() escapes "<" so they
+      // can't close the tag. Schema markup must be inlined, not loaded externally.
+      dangerouslySetInnerHTML={jsonLd(itemList)}
     />
   );
 }

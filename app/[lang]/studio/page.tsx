@@ -7,14 +7,14 @@ import AnimatedSection from "@/components/ui/AnimatedSection";
 import GoldDivider from "@/components/ui/GoldDivider";
 import { useLanguage } from '@/hooks/useLanguage';
 import { isToolEnabled, type ToolId } from "@/lib/tools-config";
+import { STUDIO_TOOL_CARDS, studioToolTexts, type StudioToolOverride } from "@/lib/data/studio-tools";
 
 export default function StudioPage() {
   const { language } = useLanguage();
   const isRu = language === 'ru';
   const isEn = language === 'en';
 
-  type ApiTool = { id: string; title_uk: string; title_ru: string; title_en: string; desc_uk: string; desc_ru: string; desc_en: string };
-  const [apiTools, setApiTools] = useState<ApiTool[] | null>(null);
+  const [apiTools, setApiTools] = useState<StudioToolOverride[] | null>(null);
   const [toolsEnabled, setToolsEnabled] = useState<Partial<Record<ToolId, boolean>> | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
 
@@ -29,37 +29,13 @@ export default function StudioPage() {
       .catch(() => {});
   }, []);
 
-  // Порядок: Карта дня → Нумерологія → Карта сумісності → Місячний провідник → Натальна карта
-  // Натальна карта вимкнена за замовчуванням і з'являється тільки коли admin
-  // увімкне її через адмінку (або у preview-режимі).
-  const tools = isRu ? [
-    { href: `/${language}/studio/daily-card`,   title: "Карта дня",              subtitle: "Таро",          description: "Ежедневная карта Таро — ваш ориентир и медитация на сегодня. Персональное предсказание от Ellen Soul.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
-    { href: `/${language}/studio/numerology`,    title: "Нумерология",            subtitle: "Нумерология",   description: "Ваше число Судьбы, число Пути, Душа, Личность и карматические уроки по имени и дате рождения.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
-    { href: `/${language}/studio/compatibility`, title: "Карта совместимости",    subtitle: "Астрология · Нумерология", description: "Знаки зодиака и числа судьбы двух людей — полный анализ совместимости пары.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
-    { href: `/${language}/studio/moon-phase`,    title: "Лунный проводник",       subtitle: "Луна · Астрология", description: "Точная фаза, знак и градус Луны на любую дату. Тёмная Луна, Void of Course, узлы, Лилит — личное лунное послание.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
-    { href: `/${language}/studio/natal-chart`,   title: "Натальная карта",        subtitle: "Астрология",       description: "Полный астрологический портрет: планеты, дома, аспекты — ваш космический паспорт.", glyph: "✺", accent: "from-[#9A6E28] to-[#5A3E18]" },
-    { href: `/${language}/studio/horoscope`,     title: "Гороскоп дня",           subtitle: "Астрология + Нумерология", description: "Персональный гороскоп на сегодня: конвергенция транзитов к вашей натальной карте, окна удачи с точностью до минуты.", glyph: "☉", accent: "from-[#E8C98A] to-[#9A6E28]" },
-    { href: `/${language}/studio/year-forecast`, title: "Прогноз года",           subtitle: "Соляр · Прогрессии", description: "Прогноз на год: соляр задаёт тему, прогрессивная Луна — вашу эмоциональную пору. С колесом солнечного возвращения.", glyph: "❂", accent: "from-[#D4A853] to-[#9A6E28]" },
-    { href: `/${language}/studio/dreams`,        title: "Сонник",                 subtitle: "AI-анализ снов", description: "Опишите свой сон — AI найдёт символы, даст глубокое психологическое и духовное толкование, послание подсознания и аффирмацию.", glyph: "🌙", accent: "from-[#7E6AC8] to-[#3B2E6E]" },
-  ] : isEn ? [
-    { href: `/${language}/studio/daily-card`,   title: "Card of the Day",         subtitle: "Tarot",         description: "Daily Tarot card — your guide and meditation for today. Personal reading from Ellen Soul.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
-    { href: `/${language}/studio/numerology`,    title: "Numerology",              subtitle: "Numerology",    description: "Your Destiny, Life Path, Soul, Personality numbers and karmic lessons by name and date of birth.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
-    { href: `/${language}/studio/compatibility`, title: "Compatibility Map",        subtitle: "Astrology · Numerology", description: "Zodiac signs and destiny numbers of two people — full couple compatibility analysis.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
-    { href: `/${language}/studio/moon-phase`,    title: "Moon Guide",              subtitle: "Moon · Astrology", description: "The precise Moon phase, sign and degree for any date. Dark Moon, Void of Course, nodes, Lilith — a personal lunar message.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
-    { href: `/${language}/studio/natal-chart`,   title: "Natal Chart",             subtitle: "Astrology",        description: "A full astrological portrait: planets, houses, aspects — your cosmic passport.", glyph: "✺", accent: "from-[#9A6E28] to-[#5A3E18]" },
-    { href: `/${language}/studio/horoscope`,     title: "Daily Horoscope",          subtitle: "Astrology + Numerology", description: "Your personal horoscope for today: transit convergence to your natal chart, windows of luck down to the minute.", glyph: "☉", accent: "from-[#E8C98A] to-[#9A6E28]" },
-    { href: `/${language}/studio/year-forecast`, title: "Year Forecast",            subtitle: "Solar Return · Progressions", description: "Your year ahead: the Solar Return sets the theme, the progressed Moon your emotional season. With a solar-return wheel.", glyph: "❂", accent: "from-[#D4A853] to-[#9A6E28]" },
-    { href: `/${language}/studio/dreams`,        title: "Dream Interpreter",        subtitle: "AI dream analysis", description: "Describe your dream — AI detects the symbols, gives a deep psychological and spiritual reading, a message from the subconscious and an affirmation.", glyph: "🌙", accent: "from-[#7E6AC8] to-[#3B2E6E]" },
-  ] : [
-    { href: `/${language}/studio/daily-card`,   title: "Карта дня",              subtitle: "Таро",          description: "Щоденна карта Таро — ваш орієнтир та медитація на сьогодні. Персональне передбачення від Ellen Soul.", glyph: "✦", accent: "from-[#B8883A] to-[#9A6E28]" },
-    { href: `/${language}/studio/numerology`,    title: "Нумерологія",            subtitle: "Нумерологія",   description: "Ваше число Долі, число Шляху, Душа, Особистість та карматичні уроки за ім'ям і датою народження.", glyph: "∞", accent: "from-[#D4A853] to-[#C4A97A]" },
-    { href: `/${language}/studio/compatibility`, title: "Карта сумісності",       subtitle: "Астрологія · Нумерологія", description: "Знаки зодіаку та числа долі двох людей — повний аналіз сумісності пари.", glyph: "♡", accent: "from-[#E8C98A] to-[#C4A97A]" },
-    { href: `/${language}/studio/moon-phase`,    title: "Місячний провідник",     subtitle: "Місяць · Астрологія", description: "Точна фаза, знак і градус Місяця на будь-яку дату. Темний Місяць, Void of Course, вузли, Ліліт — особисте місячне послання.", glyph: "🌙", accent: "from-[#C4A97A] to-[#9A6E28]" },
-    { href: `/${language}/studio/natal-chart`,   title: "Натальна карта",         subtitle: "Астрологія",          description: "Повний астрологічний портрет: планети, доми, аспекти — ваш космічний паспорт.", glyph: "✺", accent: "from-[#9A6E28] to-[#5A3E18]" },
-    { href: `/${language}/studio/horoscope`,     title: "Гороскоп дня",           subtitle: "Астрологія + Нумерологія", description: "Персональний гороскоп на сьогодні: конвергенція транзитів до твоєї натальної карти, вікна удачі з точністю до хвилини.", glyph: "☉", accent: "from-[#E8C98A] to-[#9A6E28]" },
-    { href: `/${language}/studio/year-forecast`, title: "Прогноз року",           subtitle: "Соляр · Прогресії", description: "Прогноз на рік: соляр задає тему, прогресивний Місяць — твою емоційну пору. З колесом сонячного повернення.", glyph: "❂", accent: "from-[#D4A853] to-[#9A6E28]" },
-    { href: `/${language}/studio/dreams`,        title: "Сонник",                 subtitle: "AI-аналіз снів", description: "Опишіть свій сон — AI знайде символи, дасть глибоке психологічне й духовне трактування, послання підсвідомості та афірмацію.", glyph: "🌙", accent: "from-[#7E6AC8] to-[#3B2E6E]" },
-  ];
+  // Order and built-in texts live in lib/data/studio-tools.ts (shared with the
+  // admin, which can override any tool's title and description).
+  const tools = STUDIO_TOOL_CARDS.map((card) => ({
+    ...card,
+    href: `/${language}/studio/${card.id}`,
+    subtitle: isRu ? card.subtitle_ru : isEn ? card.subtitle_en : card.subtitle_uk,
+  }));
 
   return (
     <>
@@ -90,18 +66,14 @@ export default function StudioPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-7">
             {tools
-              .filter((tool) => {
-                const id = tool.href.split('/').pop() as ToolId;
-                // In preview mode show everything (with badge); otherwise hide
-                // tools the admin has disabled.
-                return previewMode || isToolEnabled(id, toolsEnabled);
-              })
+              // In preview mode show everything (with badge); otherwise hide
+              // tools the admin has disabled.
+              .filter((tool) => previewMode || isToolEnabled(tool.id, toolsEnabled))
               .map((tool, i) => {
-              const id = tool.href.split('/').pop() as ToolId;
-              const disabled = !isToolEnabled(id, toolsEnabled);
-              const apiTool = apiTools?.find(t => t.id === id);
-              const title = apiTool ? (isRu ? apiTool.title_ru : isEn ? apiTool.title_en : apiTool.title_uk) : tool.title;
-              const description = apiTool ? (isRu ? apiTool.desc_ru : isEn ? apiTool.desc_en : apiTool.desc_uk) : tool.description;
+              const disabled = !isToolEnabled(tool.id, toolsEnabled);
+              const texts = studioToolTexts(tool, apiTools);
+              const title = isRu ? texts.title_ru : isEn ? texts.title_en : texts.title_uk;
+              const description = isRu ? texts.desc_ru : isEn ? texts.desc_en : texts.desc_uk;
               return (
               <AnimatedSection key={tool.href} delay={i * 0.1}>
                 <Link href={tool.href} className="group block h-full">

@@ -24,7 +24,8 @@ function PageviewTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   useEffect(() => {
-    if (!pathname) return;
+    // The owner's admin visits aren't site traffic.
+    if (!pathname || pathname.startsWith("/admin")) return;
     const url = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : "");
     trackPageview(url);
   }, [pathname, searchParams]);
@@ -84,6 +85,8 @@ function IdentityTracker() {
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    // No analytics (autocapture included) inside the admin panel.
+    if (window.location.pathname.startsWith("/admin")) return;
     initPostHog();
   }, []);
 

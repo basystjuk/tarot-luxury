@@ -8,6 +8,7 @@
  */
 
 import type { ServiceItem } from "@/lib/data/services";
+import { jsonLd } from "@/lib/seo/json-ld";
 
 const SITE = "https://ellen-soul.com";
 
@@ -47,7 +48,7 @@ export default function ServiceSchema({
         <script
           key={i}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(d) }}
+          dangerouslySetInnerHTML={jsonLd(d)}
         />
       ))}
     </>

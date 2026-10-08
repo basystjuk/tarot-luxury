@@ -9,6 +9,8 @@
  * the user actually sees, and the canonical URL it links to.
  */
 
+import { jsonLd } from "@/lib/seo/json-ld";
+
 export interface Crumb { name: string; url: string }
 
 export default function Breadcrumbs({ items }: { items: Crumb[] }) {
@@ -26,7 +28,7 @@ export default function Breadcrumbs({ items }: { items: Crumb[] }) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={jsonLd(data)}
     />
   );
 }

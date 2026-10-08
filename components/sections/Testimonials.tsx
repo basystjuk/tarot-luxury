@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import { testimonials as DEFAULT_TESTIMONIALS, type Testimonial } from "@/lib/data/testimonials";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -22,6 +21,7 @@ function StarRating({ count }: { count: number }) {
 export default function Testimonials() {
   const { language } = useLanguage();
   const isRu = language === "ru";
+  const isEn = language === "en";
 
   const [testimonials, setTestimonials] = useState<Testimonial[]>(DEFAULT_TESTIMONIALS);
 
@@ -44,6 +44,13 @@ export default function Testimonials() {
         { value: "98%", label: "довольных клиенток" },
         { value: "12", label: "стран" },
       ]
+    : isEn
+    ? [
+        { value: "500+", label: "consultations" },
+        { value: "5+", label: "years of practice" },
+        { value: "98%", label: "happy clients" },
+        { value: "12", label: "countries" },
+      ]
     : [
         { value: "500+", label: "консультацій" },
         { value: "5+", label: "років практики" },
@@ -56,10 +63,10 @@ export default function Testimonials() {
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <AnimatedSection className="text-center mb-16">
           <span className="tag mb-4 inline-block">
-            {isRu ? "Отзывы" : "Відгуки"}
+            {isRu ? "Отзывы" : isEn ? "Reviews" : "Відгуки"}
           </span>
           <h2 className="text-4xl lg:text-5xl" style={{ fontFamily: "var(--font-cormorant)" }}>
-            {isRu ? "Что говорят клиентки" : "Що кажуть клієнтки"}
+            {isRu ? "Что говорят клиентки" : isEn ? "What clients say" : "Що кажуть клієнтки"}
           </h2>
         </AnimatedSection>
 
@@ -81,7 +88,7 @@ export default function Testimonials() {
                 <StarRating count={review.rating} />
 
                 <p className="text-[#5C4530] leading-relaxed flex-1 mb-6 text-base">
-                  {isRu ? review.text_ru : review.text_uk}
+                  {isRu ? review.text_ru : isEn ? (review.text_en?.trim() || review.text_uk) : review.text_uk}
                 </p>
 
                 <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[rgba(196,169,122,0.2)]">
@@ -115,13 +122,6 @@ export default function Testimonials() {
           </div>
         </AnimatedSection>
 
-        {visible.length > 3 && (
-          <AnimatedSection delay={0.4} className="text-center mt-10">
-            <Link href="/reviews" className="btn-outline">
-              {isRu ? "Все отзывы" : "Всі відгуки"}
-            </Link>
-          </AnimatedSection>
-        )}
       </div>
     </section>
   );

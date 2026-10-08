@@ -61,5 +61,8 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|og-image).*)'],
+  // `ingest` = the PostHog reverse proxy (next.config rewrites). Proxy runs
+  // before rewrites, so without this exclusion event POSTs to /ingest/e/
+  // (no dot in the path) were locale-redirected to /<lang>/ingest/e/ and lost.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|og-image|ingest).*)'],
 };

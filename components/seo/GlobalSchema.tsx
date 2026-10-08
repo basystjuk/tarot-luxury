@@ -15,11 +15,11 @@
  * Mounted once in the root layout so every page inherits these signals.
  */
 
+import { jsonLd } from "@/lib/seo/json-ld";
+
 const SITE = "https://ellen-soul.com";
 
-const json = (data: object) => ({
-  __html: JSON.stringify(data, null, 0),
-});
+const json = (data: object) => jsonLd(data);
 
 export default function GlobalSchema() {
   const organization = {

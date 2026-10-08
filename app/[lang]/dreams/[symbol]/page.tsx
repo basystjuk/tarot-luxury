@@ -16,6 +16,7 @@ import GoldDivider from "@/components/ui/GoldDivider";
 import Breadcrumbs from "@/components/seo/Breadcrumbs";
 import FaqSchema, { type FaqEntry } from "@/components/seo/FaqSchema";
 import { DREAM_SYMBOLS, SYMBOL_BY_SLUG, symbolName, ARCHETYPE_LABELS, type DreamSymbol } from "@/lib/dreams/symbols";
+import { jsonLd } from "@/lib/seo/json-ld";
 
 const SITE = "https://ellen-soul.com";
 const LANGS = ["uk", "ru", "en"] as const;
@@ -113,7 +114,7 @@ export default async function SymbolPage({ params }: { params: Promise<{ lang: s
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(article) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(article)} />
       <FaqSchema faqs={faq} />
       <Breadcrumbs items={[
         { name: home, url: `${SITE}/${lang}` },

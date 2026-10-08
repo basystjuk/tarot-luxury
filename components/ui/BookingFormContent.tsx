@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Send, CheckCircle } from 'lucide-react';
 import { useLanguage } from '@/hooks/useLanguage';
+import { DEFAULT_CONTACTS } from '@/lib/content-defaults';
 
 type ContactMethod = 'telegram' | 'whatsapp' | 'instagram';
 
@@ -87,11 +88,14 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
     : ['Одне питання', 'Розклад Амур', 'Онлайн таро сесія', 'Особистий запит'];
 
   const [dynamicTopics, setDynamicTopics] = useState<string[]>([]);
+  // Ellen's direct contacts — offered when a request can't be delivered.
+  const [contacts, setContacts] = useState(DEFAULT_CONTACTS);
 
   useEffect(() => {
     fetch('/api/content')
       .then(r => r.json())
       .then(data => {
+        if (data.contacts) setContacts({ ...DEFAULT_CONTACTS, ...data.contacts });
         if (data.services?.length) {
           const titles = data.services.map(
             (s: { title_ru: string; title_uk: string; title_en?: string }) =>
@@ -120,6 +124,7 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [contactError, setContactError] = useState('');
+  const [sendError, setSendError] = useState(false);
 
   useEffect(() => {
     if (defaultTopic) {
@@ -188,8 +193,10 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
     if (!contactValue) return;
 
     setLoading(true);
+    setSendError(false);
+    let delivered = false;
     try {
-      await fetch('/api/contact', {
+      const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,8 +209,17 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
           language,
         }),
       });
-    } catch { /* show success anyway */ }
+      delivered = res.ok;
+    } catch {
+      delivered = false;
+    }
     setLoading(false);
+    if (!delivered) {
+      // Never confirm a request Ellen didn't receive — keep the form filled
+      // and offer her direct contacts instead.
+      setSendError(true);
+      return;
+    }
     setSubmitted(true);
     onSuccess?.();
   };
@@ -386,6 +402,19 @@ export default function BookingFormContent({ defaultTopic, onSuccess }: Props) {
           className="input-luxury w-full resize-none"
         />
       </div>
+
+      {sendError && (
+        <div role="alert" className="rounded-xl border border-[rgba(196,169,122,0.5)] bg-[#F2EBD9] px-4 py-3 text-sm text-[#5C4530] leading-relaxed">
+          {isRu
+            ? 'Не удалось отправить заявку. Попробуйте ещё раз или напишите мне напрямую: '
+            : isEn
+            ? "Your request couldn't be sent. Please try again or message me directly: "
+            : 'Не вдалося надіслати заявку. Спробуйте ще раз або напишіть мені напряму: '}
+          <a href={contacts.telegram_url} target="_blank" rel="noopener noreferrer" className="underline text-[#B8883A]">Telegram</a>
+          {' · '}
+          <a href={contacts.whatsapp_url} target="_blank" rel="noopener noreferrer" className="underline text-[#B8883A]">WhatsApp</a>
+        </div>
+      )}
 
       <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
         {loading ? (

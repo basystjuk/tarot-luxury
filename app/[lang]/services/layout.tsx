@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { type Language, getTranslation } from '@/lib/i18n/translations';
 import ServiceSchema from '@/components/seo/ServiceSchema';
-import { DEFAULT_SERVICES } from '@/lib/data/services';
+import { DEFAULT_SERVICES, type ServiceItem } from '@/lib/data/services';
+import { getCachedPublicContent } from '@/lib/public-content';
 import Breadcrumbs from '@/components/seo/Breadcrumbs';
 
 const VALID_LANGS = ['uk', 'ru', 'en'] as const;
@@ -44,13 +45,17 @@ export default async function ServicesLayout({
   const { lang: rawLang } = await params;
   const lang = (VALID_LANGS.includes(rawLang as Language) ? rawLang : 'uk') as 'uk' | 'ru' | 'en';
   const home = lang === 'ru' ? 'Главная' : lang === 'en' ? 'Home' : 'Головна';
-  const services = lang === 'ru' ? 'Услуги' : lang === 'en' ? 'Services' : 'Послуги';
+  const servicesLabel = lang === 'ru' ? 'Услуги' : lang === 'en' ? 'Services' : 'Послуги';
+  // Prices and names as edited in the admin (what the page shows), not code defaults.
+  const content = await getCachedPublicContent();
+  const stored = content.services as ServiceItem[] | undefined;
+  const services = Array.isArray(stored) && stored.length > 0 ? stored : DEFAULT_SERVICES;
   return (
     <>
-      <ServiceSchema services={DEFAULT_SERVICES} lang={lang} />
+      <ServiceSchema services={services} lang={lang} />
       <Breadcrumbs items={[
         { name: home, url: `${SITE_URL}/${lang}` },
-        { name: services, url: `${SITE_URL}/${lang}/services` },
+        { name: servicesLabel, url: `${SITE_URL}/${lang}/services` },
       ]} />
       {children}
     </>

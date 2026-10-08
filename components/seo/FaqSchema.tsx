@@ -11,6 +11,8 @@
  * they do).
  */
 
+import { jsonLd } from "@/lib/seo/json-ld";
+
 export interface FaqEntry { q: string; a: string }
 
 export default function FaqSchema({ faqs }: { faqs: FaqEntry[] }) {
@@ -27,7 +29,7 @@ export default function FaqSchema({ faqs }: { faqs: FaqEntry[] }) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+      dangerouslySetInnerHTML={jsonLd(data)}
     />
   );
 }

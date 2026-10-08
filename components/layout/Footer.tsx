@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/hooks/useLanguage';
 import FooterScene from '@/components/celebration/FooterScene';
 
@@ -31,8 +32,12 @@ function TelegramIcon() {
 
 export default function Footer() {
   const { t, language } = useLanguage();
+  const pathname = usePathname();
   const isRu = language === 'ru';
   const isEn = language === 'en';
+
+  // Public site chrome only — not under the admin panel.
+  if (pathname?.startsWith('/admin')) return null;
 
   return (
     <footer className="relative overflow-hidden bg-[#1C1512] text-white/90">
