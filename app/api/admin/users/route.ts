@@ -10,25 +10,18 @@
  *   ?offset=<n>     — pagination offset
  *   ?sort=<field>   — created_at_desc (default) | created_at_asc | last_seen_desc
  *
- * Auth: preview cookie (ellen_preview) OR CRON_SECRET bearer.
+ * Auth: admin session OR CRON_SECRET bearer.
  *
  * Bypass RLS via service-role client — RLS protects regular user APIs
  * but admin work needs cross-row reads.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
+import { adminUnauthorized, isAdminOrCronRequest } from "@/lib/admin-auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
-function authorised(req: NextRequest): boolean {
-  if (isPreviewFromRequest(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return false;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  if (!isAdminOrCronRequest(req)) return adminUnauthorized();
 
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "no_admin_client" }, { status: 503 });

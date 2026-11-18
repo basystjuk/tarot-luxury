@@ -1,28 +1,31 @@
 /**
- * Preview mode — lets the site owner browse disabled tools and bypass
+ * Preview mode — lets the signed-in site owner browse disabled tools and bypass
  * AI-route rate limits without exposing them to the public.
  *
  * Implementation:
- *   - `ellen_preview`      — httpOnly cookie. Value = PREVIEW_SECRET. Server
+ *   - `ellen_preview`      — httpOnly cookie. Value = the preview secret. Server
  *                            routes trust this for gating (visibility + rate
- *                            limit bypass).
+ *                            limit bypass). It never grants admin API access.
  *   - `ellen_preview_ui`   — non-httpOnly mirror, value "1". Lets the client
  *                            know preview is on without exposing the secret.
  *
- * Toggling is done from the admin panel via `/api/admin/preview`.
+ * Toggled from the admin panel via `/api/admin/preview`, cleared at admin sign-out.
  */
+
+import { deriveSecret, safeEqual, usableAdminPassword } from "./admin-session";
 
 export const PREVIEW_COOKIE = "ellen_preview";
 export const PREVIEW_UI_COOKIE = "ellen_preview_ui";
 
-/** The cookie value the server checks against. Override via env in production. */
-export function getPreviewSecret(): string {
-  return (
-    process.env.PREVIEW_SECRET ||
-    // Stable fallback — different from ADMIN_PASSWORD so the admin secret never
-    // leaves the server. If you ever need to invalidate, set PREVIEW_SECRET.
-    "ellen-preview-2026"
-  );
+/**
+ * The cookie value the server checks against: PREVIEW_SECRET when it is long
+ * enough, otherwise derived from ADMIN_PASSWORD. Null keeps preview mode off.
+ */
+export function getPreviewSecret(): string | null {
+  const explicit = usableAdminPassword(process.env.PREVIEW_SECRET);
+  if (explicit) return explicit;
+  const password = usableAdminPassword(process.env.ADMIN_PASSWORD);
+  return password ? deriveSecret(password, "preview-cookie-v1") : null;
 }
 
 /** Server-side check based on a Request's `Cookie` header. */
@@ -37,20 +40,13 @@ export function isPreviewFromCookieString(cookieHeader: string | null | undefine
 }
 
 function cookieMatches(cookieHeader: string): boolean {
+  const secret = getPreviewSecret();
+  if (!secret) return false;
   const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${PREVIEW_COOKIE}=([^;]+)`));
   if (!match) return false;
   try {
-    return decodeURIComponent(match[1]) === getPreviewSecret();
+    return safeEqual(decodeURIComponent(match[1]), secret);
   } catch {
     return false;
   }
-}
-
-/** Client-side hint: presence of the UI mirror cookie (safe to read in JS). */
-export function isPreviewFromDocument(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.cookie
-    .split(";")
-    .map((c) => c.trim())
-    .some((c) => c === `${PREVIEW_UI_COOKIE}=1`);
 }

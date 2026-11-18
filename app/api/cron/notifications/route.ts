@@ -22,7 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { sendMessage, isTelegramConfigured } from "@/lib/telegram/bot";
+import { sendMessage, isTelegramConfigured, escapeHtml } from "@/lib/telegram/bot";
 import { sendPushToUser, isPushConfigured, type PushPayload } from "@/lib/push/send";
 import {
   dateToJD, calcPlanetDeg, findNextLunarReturn, jdToDate,
@@ -258,7 +258,7 @@ function phasePeakMessage(p: { type: "new" | "full"; date: Date }, moonSignIdx: 
 }
 
 function solarReturnMessage(name: string | null): string {
-  const greet = name ? `, ${name}` : "";
+  const greet = name ? `, ${escapeHtml(name)}` : "";
   return `<b>☀️ Твоє Соляне повернення</b>\n\n` +
     `З Днем народження${greet}! Сьогодні Сонце повертається у точку, де воно сяяло у мить твого народження — ` +
     `починається твій новий особистий рік.\n\n` +

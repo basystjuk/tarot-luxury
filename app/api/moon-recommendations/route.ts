@@ -3,13 +3,13 @@ import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
+import { readJsonBody } from "@/lib/request-limits";
 
 export const maxDuration = 30;
 
 // Per-user daily limit (Phase В policy: AI = signed-in only). Separate
 // bucket from /api/moon-reading so a user can still pull a reading after
 // using recommendations.
-const userMap = new Map<string, { day: string }>();
 
 interface Recommendation {
   name: string;
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (!isPreviewFromRequest(req)) {
     const gate = await requireAiAuth();
     if (gate.deny) return gate.deny;
-    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+    if (!(await checkPerUserDailyRate("moon-recommendations", gate.user!.id))) {
       return NextResponse.json(
         { error: "rate_limit", message: "Ліміт 1 запит на добу вичерпано." },
         { status: 429 }
@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { language, moonSign, moonSignEn, element } = await req.json();
+  const parsed = await readJsonBody(req);
+  if (parsed.deny) return parsed.deny;
+  const { language, moonSign, moonSignEn, element } = parsed.data;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {

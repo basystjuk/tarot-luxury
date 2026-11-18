@@ -10,24 +10,17 @@ import {
 } from "@/lib/content-store";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { CONTENT_CACHE_TAG } from "@/lib/public-content";
-import { isPreviewReadOnly, previewWriteBlocked } from "@/lib/admin-auth";
+import { adminUnauthorized, isAdminRequest, isPreviewReadOnly, previewWriteBlocked } from "@/lib/admin-auth";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
 /** Version (ETag) of the document the editor's changes are based on. */
 const VERSION_HEADER = "x-content-version";
 const NO_STORE = { "Cache-Control": "no-store" };
-
-function authorised(req: NextRequest): boolean {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
 
 // GET — the stored document for the admin editor, read past every cache,
 // with its version. Unlike the public /api/content it fails loudly: an editor
 // that silently fell back to defaults would overwrite the real site on save.
 export async function GET(req: NextRequest) {
-  if (!authorised(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return adminUnauthorized();
   const store = getContentStore();
   if (!store) {
     return NextResponse.json({ error: "Blob storage not configured" }, { status: 503 });
@@ -62,9 +55,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!authorised(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return adminUnauthorized();
   const store = getContentStore();
   if (!store) {
     return NextResponse.json({ error: "Blob storage not configured" }, { status: 503 });

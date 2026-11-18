@@ -1,15 +1,60 @@
 /**
- * Admin API access check shared by the admin routes added with the redesigned
- * panel. Same rule the older admin routes use (x-admin-password header) —
- * kept in one place so replacing it with per-person accounts touches one file.
+ * Admin API access. Every admin route goes through this file.
+ *
+ * Sign-in happens on the server (/api/admin/login) and leaves an httpOnly,
+ * signed session cookie. The password never reaches browser code, and there is
+ * no built-in fallback: without a strong ADMIN_PASSWORD admin stays closed.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  ADMIN_SESSION_MAX_AGE_SECONDS,
+  createAdminSessionToken,
+  isValidAdminSessionToken,
+  safeEqual,
+  usableAdminPassword,
+} from "@/lib/admin-session";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
+export const ADMIN_SESSION_COOKIE = "ellen_admin";
+
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict",
+  // Only the admin API ever needs to see this cookie.
+  path: "/api/admin",
+} as const;
+
+export function adminPassword(): string | null {
+  return usableAdminPassword(process.env.ADMIN_PASSWORD);
+}
 
 export function isAdminRequest(req: NextRequest): boolean {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
+  const password = adminPassword();
+  if (!password) return false;
+  return isValidAdminSessionToken(password, req.cookies.get(ADMIN_SESSION_COOKIE)?.value);
+}
+
+/** Admin session, or the cron bearer secret for scripts. */
+export function isAdminOrCronRequest(req: NextRequest): boolean {
+  if (isAdminRequest(req)) return true;
+  const secret = process.env.CRON_SECRET;
+  return Boolean(secret) && safeEqual(req.headers.get("authorization") ?? "", `Bearer ${secret}`);
+}
+
+export function adminUnauthorized(): NextResponse {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+}
+
+export function setAdminSessionCookie(res: NextResponse, password: string): void {
+  res.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(password), {
+    ...SESSION_COOKIE_OPTIONS,
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+  });
+}
+
+export function clearAdminSessionCookie(res: NextResponse): void {
+  res.cookies.set(ADMIN_SESSION_COOKIE, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
 }
 
 /**

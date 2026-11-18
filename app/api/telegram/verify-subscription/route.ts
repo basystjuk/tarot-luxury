@@ -12,6 +12,7 @@
 
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isChannelMember, isTelegramConfigured } from "@/lib/telegram/bot";
 
 export async function POST() {
@@ -38,7 +39,10 @@ export async function POST() {
     return NextResponse.json({ error: "check_failed" }, { status: 502 });
   }
 
-  await supa
+  // Server-verified field: users have no write access to it (migration 0008).
+  const admin = getSupabaseAdmin();
+  if (!admin) return NextResponse.json({ error: "not_configured" }, { status: 503 });
+  await admin
     .from("profiles")
     .update({
       subscribed_to_channel: isMember,

@@ -11,9 +11,9 @@ import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
+import { readJsonBody } from "@/lib/request-limits";
 
 export const maxDuration = 30;
-const userMap = new Map<string, { day: string }>();
 
 interface Body {
   language: string;
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   if (!isPreviewFromRequest(req)) {
     const gate = await requireAiAuth();
     if (gate.deny) return gate.deny;
-    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+    if (!(await checkPerUserDailyRate("natal-chart-portrait", gate.user!.id))) {
       return NextResponse.json(
         { error: "rate_limit", message: "1 натальний портрет на добу. Повертайся завтра ✨" },
         { status: 429 }
@@ -40,9 +40,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let body: Body;
-  try { body = (await req.json()) as Body; }
-  catch { return NextResponse.json({ error: "bad_json" }, { status: 400 }); }
+  const parsed = await readJsonBody<Body>(req);
+  if (parsed.deny) return parsed.deny;
+  const body = parsed.data;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "not_configured" }, { status: 500 });

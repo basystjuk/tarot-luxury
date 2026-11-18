@@ -2,7 +2,7 @@
  * POST /api/admin/setup-telegram-webhook
  *
  * One-shot bootstrap that calls Telegram's setWebhook with our handler URL
- * and the secret token from env. Admin-only (preview cookie gate).
+ * and the secret token from env. Admin session or CRON_SECRET bearer.
  *
  * Why a route and not a manual curl: we never expose TELEGRAM_BOT_TOKEN
  * to the developer's laptop (Vercel encrypts production secrets and
@@ -14,8 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
-import { isPreviewReadOnly } from "@/lib/admin-auth";
+import { isAdminOrCronRequest, isPreviewReadOnly } from "@/lib/admin-auth";
 
 export const maxDuration = 15;
 
@@ -27,19 +26,9 @@ interface SetupResult {
   error?: string;
 }
 
-function authorised(req: NextRequest): boolean {
-  // Two auth paths: admin preview cookie (browser) OR CRON_SECRET bearer
-  // (CLI / scripts). The bearer is the same secret used by Vercel Cron,
-  // so it's already in env and rotated alongside cron auth.
-  if (isPreviewFromRequest(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse<SetupResult>> {
-  if (!authorised(req)) {
-    return NextResponse.json({ configured: false, error: "unauthorized" }, { status: 404 });
+  if (!isAdminOrCronRequest(req)) {
+    return NextResponse.json({ configured: false, error: "Unauthorized" }, { status: 401 });
   }
   // Re-registering the webhook from a preview would repoint the live bot.
   if (isPreviewReadOnly()) {
@@ -89,8 +78,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<SetupResult>>
 
 // Also expose GET that just reports current state (no mutation)
 export async function GET(req: NextRequest) {
-  if (!authorised(req)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 404 });
+  if (!isAdminOrCronRequest(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return NextResponse.json({ error: "no_token" }, { status: 503 });

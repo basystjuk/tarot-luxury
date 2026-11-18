@@ -4,22 +4,15 @@
  * Full per-user detail for the admin user panel: profile + notification
  * preferences + last 30 tarot pulls + last 20 notifications sent.
  *
- * Auth: same as the list endpoint (preview cookie or CRON_SECRET).
+ * Auth: same as the list endpoint (admin session or CRON_SECRET).
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
+import { adminUnauthorized, isAdminOrCronRequest } from "@/lib/admin-auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
-function authorised(req: NextRequest): boolean {
-  if (isPreviewFromRequest(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return false;
-}
-
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  if (!isAdminOrCronRequest(req)) return adminUnauthorized();
 
   const { id } = await ctx.params;
   if (!/^[0-9a-f-]{30,}$/i.test(id)) {

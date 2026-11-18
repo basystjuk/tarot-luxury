@@ -11,12 +11,12 @@
  *   if (gate.deny) return gate.deny; // already a NextResponse 401/503
  *   const user = gate.user;          // typed Supabase user
  *
- * Also returns a per-user rate-limit helper bound to a Map you pass in.
+ * Also exports the per-user daily quota check.
  */
 
 import { NextResponse } from "next/server";
-import { studioDayISO } from "@/lib/time/day";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { consumeDailyQuota } from "@/lib/rate-limit";
 
 type SupabaseUser = { id: string; email?: string };
 
@@ -52,17 +52,11 @@ export async function requireAiAuth(): Promise<AuthGateResult> {
 }
 
 /**
- * Per-user "1 request per Kyiv day" rate limit.
- * Caller owns the Map (so each endpoint has its own quota space).
+ * Per-user "1 request per Kyiv day" limit, shared by all server instances.
+ * Each tool has its own quota.
  *
  * Returns true if allowed, false if blocked (the caller should respond 429).
  */
-export function checkPerUserDailyRate(map: Map<string, { day: string }>, userId: string): boolean {
-  const today = studioDayISO();
-  const entry = map.get(userId);
-  if (!entry || entry.day !== today) {
-    map.set(userId, { day: today });
-    return true;
-  }
-  return false;
+export function checkPerUserDailyRate(tool: string, userId: string): Promise<boolean> {
+  return consumeDailyQuota(tool, userId);
 }

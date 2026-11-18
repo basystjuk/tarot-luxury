@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAiAuth } from "@/lib/auth/gate";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isAllowedPushEndpoint, isValidPushKey } from "@/lib/push/endpoint";
+import { readJsonBody } from "@/lib/request-limits";
 
 interface Body {
   subscription: {
@@ -23,19 +25,18 @@ export async function POST(req: NextRequest) {
   const gate = await requireAiAuth();
   if (gate.deny) return gate.deny;
 
-  let body: Body;
-  try { body = (await req.json()) as Body; }
-  catch { return NextResponse.json({ error: "bad_json" }, { status: 400 }); }
+  const parsed = await readJsonBody<Body>(req, 4 * 1024);
+  if (parsed.deny) return parsed.deny;
 
-  const sub = body.subscription;
-  if (!sub?.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) {
+  const sub = parsed.data.subscription;
+  if (!isAllowedPushEndpoint(sub?.endpoint) || !isValidPushKey(sub.keys?.p256dh) || !isValidPushKey(sub.keys?.auth)) {
     return NextResponse.json({ error: "bad_subscription" }, { status: 400 });
   }
 
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "no_admin" }, { status: 500 });
 
-  const ua = req.headers.get("user-agent") || null;
+  const ua = req.headers.get("user-agent")?.slice(0, 300) || null;
   const { error } = await admin.from("push_subscriptions").upsert({
     endpoint:     sub.endpoint,
     user_id:      gate.user!.id,

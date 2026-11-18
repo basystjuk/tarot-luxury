@@ -16,12 +16,12 @@ import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
+import { cleanText, readJsonBody } from "@/lib/request-limits";
 import { detectSymbols, analyzeDream } from "@/lib/dreams/analyze";
 import { symbolName } from "@/lib/dreams/symbols";
 import { lunarState } from "@/lib/astro/moon-state";
 
 export const maxDuration = 30;
-const userMap = new Map<string, { day: string }>();
 
 interface Body {
   language: "uk" | "ru" | "en";
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   if (!isPreviewFromRequest(req)) {
     const gate = await requireAiAuth();
     if (gate.deny) return gate.deny;
-    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+    if (!(await checkPerUserDailyRate("dream-reading", gate.user!.id))) {
       return NextResponse.json(
         { error: "rate_limit", message: "1 глибокий аналіз сну на добу. Повертайся завтра ✨" },
         { status: 429 }
@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let body: Body;
-  try { body = (await req.json()) as Body; }
-  catch { return NextResponse.json({ error: "bad_json" }, { status: 400 }); }
+  const parsed = await readJsonBody<Body>(req);
+  if (parsed.deny) return parsed.deny;
+  const body = parsed.data;
 
-  const dream = (body.dream ?? "").trim();
+  const dream = cleanText(body.dream, 2500);
   if (dream.length < 8) return NextResponse.json({ error: "too_short" }, { status: 400 });
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   const tpl = resolvePrompt("dream-reading", overrides);
   const vars: Record<string, string | undefined> = {
     language_name: getLanguageName(lang),
-    name: body.name?.trim() || "",
+    name: cleanText(body.name, 80),
     dreamText: dream.slice(0, 2500),
     symbols: symbolsStr,
     tone: analysis.tone,

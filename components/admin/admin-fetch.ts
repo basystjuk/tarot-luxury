@@ -1,16 +1,17 @@
 /**
  * Client-side calls to the admin API.
  *
- * Access still relies on the shared admin password header (to be replaced by
- * per-person accounts) — kept in this one module rather than in every page.
+ * Access relies on the httpOnly session cookie set by /api/admin/login. No
+ * password or secret belongs in this file: everything here ships to the browser.
  */
 
-export const ADMIN_PASSWORD = "ellensoul2025";
+/** Fired when the server no longer accepts the session, to show sign-in again. */
+export const ADMIN_SESSION_EXPIRED_EVENT = "ellen-admin-session-expired";
 
-export function adminFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(init.headers);
-  headers.set("x-admin-password", ADMIN_PASSWORD);
-  return fetch(input, { cache: "no-store", ...init, headers });
+export async function adminFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(input, { cache: "no-store", ...init });
+  if (res.status === 401) window.dispatchEvent(new Event(ADMIN_SESSION_EXPIRED_EVENT));
+  return res;
 }
 
 /** Plain-language versions of the API's error codes. */
@@ -42,18 +43,6 @@ export async function responseError(res: Response): Promise<string> {
   } catch {
     return `${res.status}: ${res.statusText || "Unknown"}`;
   }
-}
-
-/**
- * The users/videos admin APIs authorise via the preview cookie — set it before
- * calling them (idempotent). Awaited, so the first request never races it.
- */
-export async function ensureAdminCookie(): Promise<void> {
-  await adminFetch("/api/admin/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled: true }),
-  });
 }
 
 /** Lets the browser save `data` as a JSON file. */

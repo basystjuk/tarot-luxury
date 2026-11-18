@@ -6,9 +6,9 @@
  * Telegram message to one user.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, Search, Send, Users } from "lucide-react";
-import { adminFetch, ensureAdminCookie, responseError } from "@/components/admin/admin-fetch";
+import { adminFetch, responseError } from "@/components/admin/admin-fetch";
 import { formatDateTime } from "@/components/admin/format";
 import { Badge, Button, Card, EmptyState, Notice, PageHeader, Skeleton, TextAreaField, useConfirm, useToast } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
@@ -209,12 +209,9 @@ export default function UsersPage() {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const cookieReady = useRef<Promise<void> | null>(null);
 
   const load = useCallback(async (q: string, from: number) => {
     try {
-      cookieReady.current ??= ensureAdminCookie();
-      await cookieReady.current;
       const params = new URLSearchParams({ limit: String(PAGE), offset: String(from) });
       if (q.trim()) params.set("q", q.trim());
       const res = await adminFetch(`/api/admin/users?${params}`);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
+import { readJsonBody } from "@/lib/request-limits";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 
@@ -9,7 +9,6 @@ export const maxDuration = 30;
 
 // Rate limit: 1 synthesis per IP per Kyiv calendar day
 // Per-user daily limit (Phase В policy: AI = signed-in only).
-const userMap = new Map<string, { day: string }>();
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -168,9 +167,6 @@ function splitSections(raw: string): { intro: string; portrait: string } {
 }
 
 export async function POST(req: NextRequest) {
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-
   // ── Auth gate (Phase В policy) ──────────────────────────────────────────
   // Preview-cookie bypasses the gate entirely (owner iteration).
   // Anonymous users → 401 with auth_required so the UI can offer sign-in.
@@ -178,17 +174,19 @@ export async function POST(req: NextRequest) {
   if (!isPreviewFromRequest(req)) {
     const gate = await requireAiAuth();
     if (gate.deny) return gate.deny;
-    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+    if (!(await checkPerUserDailyRate("numerology-synthesis", gate.user!.id))) {
       return NextResponse.json(
         { error: "rate_limit", message: "Ліміт 1 синтез на добу вичерпано. Повертайтесь завтра 🌙" },
         { status: 429 }
       );
     }
-    void ip; // keep parameter for legacy logging analysis
   }
 
+  const parsed = await readJsonBody<SynthesisRequest>(req);
+  if (parsed.deny) return parsed.deny;
+
   try {
-    const data = (await req.json()) as SynthesisRequest;
+    const data = parsed.data;
 
     const { numbersBlock, extrasBlock } = buildPromptVars(data);
     const overrides = (await loadPromptOverrides()) as PromptOverrides | null;

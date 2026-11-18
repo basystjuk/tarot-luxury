@@ -15,26 +15,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { studioDayISO } from "@/lib/time/day";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { consumeDailyQuota } from "@/lib/rate-limit";
+import { readJsonBody } from "@/lib/request-limits";
 
 export const maxDuration = 30;
-
-// Per-user, per-Kyiv-day in-memory rate limiting. Restored across cold
-// starts via DB lookup of "numerology_activation:<day>" in notification_log
-// would be more robust — kept in-memory for now (single Vercel instance
-// regional dominance + low traffic = good enough).
-const userMap = new Map<string, { day: string }>();
-// Day key comes from lib/time/day — one implementation, one format (ISO).
-// Four copies used to exist in two different formats.
-function checkRate(userId: string): boolean {
-  const today = studioDayISO();
-  const e = userMap.get(userId);
-  if (!e || e.day !== today) { userMap.set(userId, { day: today }); return true; }
-  return false;
-}
 
 interface Body {
   name: string;
@@ -61,16 +48,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!checkRate(user.id)) {
+  if (!(await consumeDailyQuota("numerology-activation", user.id))) {
     return NextResponse.json(
       { error: "rate_limit", message: "Ліміт 1 активація на добу." },
       { status: 429 }
     );
   }
 
-  let body: Body;
-  try { body = (await req.json()) as Body; }
-  catch { return NextResponse.json({ error: "bad_json" }, { status: 400 }); }
+  const parsed = await readJsonBody<Body>(req);
+  if (parsed.deny) return parsed.deny;
+  const body = parsed.data;
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "not_configured" }, { status: 500 });

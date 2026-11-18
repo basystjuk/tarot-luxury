@@ -14,6 +14,7 @@
 
 import webpush, { type PushSubscription as WebPushSubscription } from "web-push";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isAllowedPushEndpoint } from "@/lib/push/endpoint";
 
 export interface PushPayload {
   title: string;
@@ -22,6 +23,10 @@ export interface PushPayload {
   tag?: string;       // collapses duplicates of the same kind
   icon?: string;
 }
+
+/** A slow push service must not stall the daily fan-out for everyone else. */
+const SEND_TIMEOUT_MS = 5000;
+const MAX_SUBSCRIPTIONS_PER_USER = 10;
 
 let configured = false;
 function ensureConfigured(): boolean {
@@ -58,7 +63,9 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   const { data: subs } = await admin
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .order("last_seen_at", { ascending: false })
+    .limit(MAX_SUBSCRIPTIONS_PER_USER);
 
   if (!subs || subs.length === 0) return 0;
 
@@ -67,12 +74,17 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   const stale: string[] = [];
 
   await Promise.all((subs as SubRow[]).map(async (s) => {
+    // Rows can also arrive straight through the public API, so check here too.
+    if (!isAllowedPushEndpoint(s.endpoint)) {
+      stale.push(s.endpoint);
+      return;
+    }
     const subscription: WebPushSubscription = {
       endpoint: s.endpoint,
       keys: { p256dh: s.p256dh, auth: s.auth },
     };
     try {
-      await webpush.sendNotification(subscription, json, { TTL: 24 * 3600 });
+      await webpush.sendNotification(subscription, json, { TTL: 24 * 3600, timeout: SEND_TIMEOUT_MS });
       delivered++;
     } catch (e: unknown) {
       const code = (e as { statusCode?: number })?.statusCode;

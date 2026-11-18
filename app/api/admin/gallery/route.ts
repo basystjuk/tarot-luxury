@@ -1,16 +1,11 @@
 import { put, del, list } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { GALLERY_PREFIX, galleryExtension, isGalleryImagePathname } from "@/lib/gallery";
-import { previewWriteBlocked } from "@/lib/admin-auth";
+import { adminUnauthorized, isAdminRequest, previewWriteBlocked } from "@/lib/admin-auth";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
 const META_PATHNAME = "gallery-meta.json";
 
 type GalleryMeta = Record<string, { position?: "top" | "center" | "bottom" }>;
-
-function auth(req: NextRequest): boolean {
-  return req.headers.get("x-admin-password") === ADMIN_PASSWORD;
-}
 
 // Reuse an existing list result to extract meta — avoids extra list() call
 async function readMetaFromBlobs(blobs: { url: string; pathname: string }[]): Promise<GalleryMeta> {
@@ -38,7 +33,7 @@ async function writeMeta(meta: GalleryMeta): Promise<void> {
 // GET — the gallery for the admin, straight from storage (the public
 // /api/gallery is CDN-cached, so a fresh upload wouldn't show up there yet)
 export async function GET(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminRequest(req)) return adminUnauthorized();
   if (!process.env.BLOB_READ_WRITE_TOKEN)
     return NextResponse.json({ error: "Blob not configured" }, { status: 503 });
   try {
@@ -63,7 +58,7 @@ export async function GET(req: NextRequest) {
 
 // POST — upload a new gallery image
 export async function POST(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminRequest(req)) return adminUnauthorized();
   const blocked = previewWriteBlocked();
   if (blocked) return blocked;
   if (!process.env.BLOB_READ_WRITE_TOKEN)
@@ -89,7 +84,7 @@ export async function POST(req: NextRequest) {
 
 // PATCH — update photo position metadata
 export async function PATCH(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminRequest(req)) return adminUnauthorized();
   const blocked = previewWriteBlocked();
   if (blocked) return blocked;
   if (!process.env.BLOB_READ_WRITE_TOKEN)
@@ -110,7 +105,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE — remove a gallery image by pathname query param
 export async function DELETE(req: NextRequest) {
-  if (!auth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminRequest(req)) return adminUnauthorized();
   const blocked = previewWriteBlocked();
   if (blocked) return blocked;
   if (!process.env.BLOB_READ_WRITE_TOKEN)

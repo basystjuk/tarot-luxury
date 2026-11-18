@@ -17,19 +17,16 @@ import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } 
 import { loadPromptOverrides } from "@/lib/server-content";
 import { getMeaning } from "@/lib/data/tarot-meanings";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
+import { cleanText, readJsonBody } from "@/lib/request-limits";
 
 export const maxDuration = 30;
-
-// Per-user daily limit. Clarify is "secondary AI" on the daily card —
-// Phase В policy puts everything except the first card draw behind sign-in.
-const userMap = new Map<string, { day: string }>();
 
 export async function POST(req: NextRequest) {
   // Auth gate per Phase В: only the first daily-card draw is anonymous.
   if (!isPreviewFromRequest(req)) {
     const gate = await requireAiAuth();
     if (gate.deny) return gate.deny;
-    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+    if (!(await checkPerUserDailyRate("tarot-clarify", gate.user!.id))) {
       return NextResponse.json(
         { error: "rate_limit", message: "Ліміт 1 уточнення на добу вичерпано." },
         { status: 429 }
@@ -37,8 +34,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { cardName, language, reversed = false, previousReading = "", userQuestion = "" } = await req.json();
-  if (!userQuestion.trim()) {
+  const parsed = await readJsonBody(req);
+  if (parsed.deny) return parsed.deny;
+  const { language, reversed = false } = parsed.data;
+  const cardName = cleanText(parsed.data.cardName, 80);
+  const previousReading = cleanText(parsed.data.previousReading, 4000);
+  const userQuestion = cleanText(parsed.data.userQuestion, 240);
+  if (!userQuestion) {
     return NextResponse.json({ error: "no_question" }, { status: 400 });
   }
 
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
     language_name: getLanguageName(language),
     cardName, orientation,
     previousReading,
-    userQuestion: userQuestion.trim(),
+    userQuestion,
     canonicalCore,
   };
   const SYSTEM_PROMPT = renderTemplate(tpl.system, vars);

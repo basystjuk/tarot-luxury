@@ -7,7 +7,7 @@
     "build": "rm -rf .next/cache && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsc -p tsconfig.test.json && node .test-build/lib/astro/__invariants__.js && node .test-build/lib/numerology/__sanity__.js && node .test-build/lib/__sanity__/content.js",
+    "test": "tsc -p tsconfig.test.json && node .test-build/lib/astro/__invariants__.js && node .test-build/lib/numerology/__sanity__.js && node .test-build/lib/__sanity__/content.js && node .test-build/lib/__sanity__/security.js",
     "test:astro": "tsc -p tsconfig.test.json && node .test-build/lib/astro/__invariants__.js"
   },
   "dependencies": {
@@ -23,7 +23,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.16.0",
-    "next": "16.2.6",
+    "next": "16.4.6",
     "next-themes": "^0.4.6",
     "posthog-js": "^1.376.0",
     "react": "19.2.4",
@@ -39,7 +39,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -5,27 +5,19 @@
  * (same logic as the hourly cron). Useful right after publishing a new
  * video and not wanting to wait an hour for it to surface.
  *
- * Auth: preview cookie OR CRON_SECRET bearer.
+ * Auth: admin session OR CRON_SECRET bearer.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { syncChannel } from "@/lib/youtube/sync";
 import { indexNowSubmit, journalUrls } from "@/lib/seo/indexnow";
-import { previewWriteBlocked } from "@/lib/admin-auth";
+import { adminUnauthorized, isAdminOrCronRequest, previewWriteBlocked } from "@/lib/admin-auth";
 
 export const maxDuration = 30;
 
-function authorised(req: NextRequest): boolean {
-  if (isPreviewFromRequest(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return false;
-}
-
 export async function POST(req: NextRequest) {
-  if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  if (!isAdminOrCronRequest(req)) return adminUnauthorized();
   const blocked = previewWriteBlocked();
   if (blocked) return blocked;
   const apiKey = process.env.YOUTUBE_API_KEY;

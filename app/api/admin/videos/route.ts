@@ -4,25 +4,17 @@
  *   GET  — list ALL videos (including hidden), newest first
  *   PATCH — { id, hidden?, tool_pick?, tags? } update moderation fields
  *
- * Auth: preview cookie OR CRON_SECRET bearer (same pattern as users admin).
+ * Auth: admin session OR CRON_SECRET bearer (same pattern as users admin).
  * Service-role client bypasses RLS so we can see hidden rows too.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { ALL_TOOL_IDS, type ToolId } from "@/lib/tools-config";
-import { previewWriteBlocked } from "@/lib/admin-auth";
-
-function authorised(req: NextRequest): boolean {
-  if (isPreviewFromRequest(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return false;
-}
+import { adminUnauthorized, isAdminOrCronRequest, previewWriteBlocked } from "@/lib/admin-auth";
 
 export async function GET(req: NextRequest) {
-  if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  if (!isAdminOrCronRequest(req)) return adminUnauthorized();
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "no_admin_client" }, { status: 503 });
 
@@ -36,7 +28,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  if (!isAdminOrCronRequest(req)) return adminUnauthorized();
   const blocked = previewWriteBlocked();
   if (blocked) return blocked;
   const admin = getSupabaseAdmin();

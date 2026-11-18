@@ -4,17 +4,16 @@ import {
   PREVIEW_UI_COOKIE,
   getPreviewSecret,
 } from "@/lib/preview";
+import { adminUnauthorized, isAdminRequest } from "@/lib/admin-auth";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "ellensoul2025";
 // 90 days — long enough that the owner doesn't have to re-enable every visit,
 // short enough that an abandoned device eventually loses access.
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
 
 export async function POST(req: NextRequest) {
-  const password = req.headers.get("x-admin-password");
-  if (password !== ADMIN_PASSWORD) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!isAdminRequest(req)) return adminUnauthorized();
+  const secret = getPreviewSecret();
+  if (!secret) return NextResponse.json({ error: "not_configured" }, { status: 503 });
 
   let body: { enabled?: boolean } = {};
   try {
@@ -27,7 +26,7 @@ export async function POST(req: NextRequest) {
   const res = NextResponse.json({ ok: true, preview: enable });
 
   if (enable) {
-    res.cookies.set(PREVIEW_COOKIE, getPreviewSecret(), {
+    res.cookies.set(PREVIEW_COOKIE, secret, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",

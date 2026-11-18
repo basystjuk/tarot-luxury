@@ -1,50 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { studioDayISO } from "@/lib/time/day";
-import { headers } from "next/headers";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } from "@/lib/ai-prompts";
 import { loadPromptOverrides } from "@/lib/server-content";
 import { getMeaning } from "@/lib/data/tarot-meanings";
+import { clientIp, consumeDailyQuota } from "@/lib/rate-limit";
+import { cleanText, readJsonBody } from "@/lib/request-limits";
 
 export const maxDuration = 30;
 
-// Rate limit: 1 reading per IP per Kyiv calendar day
-const ipMap = new Map<string, { day: string }>();
-
-// Day key comes from lib/time/day — one implementation, one format (ISO).
-// Four copies used to exist in two different formats.
-
-function checkRateLimit(ip: string): boolean {
-  const today = studioDayISO();
-  const entry = ipMap.get(ip);
-  if (!entry || entry.day !== today) {
-    ipMap.set(ip, { day: today });
-    return true;
-  }
-  return false;
-}
+// Anonymous endpoint: 1 reading per IP per Kyiv calendar day, small bodies only.
+const BODY_LIMIT_BYTES = 4 * 1024;
 
 export async function POST(req: NextRequest) {
-  const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-
   // Preview mode (admin cookie) bypasses rate limit so the owner can keep
   // iterating on prompts without burning the public daily quota.
-  if (!isPreviewFromRequest(req) && !checkRateLimit(ip)) {
+  if (!isPreviewFromRequest(req) && !(await consumeDailyQuota("tarot-reading", clientIp(req)))) {
     return NextResponse.json(
       { error: "rate_limit", message: "Ліміт 1 запит на добу вичерпано." },
       { status: 429 }
     );
   }
 
-  const {
-    cardName,
-    language,
-    arcanaType,
-    suitElement,
-    reversed = false,
-    userQuestion = "",
-  } = await req.json();
+  const parsed = await readJsonBody(req, BODY_LIMIT_BYTES);
+  if (parsed.deny) return parsed.deny;
+  const { language, arcanaType, reversed = false } = parsed.data;
+  const cardName = cleanText(parsed.data.cardName, 80);
+  const suitElement = cleanText(parsed.data.suitElement, 20);
+  const userQuestion = cleanText(parsed.data.userQuestion, 240);
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -92,7 +74,7 @@ export async function POST(req: NextRequest) {
     canonicalPsychology,
     canonicalAdvice,
     canonicalKeywords,
-    userQuestion: typeof userQuestion === "string" ? userQuestion.trim() : "",
+    userQuestion,
   };
   const SYSTEM_PROMPT = renderTemplate(tpl.system, vars);
   const prompt = renderTemplate(tpl.user, vars);

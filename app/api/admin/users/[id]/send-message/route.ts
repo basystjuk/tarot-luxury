@@ -11,20 +11,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sendMessage, isTelegramConfigured, escapeHtml } from "@/lib/telegram/bot";
-import { previewWriteBlocked } from "@/lib/admin-auth";
-
-function authorised(req: NextRequest): boolean {
-  if (isPreviewFromRequest(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") === `Bearer ${secret}`) return true;
-  return false;
-}
+import { adminUnauthorized, isAdminOrCronRequest, previewWriteBlocked } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  if (!authorised(req)) return new NextResponse("Not found", { status: 404 });
+  if (!isAdminOrCronRequest(req)) return adminUnauthorized();
   const blocked = previewWriteBlocked();
   if (blocked) return blocked;
   if (!isTelegramConfigured()) {

@@ -6,19 +6,16 @@
  *   - posthog_host            — what the SDK is pointed at
  *   - posthog_reachable       — can we hit the EU ingest from the server?
  *
- * Protected by the admin preview cookie. If you don't have the cookie,
- * the route 404s (no info leak about its existence).
+ * Requires an admin session.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { isPreviewFromRequest } from "@/lib/preview";
+import { adminUnauthorized, isAdminRequest } from "@/lib/admin-auth";
 
 export const maxDuration = 15;
 
 export async function GET(req: NextRequest) {
-  if (!isPreviewFromRequest(req)) {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  if (!isAdminRequest(req)) return adminUnauthorized();
 
   const key  = process.env.NEXT_PUBLIC_POSTHOG_KEY  ?? "";
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "";

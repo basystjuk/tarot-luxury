@@ -3,14 +3,17 @@
 
 ## Секрети (НІКОЛИ в git/клієнтський код/чат)
 - Прод-значення — **у Vercel env**; локально — `.env.local` (у .gitignore). `.env.example` — шаблон без значень (він і є документація).
-- Server-only: `TELEGRAM_BOT_TOKEN` · `SUPABASE_SERVICE_ROLE_KEY` · `GROQ_API_KEY` · `CRON_SECRET` · `TELEGRAM_WEBHOOK_SECRET` · `BLOB_READ_WRITE_TOKEN` · `ADMIN_PREVIEW_SECRET`.
+- Server-only: `TELEGRAM_BOT_TOKEN` · `SUPABASE_SERVICE_ROLE_KEY` · `GROQ_API_KEY` · `CRON_SECRET` · `TELEGRAM_WEBHOOK_SECRET` · `BLOB_READ_WRITE_TOKEN` · `ADMIN_PASSWORD` · `PREVIEW_SECRET`.
+- **Жодних запасних значень секретів у коді** (`?? "пароль"`): немає секрету = функція закрита.
 - Публічні за дизайном: `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY` (RLS-гейт), `NEXT_PUBLIC_POSTHOG_*`.
 - **Рев'ю-чек:** секретне імʼя не зустрічається в `'use client'`-файлах і не має префікса NEXT_PUBLIC.
 - Компрометація секрету = **пожежний виняток** (поза чергою): відкликати/перевипустити ОДРАЗУ (BotFather / Supabase / Groq), потім розбір. (Урок GrandKeram E4.)
 
 ## Межі доступу
 - **RLS** — головний захист даних (див. DATA_MODEL; таблиця без політик не їде в прод).
-- Адмінка/адмін-API — guard на кожному роуті; новий роут = той самий патерн перевірки.
+- Адмінка/адмін-API — guard із `lib/admin-auth.ts` на кожному роуті. Вхід лише через сервер (`/api/admin/login`), сесія = підписаний httpOnly-cookie на 12 год, пароль від 16 символів.
+- Колонки `profiles`, які визначає сервер (`telegram_chat_id`, `email`, статус підписки), клієнт змінювати не може (міграція 0008).
+- Ліміти публічних форм і AI — спільні, через `lib/rate-limit.ts`; push — лише на дозволені адреси (`lib/push/endpoint.ts`).
 - Webhook TG — перевірка `TELEGRAM_WEBHOOK_SECRET`-заголовка (наявний патерн, не послаблювати).
 - Crons — Bearer `CRON_SECRET`.
 

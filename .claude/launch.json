@@ -10,7 +10,7 @@
     {
       "name": "admin-safe-local",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["BLOB_READ_WRITE_TOKEN=", "LOCAL_CONTENT_DIR=.local-content", "npx", "next", "dev", "-p", "3010"],
+      "runtimeArgs": ["BLOB_READ_WRITE_TOKEN=", "LOCAL_CONTENT_DIR=.local-content", "ADMIN_PASSWORD=local-dev-only-password", "npx", "next", "dev", "-p", "3010"],
       "port": 3010
     }
   ]

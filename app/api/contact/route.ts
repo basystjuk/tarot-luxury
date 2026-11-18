@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_SERVICES, type ServiceItem } from "@/lib/data/services";
 import { loadPublicContent } from "@/lib/public-content";
+import { clientIp, consumeRateLimit } from "@/lib/rate-limit";
+import { cleanText, readJsonBody } from "@/lib/request-limits";
+
+const MAX_LEADS_PER_HOUR = 5;
+const BODY_LIMIT_BYTES = 16 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, contactType, contact, topic, message, currency } =
-      await req.json();
+    if (!(await consumeRateLimit("contact", clientIp(req), MAX_LEADS_PER_HOUR, 60 * 60))) {
+      return NextResponse.json({ error: "rate_limit" }, { status: 429 });
+    }
 
-    if (!name?.trim() || !contact?.trim()) {
+    const parsed = await readJsonBody(req, BODY_LIMIT_BYTES);
+    if (parsed.deny) return parsed.deny;
+
+    // Caps keep the assembled text under Telegram's 4096-character limit.
+    const { contactType } = parsed.data;
+    const name = cleanText(parsed.data.name, 100);
+    const contact = cleanText(parsed.data.contact, 200);
+    const topic = cleanText(parsed.data.topic, 200);
+    const message = cleanText(parsed.data.message, 3000);
+    const currency = cleanText(parsed.data.currency, 20);
+
+    if (!name || !contact) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -48,16 +65,16 @@ export async function POST(req: NextRequest) {
     const parts: string[] = [
       `❤️ *${esc(topicLine)}*`,
       ``,
-      `👤 Name: ${esc(name.trim())}`,
-      `📲 ${methodLabel} ${esc(contact.trim())}`,
+      `👤 Name: ${esc(name)}`,
+      `📲 ${methodLabel} ${esc(contact)}`,
     ];
 
-    if (currency?.trim()) {
-      parts.push(`💲 ${esc(currency.trim())}`);
+    if (currency) {
+      parts.push(`💲 ${esc(currency)}`);
     }
 
-    if (message?.trim()) {
-      parts.push(``, `📜 ${esc(message.trim())}`);
+    if (message) {
+      parts.push(``, `📜 ${esc(message)}`);
     }
 
     const text = parts.join("\n");

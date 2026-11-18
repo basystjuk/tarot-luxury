@@ -3,13 +3,13 @@ import { renderTemplate, resolvePrompt, getLanguageName, type PromptOverrides } 
 import { loadPromptOverrides } from "@/lib/server-content";
 import { isPreviewFromRequest } from "@/lib/preview";
 import { requireAiAuth, checkPerUserDailyRate } from "@/lib/auth/gate";
+import { readJsonBody } from "@/lib/request-limits";
 
 export const maxDuration = 30;
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 // Per-user, per-Kyiv-day quota (one synastry reading/day/user).
-const userMap = new Map<string, { day: string }>();
 
 interface CompatibilityRequest {
   language: "uk" | "ru" | "en";
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
   if (!isPreviewFromRequest(req)) {
     const gate = await requireAiAuth();
     if (gate.deny) return gate.deny;
-    if (!checkPerUserDailyRate(userMap, gate.user!.id)) {
+    if (!(await checkPerUserDailyRate("compatibility-reading", gate.user!.id))) {
       return NextResponse.json(
         { error: "rate_limit", message: "1 розбір сумісності на добу. Повертайся завтра ✨" },
         { status: 429 }
@@ -172,8 +172,11 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "not_configured" }, { status: 500 });
 
+  const parsed = await readJsonBody<CompatibilityRequest>(req);
+  if (parsed.deny) return parsed.deny;
+
   try {
-    const data = (await req.json()) as CompatibilityRequest;
+    const data = parsed.data;
 
     const { dataBlock, relDirective } = buildPromptVars(data);
     const overrides = (await loadPromptOverrides()) as PromptOverrides | null;

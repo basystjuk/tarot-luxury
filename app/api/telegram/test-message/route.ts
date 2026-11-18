@@ -9,7 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { sendMessage, isTelegramConfigured } from "@/lib/telegram/bot";
+import { sendMessage, isTelegramConfigured, escapeHtml } from "@/lib/telegram/bot";
 
 export async function POST() {
   if (!isTelegramConfigured()) {
@@ -30,7 +30,7 @@ export async function POST() {
     return NextResponse.json({ error: "not_linked" }, { status: 409 });
   }
 
-  const name = profile.display_name ? `, ${profile.display_name}` : "";
+  const name = profile.display_name ? `, ${escapeHtml(profile.display_name)}` : "";
   const ok = await sendMessage(profile.telegram_chat_id,
     `<b>✦ Перевірка зв'язку</b>\n\n` +
     `Привіт${name} ✨\n\n` +

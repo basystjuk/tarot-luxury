@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Clapperboard, RefreshCw } from "lucide-react";
 import { ALL_TOOL_IDS, TOOL_LABELS } from "@/lib/tools-config";
 import { THEME_LABELS, type ThemeTag } from "@/lib/youtube/tags";
-import { adminFetch, ensureAdminCookie, responseError } from "@/components/admin/admin-fetch";
+import { adminFetch, responseError } from "@/components/admin/admin-fetch";
 import { formatDateTime } from "@/components/admin/format";
 import { Button, Card, EmptyState, Notice, PageHeader, Skeleton, Switch, useToast } from "@/components/admin/ui";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,6 @@ export default function VideosPage() {
 
   const load = useCallback(async () => {
     try {
-      await ensureAdminCookie();
       const res = await adminFetch("/api/admin/videos");
       if (!res.ok) throw new Error(await responseError(res));
       setVideos((await res.json()).videos ?? []);
@@ -73,7 +72,6 @@ export default function VideosPage() {
   const resync = async () => {
     setSyncing(true);
     try {
-      await ensureAdminCookie();
       const res = await adminFetch("/api/admin/videos/resync", { method: "POST" });
       if (!res.ok) throw new Error(await responseError(res));
       const j = await res.json();

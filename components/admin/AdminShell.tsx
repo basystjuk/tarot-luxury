@@ -12,34 +12,50 @@ import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from "
 import { ArrowUpRight, Download, Eye, EyeOff, LogOut, Menu, RefreshCw, Save, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContentSection } from "@/lib/content-validation";
-import { ADMIN_PASSWORD, downloadJson } from "./admin-fetch";
+import { ADMIN_SESSION_EXPIRED_EVENT, downloadJson } from "./admin-fetch";
 import { AdminContentProvider, useAdminContent } from "./content-context";
 import { plural } from "./format";
 import { NAV, SECTION_HREF } from "./nav";
 import { Badge, Button, ConfirmProvider, IconButton, Notice, ToastProvider, useConfirm } from "./ui";
 
-// ── Sign-in state (per browser tab, like before) ──────────────────────────
+// ── Sign-in state (the server decides; the session cookie is httpOnly) ────
 
-const AUTH_KEY = "admin_auth";
-const AUTH_EVENT = "ellen-admin-auth";
+let signedInState: boolean | null = null;
+let sessionChecked = false;
+const authListeners = new Set<() => void>();
+
+function setSignedIn(on: boolean) {
+  signedInState = on;
+  authListeners.forEach((notify) => notify());
+}
+
+function checkSession() {
+  if (sessionChecked) return;
+  sessionChecked = true;
+  fetch("/api/admin/session", { cache: "no-store" })
+    .then((res) => (res.ok ? res.json() : { signedIn: false }))
+    .then((j: { signedIn?: boolean }) => setSignedIn(j.signedIn === true))
+    .catch(() => setSignedIn(false));
+}
 
 function subscribeAuth(onChange: () => void) {
-  window.addEventListener(AUTH_EVENT, onChange);
-  return () => window.removeEventListener(AUTH_EVENT, onChange);
-}
-function setSignedIn(on: boolean) {
-  if (on) sessionStorage.setItem(AUTH_KEY, "1");
-  else sessionStorage.removeItem(AUTH_KEY);
-  window.dispatchEvent(new Event(AUTH_EVENT));
+  const onExpired = () => setSignedIn(false);
+  authListeners.add(onChange);
+  window.addEventListener(ADMIN_SESSION_EXPIRED_EVENT, onExpired);
+  checkSession();
+  return () => {
+    authListeners.delete(onChange);
+    window.removeEventListener(ADMIN_SESSION_EXPIRED_EVENT, onExpired);
+  };
 }
 
 export default function AdminShell({ children }: { children: ReactNode }) {
   const signedIn = useSyncExternalStore<boolean | null>(
     subscribeAuth,
-    () => sessionStorage.getItem(AUTH_KEY) === "1",
+    () => signedInState,
     () => null,
   );
-  if (signedIn === null) return null; // server render — sign-in lives in the browser
+  if (signedIn === null) return null; // still asking the server
   if (!signedIn) return <SignIn />;
   return (
     <ToastProvider>
@@ -52,15 +68,38 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   );
 }
 
+const SIGN_IN_FAILED = "Не вдалося увійти. Спробуйте ще раз";
+const SIGN_IN_ERRORS: Record<number, string> = {
+  401: "Невірний пароль",
+  429: "Забагато спроб. Спробуйте через 15 хвилин",
+  503: "Вхід вимкнено: на сервері не задано надійний пароль адмінки",
+};
+
 function SignIn() {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
-  const [wrong, setWrong] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) setSignedIn(true);
-    else setWrong(true);
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setSignedIn(true);
+        return;
+      }
+      setError(SIGN_IN_ERRORS[res.status] ?? SIGN_IN_FAILED);
+    } catch {
+      setError(SIGN_IN_FAILED);
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -83,13 +122,13 @@ function SignIn() {
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setWrong(false);
+                  setError(null);
                 }}
-                aria-invalid={wrong || undefined}
-                aria-describedby={wrong ? "admin-password-error" : undefined}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? "admin-password-error" : undefined}
                 className={cn(
                   "w-full rounded-xl border bg-white py-2.5 pl-3.5 pr-12 text-base focus:outline-none focus:ring-2 focus:ring-[var(--gold-400)]/40 sm:text-sm",
-                  wrong ? "border-[var(--danger)]/60" : "border-[var(--sand-200)]",
+                  error ? "border-[var(--danger)]/60" : "border-[var(--sand-200)]",
                 )}
               />
               <button
@@ -101,13 +140,13 @@ function SignIn() {
                 {show ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {wrong && (
+            {error && (
               <p id="admin-password-error" role="alert" className="mt-1.5 text-sm text-[var(--danger)]">
-                Невірний пароль
+                {error}
               </p>
             )}
           </div>
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full" loading={submitting} disabled={!password}>
             Увійти
           </Button>
         </form>
@@ -182,6 +221,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       });
       if (!ok) return;
     }
+    await fetch("/api/admin/logout", { method: "POST" }).catch(() => null);
     setSignedIn(false);
   };
 
