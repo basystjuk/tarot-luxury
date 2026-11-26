@@ -15,6 +15,21 @@ export interface ServiceItem {
   includes_en: string[];
 }
 
+/**
+ * The cheapest price as written in the admin ("$30"), for "from $X" texts.
+ * Prices without a number are skipped; null when none has one.
+ */
+export function lowestPrice(services: Pick<ServiceItem, "price">[]): string | null {
+  let best: { n: number; text: string } | null = null;
+  for (const { price } of services) {
+    const m = /\d+(?:[.,]\d+)?/.exec(price ?? "");
+    if (!m) continue;
+    const n = Number(m[0].replace(",", "."));
+    if (!best || n < best.n) best = { n, text: price.trim() };
+  }
+  return best?.text ?? null;
+}
+
 export interface OrgItem {
   id: string;
   text_ru: string;

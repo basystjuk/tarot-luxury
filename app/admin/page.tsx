@@ -135,6 +135,13 @@ export default function DashboardPage() {
           ) : !sys ? (
             <Skeleton className="h-16" />
           ) : (
+            <>
+            {sys.content.error && (
+              <Notice tone="danger" className="mb-4" title="Сайт не бачить ваш контент">
+                Сховище контенту зараз не читається, тому відвідувачі бачать стандартні тексти та ціни замість збережених.
+                Ваші дані не втрачені. Передайте це розробнику.
+              </Notice>
+            )}
             <dl className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl bg-[var(--cream-100)] p-3">
                 <dt className="text-xs text-[var(--muted)]">Інтеграції</dt>
@@ -155,6 +162,7 @@ export default function DashboardPage() {
                 </dd>
               </div>
             </dl>
+            </>
           )}
         </Card>
 

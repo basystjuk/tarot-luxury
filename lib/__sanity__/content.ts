@@ -23,6 +23,7 @@ import {
 import { galleryExtension, isGalleryImagePathname } from "../gallery";
 import { STUDIO_TOOL_CARDS, studioOverridesFrom, studioToolTexts, type StudioToolTexts } from "../data/studio-tools";
 import { jsonLd } from "../seo/json-ld";
+import { lowestPrice } from "../data/services";
 
 function eq(label: string, actual: unknown, expected: unknown) {
   const a = JSON.stringify(actual);
@@ -126,8 +127,16 @@ function seo() {
   eq("JSON-LD: same data after parsing", JSON.parse(out).a, "</script><script>alert(1)</script>");
 }
 
+function prices() {
+  eq("lowestPrice: admin order does not matter", lowestPrice([{ price: "$120" }, { price: "$30" }, { price: "$75" }]), "$30");
+  eq("lowestPrice: blank and text-only prices skipped", lowestPrice([{ price: "" }, { price: "за домовленістю" }, { price: " $40 " }]), "$40");
+  eq("lowestPrice: decimals compared as numbers", lowestPrice([{ price: "$9,50" }, { price: "$10" }]), "$9,50");
+  eq("lowestPrice: nothing usable", lowestPrice([{ price: "" }]), null);
+}
+
 (async () => {
   await contentStore();
+  prices();
   gallery();
   studio();
   seo();
