@@ -28,8 +28,9 @@ export async function loadSiteContent(): Promise<Record<string, unknown> | null>
     const data = await loadStoredContent();
     cache = { fetchedAt: now, data };
     return data;
-  } catch {
-    // Fail-soft: never block AI generation on a blob hiccup.
+  } catch (err) {
+    // Fail-soft: never block AI generation on a blob hiccup — but log it.
+    console.error("[content] stored content unreadable, AI uses default prompts:", err);
     cache = { fetchedAt: now, data: null };
     return null;
   }

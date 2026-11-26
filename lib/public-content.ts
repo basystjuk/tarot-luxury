@@ -30,7 +30,10 @@ export async function loadPublicContent(): Promise<PublicContent> {
   let stored: Record<string, unknown> | null = null;
   try {
     stored = await loadStoredContent();
-  } catch {
+  } catch (err) {
+    // Visitors still get the defaults, but this must show up in the logs:
+    // a silent fallback hid a broken read for seven weeks (RETROSPECTIVE).
+    console.error("[content] stored content unreadable, serving code defaults:", err);
     stored = null;
   }
   if (!stored) return contentDefaults();
