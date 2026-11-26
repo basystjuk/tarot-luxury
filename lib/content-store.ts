@@ -73,13 +73,19 @@ const byNewest = (a: BackupInfo, b: BackupInfo) => b.at.localeCompare(a.at);
 
 const blobStore: ContentStore = {
   async read() {
-    const res = await get(CONTENT_BLOB, { access: "public", useCache: false });
+    // No `useCache: false`: this store answers its `?cache=0` URL with 400, and
+    // that silently put the whole site on code defaults (2026-10-08 → 11-26).
+    // Overwrites purge the CDN copy, so a plain read is fresh after a save.
+    const res = await get(CONTENT_BLOB, { access: "public" });
     if (!res || res.statusCode !== 200) return null;
     const text = await new Response(res.stream).text();
+    // The CDN may send a weak ETag (W/"…"); put({ ifMatch }) only accepts the
+    // strong form, so a weak one would turn every save into a 409.
+    const etag = res.blob.etag.replace(/^W\//, "");
     // put() only sends ifMatch when it is non-empty — an empty ETag would turn
     // every later write into a blind overwrite, so treat it as a read failure.
-    if (!res.blob.etag) throw new Error("Content blob response carried no ETag");
-    return { text, etag: res.blob.etag };
+    if (!etag) throw new Error("Content blob response carried no ETag");
+    return { text, etag };
   },
   async write(text, ifMatch) {
     try {
@@ -120,7 +126,7 @@ const blobStore: ContentStore = {
   async readBackup(id) {
     // Only ever read from the backup folder — the id comes from the client.
     if (!id.startsWith(BACKUP_PREFIX) || id.includes("..")) return null;
-    const res = await get(id, { access: "public", useCache: false });
+    const res = await get(id, { access: "public" }); // never overwritten — no cache concern
     if (!res || res.statusCode !== 200) return null;
     return await new Response(res.stream).text();
   },

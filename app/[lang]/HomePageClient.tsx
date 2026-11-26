@@ -12,6 +12,7 @@ import ToolsCarousel from "@/components/home/ToolsCarousel";
 import * as Accordion from "@radix-ui/react-accordion";
 import { useLanguage } from '@/hooks/useLanguage';
 import { isToolEnabled, type ToolId } from "@/lib/tools-config";
+import { DEFAULT_SERVICES, type ServiceItem } from "@/lib/data/services";
 
 export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
   const { language } = useLanguage();
@@ -24,6 +25,8 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
   } | null>(null);
   const [toolsEnabled, setToolsEnabled] = React.useState<Partial<Record<ToolId, boolean>> | null>(null);
   const [previewMode, setPreviewMode] = React.useState(false);
+  // Prices come from the admin (services list); code defaults until it loads.
+  const [apiServices, setApiServices] = React.useState<ServiceItem[]>(DEFAULT_SERVICES);
 
   React.useEffect(() => {
     fetch("/api/content")
@@ -31,6 +34,7 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
       .then(d => {
         if (d.about) setApiAbout(d.about);
         if (d.tools_enabled) setToolsEnabled(d.tools_enabled);
+        if (Array.isArray(d.services) && d.services.length) setApiServices(d.services);
         setPreviewMode(Boolean(d.preview));
       })
       .catch(() => {});
@@ -251,18 +255,22 @@ export default function HomePageClient({ photoUrl }: { photoUrl: string }) {
     },
   ];
 
+  const priceOf = (id: string) =>
+    apiServices.find((s) => s.id === id)?.price ??
+    DEFAULT_SERVICES.find((s) => s.id === id)?.price ?? "";
+
   const services = isRu ? [
-    { icon: "❓", title: "Один вопрос", description: "Детальный анализ одного волнующего вопроса через призму карт таро.", price: "$20", href: `/${language}/services#question` },
-    { icon: "💕", title: "Расклад Амур", description: "Специализированный расклад на любовь и отношения — шесть ключевых аспектов.", price: "$60", href: `/${language}/services#amor` },
-    { icon: "✨", title: "Онлайн таро сессия", description: "Общение, после которого становится легче и обретается внутреннее спокойствие.", price: "$100", href: `/${language}/services#session` },
+    { icon: "❓", title: "Один вопрос", description: "Детальный анализ одного волнующего вопроса через призму карт таро.", price: priceOf("question"), href: `/${language}/services#question` },
+    { icon: "💕", title: "Расклад Амур", description: "Специализированный расклад на любовь и отношения — шесть ключевых аспектов.", price: priceOf("amor"), href: `/${language}/services#amor` },
+    { icon: "✨", title: "Онлайн таро сессия", description: "Общение, после которого становится легче и обретается внутреннее спокойствие.", price: priceOf("session"), href: `/${language}/services#session` },
   ] : isEn ? [
-    { icon: "❓", title: "One Question", description: "Detailed analysis of one burning question through the lens of tarot cards.", price: "$20", href: `/${language}/services#question` },
-    { icon: "💕", title: "Amour Spread", description: "A specialised spread for love and relationships — six key aspects.", price: "$60", href: `/${language}/services#amor` },
-    { icon: "✨", title: "Online Tarot Session", description: "A conversation after which you feel lighter and find inner peace.", price: "$100", href: `/${language}/services#session` },
+    { icon: "❓", title: "One Question", description: "Detailed analysis of one burning question through the lens of tarot cards.", price: priceOf("question"), href: `/${language}/services#question` },
+    { icon: "💕", title: "Amour Spread", description: "A specialised spread for love and relationships — six key aspects.", price: priceOf("amor"), href: `/${language}/services#amor` },
+    { icon: "✨", title: "Online Tarot Session", description: "A conversation after which you feel lighter and find inner peace.", price: priceOf("session"), href: `/${language}/services#session` },
   ] : [
-    { icon: "❓", title: "Одне питання", description: "Детальний аналіз одного хвилюючого питання через призму карт таро.", price: "$20", href: `/${language}/services#question` },
-    { icon: "💕", title: "Розклад Амур", description: "Спеціалізований розклад на любов і стосунки — шість ключових аспектів.", price: "$60", href: `/${language}/services#amor` },
-    { icon: "✨", title: "Онлайн таро сесія", description: "Спілкування, після якого стає легше і знаходиш внутрішній спокій.", price: "$100", href: `/${language}/services#session` },
+    { icon: "❓", title: "Одне питання", description: "Детальний аналіз одного хвилюючого питання через призму карт таро.", price: priceOf("question"), href: `/${language}/services#question` },
+    { icon: "💕", title: "Розклад Амур", description: "Спеціалізований розклад на любов і стосунки — шість ключових аспектів.", price: priceOf("amor"), href: `/${language}/services#amor` },
+    { icon: "✨", title: "Онлайн таро сесія", description: "Спілкування, після якого стає легше і знаходиш внутрішній спокій.", price: priceOf("session"), href: `/${language}/services#session` },
   ];
 
   const faqs = isRu ? [
